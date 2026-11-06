@@ -8,8 +8,8 @@ standard library (recompiled from its TASTy) and a Java standard library written
 See [docs/design.md](docs/design.md) for the architecture, object model, status and roadmap.
 
 **Status:** early, but real programs work. Classes, traits, objects, exceptions, pattern
-matching, lambdas, `lazy val` and the standard collections all run. Concurrency, Go interop,
-`BigDecimal`, regex and reflection don't yet.
+matching, lambdas, `lazy val` and the standard collections all run, and Scala code can call Go
+packages. Concurrency, `BigDecimal`, regex and reflection don't work yet.
 
 ## Using it with Mill
 
@@ -37,6 +37,37 @@ val g = "Grüße".toGoString    // a Go string on Go, a byte array on the JVM
 g.byteLength                  // 7
 ```
 
+## Calling Go
+
+Declare the Go API you need as a facade. The linker checks it against the real Go package and
+converts values at the boundary:
+
+```scala
+import scalago.go.*
+
+@GoImport("strings")
+object strings:
+  def Repeat(s: String, count: Int): String = native          // count is a Go int
+  def FieldsFunc(s: String, f: Int => Boolean): Array[String] = native
+  class Builder:                                              // strings.Builder (new = zero value)
+    def WriteString(s: String): Int = native                  // the (int, error) error is checked
+    def String(): String = native
+
+@GoImport("strconv")
+object strconv:
+  def Atoi(s: String): Int = native                           // a non-nil error throws GoException
+  def ParseBool(s: String): (Boolean, GoError) = native       // or keep the error
+
+@GoImport("io")
+object io:
+  trait Writer:                                               // Go interfaces can be implemented in Scala
+    def Write(p: Array[Byte]): Int                            // ([]byte) (int, error)
+```
+
+Go modules other than the standard library go in `goRequires` (`"module@version"`), or in
+`goLocalModules` for local directories with a `go.mod` (see `example/`). Facade members throw on
+the JVM. See [docs/design.md](docs/design.md#go-interop) for the conversion rules.
+
 ## Layout
 
 | Path                 | What                                                                    |
@@ -45,8 +76,9 @@ g.byteLength                  // 7
 | `plugin/`            | Scala 3 compiler plugin (phase `genGoIR`)                               |
 | `linker/`            | Linker: lambdas, reachability, Go codegen; CLI `scalago.linker.Main`    |
 | `runtime/rt/`        | Go runtime package (strings, exceptions, natives), bundled in the linker |
+| `runtime/goapi/`     | Helper the linker runs to read the APIs of Go packages                  |
 | `javalib/`           | JDK classes in Scala (emitted as `java.*`) and Scala-library overrides  |
-| `library/`           | User-facing APIs (`scalago.go.GoString`)                                |
+| `library/`           | User-facing APIs (`GoString`, Go facades: `GoImport`, `GoException`)    |
 | `mill-build/src/`    | `ScalaGoModule`, used by this build and published as `mill-scalago`     |
 | `example/`           | A program built with `ScalaGoModule`: `mill example.goRun Ada Grace`    |
 | `tests/cases/`       | End-to-end programs with their expected output                          |
@@ -61,7 +93,9 @@ cd runtime && go test ./...      # runtime unit tests
 mill example.goRun               # the example, through ScalaGoModule
 ```
 
-Each directory in `tests/cases/` holds a program and an `expected.txt`. The entry point is
+Each directory in `tests/cases/` holds a program and an `expected.txt`. Cases with a
+`go-only.txt` (they call Go) skip the JVM, subdirectories with a `go.mod` are local Go modules, and
+a `link-errors.txt` lists errors that linking must report instead of running. The entry point is
 `Main` unless `main.txt` names another one. The test compiles the program with the plugin and
 runs it on the JVM. It then links it to Go, runs `go vet` and `go build`, and runs the binary.
 Both outputs must equal `expected.txt`. The work directory of a failing case is kept under

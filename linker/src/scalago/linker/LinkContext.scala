@@ -14,7 +14,10 @@ final class Errors:
 /** Shared state for code generation after analysis: Go types, and the program-wide helpers
  *  (string literals, dispatchers, type tests) that method bodies request.
  */
-final class LinkContext(val program: Program, val analyzer: Analyzer, val errors: Errors):
+final class LinkContext(val program: Program, val analyzer: Analyzer, val errors: Errors, val goApi: GoApi = GoApi.empty):
+  /** Go facades: conversions, calls and Go types (see [[GoInterop]]). */
+  val interop: GoInterop = GoInterop(this)
+
   /** Classes that exist at run time: instantiated ones and their ancestors. They get Go types. */
   val declared: Set[ClassName] =
     val instantiated = analyzer.instantiated.toSet
@@ -56,6 +59,7 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
   /** A Go boolean expression testing whether `e` (any reference) is an instance of `t`. */
   def typeTest(e: String, t: Type): String = t match
     case Type.Class(ClassName.Object)           => s"($e != nil)"
+    case Type.Class(c) if program.isFacade(c)   => interop.typeTest(e, c)
     case Type.Class(c) if Hijacked.isHijacked(c) => s"rt.Is[${Hijacked.instanceGoType(c)}]($e)"
     case Type.Class(c) =>
       if Hijacked.subclassesOf(c).nonEmpty then
@@ -70,6 +74,12 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
   def cast(e: String, from: Type, to: Type): String =
     val target = goType(to)
     val source = goType(from)
+    to match
+      case _ if from == to                       => e
+      case Type.Class(c) if program.isFacade(c)  => interop.cast(e, c)
+      case _                                     => castTo(e, to, source, target)
+
+  private def castTo(e: String, to: Type, source: String, target: String): String =
     if target.isEmpty || target == source then e
     else if target == "any" then
       to match

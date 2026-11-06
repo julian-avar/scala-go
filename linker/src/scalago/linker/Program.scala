@@ -11,11 +11,31 @@ import scalago.ir.*
  */
 final class Program(irClasses: Seq[ClassDef]):
   private val byName = mutable.LinkedHashMap.empty[ClassName, ClassDef]
-  for c <- irClasses if !byName.contains(c.name) do byName(c.name) = c
+  /** Go facades are kept apart: they are not part of the generated object model. */
+  private val facadesByName = mutable.LinkedHashMap.empty[ClassName, ClassDef]
+  for c <- irClasses if !byName.contains(c.name) && !facadesByName.contains(c.name) do
+    if c.goFacade.isDefined then facadesByName(c.name) = c else byName(c.name) = c
 
   def classes: Iterable[ClassDef] = byName.values
   def get(name: ClassName): Option[ClassDef] = byName.get(name)
   def contains(name: ClassName): Boolean = byName.contains(name)
+
+  def facade(name: ClassName): Option[ClassDef] = facadesByName.get(name)
+  def isFacade(name: ClassName): Boolean = facadesByName.contains(name)
+
+  /** The facade member `m` of facade `cls` or of the facades it extends. */
+  def facadeMember(cls: ClassName, m: MethodName): Option[(ClassDef, MethodDef)] =
+    facade(cls).flatMap { f =>
+      f.methods.find(d => d.name == m && d.goMember.isDefined).map(f -> _)
+        .orElse((f.superClass.toList ++ f.interfaces).iterator.map(facadeMember(_, m)).collectFirst { case Some(r) => r })
+    }
+
+  /** The facades among the ancestors of `cls` (Go interfaces that a Scala class implements). */
+  def facadeAncestors(cls: ClassName): List[ClassName] =
+    def all(c: ClassName): List[ClassName] =
+      val parents = get(c).orElse(facade(c)).toList.flatMap(d => d.superClass.toList ++ d.interfaces)
+      parents ++ parents.flatMap(all)
+    all(cls).distinct.filter(isFacade)
 
   /** Adds (or replaces) a class created by the linker (lambda classes). */
   def addSynthetic(c: ClassDef): Unit =

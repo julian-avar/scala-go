@@ -19,6 +19,8 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
   val reachedMethods = mutable.LinkedHashSet.empty[(ClassName, MethodName)]
   val staticInit = mutable.LinkedHashSet.empty[ClassName]
   val usedStaticFields = mutable.LinkedHashSet.empty[(ClassName, String)]
+  /** Go facades used by reachable code: their packages' APIs are loaded for code generation. */
+  val usedFacades = mutable.LinkedHashSet.empty[ClassName]
   private val bodies = mutable.HashMap.empty[(ClassName, MethodName), Tree]
   private val queue = mutable.Queue.empty[(ClassName, MethodName)]
 
@@ -34,6 +36,14 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
     if instantiated.add(cls) then
       current.foreach(instantiatedFrom(cls) = _)
       for (m, impl) <- program.vtable(cls) if calledNames.contains(m) do reach(impl, m)
+      // Go interfaces implemented in Scala: Go code may call any of their methods.
+      for f <- program.facadeAncestors(cls) do
+        useFacade(f)
+        reachGoException()
+        for fd <- program.facade(f); m <- fd.methods; g <- m.goMember do
+          g.params.foreach(useScalaType(_, toScala = true))
+          useScalaType(g.result, toScala = false)
+          callVirtual(m.name)
 
   def callVirtual(m: MethodName): Unit =
     if calledNames.add(m) then
@@ -79,6 +89,47 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
   private def scan(tree: Tree): Unit =
     def scanAll(trees: List[Tree]): Unit = trees.foreach(scan)
     tree match
+      case New(cls, _, args) if program.isFacade(cls) =>
+        val facade = program.facade(cls).get
+        if facade.kind == ClassKind.Interface || facade.goFacade.exists(_.isPackage) then
+          error(tree, s"cannot instantiate Go facade $cls: only Go types that are not interfaces have zero values")
+        useFacade(cls)
+        scanAll(args)
+
+      case LoadModule(cls) if program.isFacade(cls) =>
+        error(tree, s"the Go package facade $cls can only be used to call its members")
+
+      case Apply(receiver, decl, m, args, _) if program.facadeMember(decl, m).isDefined =>
+        val (facade, member) = program.facadeMember(decl, m).get
+        useFacade(decl)
+        useFacade(facade.name)
+        val g = member.goMember.get
+        receiver match
+          case LoadModule(c) if program.isFacade(c) => ()
+          case _                                    => scan(receiver)
+        for (arg, t) <- args.zip(g.params) do
+          useScalaType(t, toScala = false)
+          GoInterop.varargsArray(arg) match
+            case Some(array) => scan(array)
+            case None        => scan(arg)
+        useScalaType(g.result, toScala = true)
+        reachGoException()
+
+      case ApplyStatically(receiver, cls, m, args, _) if program.isFacade(cls) =>
+        if !m.isConstructor && m.simple != "$init$" then error(tree, s"non-virtual call of Go facade member $cls.$m")
+        else if program.facade(cls).exists(_.kind != ClassKind.Interface) then
+          error(tree, s"Scala classes cannot extend Go facade class $cls (Go interfaces, as traits, can be implemented)")
+        scan(receiver)
+        scanAll(args)
+
+      case IsInstanceOf(expr, Type.Class(cls)) if program.isFacade(cls) =>
+        useFacade(cls)
+        scan(expr)
+
+      case AsInstanceOf(expr, Type.Class(cls)) if program.isFacade(cls) =>
+        useFacade(cls)
+        scan(expr)
+
       case New(cls, ctor, args) =>
         if Natives.lookup(cls, ctor).isEmpty then
           program.get(cls) match
@@ -137,6 +188,52 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
 
       case _ =>
         Traversal.children(tree).foreach(scan)
+
+  private def useFacade(cls: ClassName): Unit =
+    if program.isFacade(cls) then usedFacades += cls
+
+  /** Makes reachable what converting a value of Scala type `t` to Go (or from Go) needs. */
+  private def useScalaType(t: ScalaType, toScala: Boolean): Unit = t match
+    case ScalaType.Ref(name, args) =>
+      useFacade(name)
+      name match
+        case FunctionArity(n) =>
+          // Go calls the Scala function: apply(Object, ...)Object.
+          callVirtual(MethodName("apply", List.fill(n)(Type.Object), Type.Object))
+          args.init.foreach(useScalaType(_, toScala = true))
+          args.lastOption.foreach(useScalaType(_, toScala = false))
+        case TupleArity(n) if toScala =>
+          val ctor = MethodName(MethodName.ConstructorSimpleName, List.fill(n)(Type.Object), Type.Void)
+          if program.findMethod(name, ctor).isDefined then
+            instantiate(name)
+            reach(name, ctor)
+          args.foreach(useScalaType(_, toScala))
+        case GoInterop.SeqClass if !toScala =>
+          callVirtual(GoInterop.SeqLength)
+          callVirtual(GoInterop.SeqApply)
+          args.foreach(useScalaType(_, toScala))
+        case _ =>
+          args.foreach(useScalaType(_, toScala))
+    case ScalaType.Arr(elem) => useScalaType(elem, toScala)
+    case ScalaType.Prim(_)   => ()
+
+  private var goExceptionReached = false
+
+  /** Go errors are thrown as scalago.go.GoException. */
+  private def reachGoException(): Unit =
+    if !goExceptionReached then
+      goExceptionReached = true
+      if program.findMethod(GoInterop.GoException, GoInterop.GoExceptionConstructor).isDefined then
+        instantiate(GoInterop.GoException)
+        reach(GoInterop.GoException, GoInterop.GoExceptionConstructor)
+
+  private object FunctionArity:
+    def unapply(name: String): Option[Int] =
+      name.stripPrefix("scala.Function").toIntOption.filter(_ => name.startsWith("scala.Function"))
+
+  private object TupleArity:
+    def unapply(name: String): Option[Int] =
+      name.stripPrefix("scala.Tuple").toIntOption.filter(_ => name.startsWith("scala.Tuple"))
 
   private def loadModule(tree: Tree, cls: ClassName): Unit =
     val ctor = MethodName(MethodName.ConstructorSimpleName, Nil, Type.Void)

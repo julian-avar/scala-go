@@ -10,14 +10,19 @@ import scalago.ir.*
 
 /** Links the `.goir` files of a whole program into a Go module that `go build` can compile.
  *
- *  Output layout (the output directory is owned by the linker; previous output is replaced):
+ *  Output layout (the linker owns `main.go` and `internal/`; previous output there is replaced):
  *  {{{
- *  go.mod          module <goModulePath>
- *  main.go         entry point, calls <mainObject>.main(args)
- *  <class>.go      one file per reachable class, all in package main
- *  support.go      string literals, dynamic dispatchers and type tests
- *  rt/             the runtime support package
+ *  go.mod                    module <goModulePath>, with the Go modules facades need
+ *  main.go                   package main: calls scala.Main()
+ *  internal/scala/           package scala: the generated code
+ *    <class>.go              one file per reachable class
+ *    support.go              string literals, dynamic dispatchers and type tests
+ *    entry.go                Main(): runs <mainObject>.main(args); runtime hooks
+ *  internal/rt/              the runtime support package
  *  }}}
+ *  The generated code is not in `package main`, and the root package is a thin facade over it:
+ *  that is where a Go API for Scala code (exports, library builds) will go. `internal/` keeps
+ *  the generated names out of reach of other modules.
  */
 object Linker:
   final case class Config(
@@ -25,7 +30,11 @@ object Linker:
        *  one (what `@main def` generates).
        */
       mainObject: String = "Main",
-      goModulePath: String = "scalagoapp"
+      goModulePath: String = "scalagoapp",
+      /** Go modules the program's facades need, as (module path, version). */
+      goRequires: Seq[(String, String)] = Nil,
+      /** Local directories replacing Go modules, as (module path, directory). */
+      goReplaces: Seq[(String, String)] = Nil
   )
 
   final class LinkingException(val errors: List[String])
@@ -34,6 +43,10 @@ object Linker:
   private val MainMethod = MethodName("main", List(Type.Array(Type.String)), Type.Void)
   private val ModuleConstructor = MethodName(MethodName.ConstructorSimpleName, Nil, Type.Void)
   private val RuntimeResourceDir = "scalago/rt"
+  /** Directory and Go package name of the generated code. */
+  private val ScalaPackageDir = "internal/scala"
+  private val ScalaPackage = "scala"
+  private val RuntimeDir = "internal/rt"
 
   /** Exception classes the runtime instantiates, in the order of `rt.ExceptionKind`. */
   private val runtimeExceptions = List(
@@ -79,36 +92,75 @@ object Linker:
     analyzer.run()
     if errors.all.nonEmpty then throw LinkingException(errors.all)
 
-    val ctx = LinkContext(program, analyzer, errors)
+    // The Go module is set up first: the APIs of the Go packages used are read in its context.
+    prepareOutputDir(outputDir)
+    write(outputDir.resolve("go.mod"), goMod(config))
+    val goPackages = analyzer.usedFacades.toList.flatMap(program.facade).flatMap(_.goFacade).map(_.pkg).filter(_.nonEmpty).distinct.sorted
+    val goApi =
+      try GoApi.load(outputDir, goPackages)
+      catch case e: GoApi.GoApiException => throw LinkingException(List(s"loading Go packages failed: ${e.getMessage}"))
+
+    val ctx = LinkContext(program, analyzer, errors, goApi)
     val classFiles = program.classes.toList
       .sortBy(_.name)
       .map(c => Mangling.fileName(c.name) -> ClassEmitter(ctx, c).emit())
       .filter(_._2.nonEmpty)
-    val main = mainFile(entry, exceptionClasses)
+    val entryFile = entryCode(ctx, entry, exceptionClasses)
     val support = supportFile(ctx)
     if errors.all.nonEmpty then throw LinkingException(errors.all)
 
-    prepareOutputDir(outputDir)
-    write(outputDir.resolve("go.mod"), s"module ${config.goModulePath}\n\ngo 1.22\n")
-    write(outputDir.resolve("main.go"), goFile(config, main))
-    write(outputDir.resolve("support.go"), goFile(config, support))
-    for (fileName, body) <- classFiles do write(outputDir.resolve(fileName), goFile(config, body))
-    copyRuntime(outputDir.resolve("rt"))
+    val scalaDir = Files.createDirectories(outputDir.resolve(ScalaPackageDir))
+    write(outputDir.resolve("main.go"), mainFile(config))
+    write(scalaDir.resolve("entry.go"), goFile(ctx, config, entryFile))
+    write(scalaDir.resolve("support.go"), goFile(ctx, config, support))
+    for (fileName, body) <- classFiles do write(scalaDir.resolve(fileName), goFile(ctx, config, body))
+    copyRuntime(outputDir.resolve(RuntimeDir))
 
-  private def goFile(config: Config, body: String): String =
+  private def goMod(config: Config): String =
+    val sb = StringBuilder(s"module ${config.goModulePath}\n\ngo 1.22\n")
+    if config.goRequires.nonEmpty then
+      sb ++= config.goRequires.map((m, v) => s"\t$m $v\n").mkString("\nrequire (\n", "", ")\n")
+    for (m, dir) <- config.goReplaces do sb ++= s"\nreplace $m => $dir\n"
+    sb.toString
+
+  private def goFile(ctx: LinkContext, config: Config, body: String): String =
     def uses(pkg: String) = s"(?<![A-Za-z0-9_.])$pkg\\.".r.findFirstIn(body).isDefined
+    val goPackages = "(?<![A-Za-z0-9_.])(gp_[A-Za-z0-9_]+)\\.".r.findAllMatchIn(body).map(_.group(1)).toSet.toList.sorted
+      .map(alias => s"$alias \"${ctx.interop.imports(alias)}\"")
     val imports = List(
-      Option.when(uses("rt"))(s"\"${config.goModulePath}/rt\""),
+      Option.when(uses("rt"))(s"\"${config.goModulePath}/$RuntimeDir\""),
       Option.when(uses("math"))("\"math\"")
-    ).flatten
+    ).flatten ++ goPackages
     val importBlock = imports match
       case Nil         => ""
       case List(one)   => s"import $one\n\n"
       case several     => several.mkString("import (\n\t", "\n\t", "\n)\n\n")
-    s"// Code generated by scala-go. DO NOT EDIT.\n\npackage main\n\n$importBlock$body"
+    s"// Code generated by scala-go. DO NOT EDIT.\n\npackage $ScalaPackage\n\n$importBlock$body"
 
-  private def mainFile(entry: String, exceptions: List[(String, ClassName)]): String =
+  /** The program's `main` package: a thin layer over the generated package. */
+  private def mainFile(config: Config): String =
+    s"""// Code generated by scala-go. DO NOT EDIT.
+       |
+       |package main
+       |
+       |import "${config.goModulePath}/$ScalaPackageDir"
+       |
+       |func main() { $ScalaPackage.Main() }
+       |""".stripMargin
+
+  /** `Main()`, which runs the Scala entry point, and the hooks the runtime needs. */
+  private def entryCode(ctx: LinkContext, entry: String, exceptions: List[(String, ClassName)]): String =
     val sb = StringBuilder()
+    if ctx.analyzer.instantiated.contains(GoInterop.GoException) then
+      val struct = Mangling.struct(GoInterop.GoException)
+      sb ++= "func init() {\n"
+      sb ++= "\trt.MakeGoException = func(err error) any {\n"
+      sb ++= s"\t\treturn ${Mangling.newInstance(GoInterop.GoException, GoInterop.GoExceptionConstructor)}(err)\n"
+      sb ++= "\t}\n"
+      sb ++= "\trt.GoExceptionError = func(throwable any) error {\n"
+      sb ++= s"\t\tif e, ok := throwable.(*$struct); ok {\n"
+      sb ++= s"\t\t\treturn rt.Cast[error](e.${Mangling.field("error")})\n"
+      sb ++= "\t\t}\n\t\treturn nil\n\t}\n}\n\n"
     if exceptions.nonEmpty then
       sb ++= "func init() {\n"
       sb ++= "\trt.MakeException = func(kind rt.ExceptionKind, message *rt.String) any {\n"
@@ -117,7 +169,8 @@ object Linker:
         sb ++= s"\t\tcase rt.$kind:\n"
         sb ++= s"\t\t\treturn ${Mangling.newInstance(cls, MessageConstructor)}(message)\n"
       sb ++= "\t\t}\n\t\treturn nil\n\t}\n}\n\n"
-    sb ++= "func main() {\n"
+    sb ++= "// Main runs the Scala program's entry point with the command-line arguments.\n"
+    sb ++= "func Main() {\n"
     sb ++= "\tdefer rt.HandleUncaught()\n"
     sb ++= s"\t$entry\n"
     sb ++= "\trt.FlushStdout()\n"
@@ -177,16 +230,19 @@ object Linker:
       line()
     sb.toString
 
-  /** Removes what a previous link produced: top-level `.go` files and the runtime directory. */
+  /** Removes what a previous link produced: top-level `.go` files and the generated packages
+   *  (also those of the previous layout, where everything was at the top level and in `rt/`).
+   */
   private def prepareOutputDir(dir: Path): Unit =
     Files.createDirectories(dir)
     Using.resource(Files.list(dir)) { entries =>
       entries.iterator.asScala.filter(_.getFileName.toString.endsWith(".go")).foreach(Files.delete)
     }
-    val rt = dir.resolve("rt")
-    if Files.isDirectory(rt) then
-      Using.resource(Files.list(rt))(_.iterator.asScala.foreach(Files.delete))
-      Files.delete(rt)
+    for sub <- List("rt", ScalaPackageDir, RuntimeDir) do
+      val generated = dir.resolve(sub)
+      if Files.isDirectory(generated) then
+        Using.resource(Files.list(generated))(_.iterator.asScala.filter(Files.isRegularFile(_)).foreach(Files.delete))
+        Files.delete(generated)
 
   private def copyRuntime(dest: Path): Unit =
     Files.createDirectories(dest)

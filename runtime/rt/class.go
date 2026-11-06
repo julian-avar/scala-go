@@ -80,8 +80,10 @@ func GetClass(x any) *Class {
 		return ClassOf("[Ljava.lang.Object;")
 	case scalaClassName:
 		return ClassOf(v.ScalaClassName())
+	case *Object:
+		return ClassOf("java.lang.Object")
 	}
-	return ClassOf("java.lang.Object")
+	return ClassOf(foreignClassName(x))
 }
 
 func ClassGetName(c *Class) *String { return Str(c.name) }

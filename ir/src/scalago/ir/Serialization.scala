@@ -11,7 +11,7 @@ import scala.collection.mutable
  */
 object Serialization:
   val Magic: Int = 0x53474f49 // "SGOI"
-  val FormatVersion: Int = 2
+  val FormatVersion: Int = 3
   val FileExtension: String = ".goir"
 
   final class IRFormatException(msg: String) extends IOException(msg)
@@ -137,8 +137,15 @@ object Serialization:
         bool(m.isStatic)
         bool(m.isPrivate)
         pos(m.pos)
+        option(m.goMember) { g => str(g.goName); list(g.params)(scalaType); scalaType(g.result); bool(g.isProperty) }
       }
       pos(c.pos)
+      option(c.goFacade) { f => str(f.pkg); str(f.name) }
+
+    def scalaType(t: ScalaType): Unit = t match
+      case ScalaType.Prim(p)         => { out.writeByte(0); tpe(p) }
+      case ScalaType.Ref(name, args) => { out.writeByte(1); str(name); list(args)(scalaType) }
+      case ScalaType.Arr(elem)       => { out.writeByte(2); scalaType(elem) }
 
     def trees(ts: List[Tree]): Unit = list(ts)(tree)
 
@@ -230,9 +237,16 @@ object Serialization:
       val methods = list {
         val name = method()
         val params = list(ParamDef(str(), tpe()))
-        MethodDef(name, params, option(tree()), bool(), bool(), pos())
+        MethodDef(name, params, option(tree()), bool(), bool(), pos(),
+          option(GoMember(str(), list(scalaType()), scalaType(), bool())))
       }
-      ClassDef(name, kind, isAbstract, superClass, interfaces, fields, methods, pos())
+      ClassDef(name, kind, isAbstract, superClass, interfaces, fields, methods, pos(), option(GoFacade(str(), str())))
+
+    def scalaType(): ScalaType = in.readUnsignedByte() match
+      case 0     => ScalaType.Prim(tpe())
+      case 1     => ScalaType.Ref(str(), list(scalaType()))
+      case 2     => ScalaType.Arr(scalaType())
+      case other => throw IRFormatException(s"unknown Scala type tag $other")
 
     def trees(): List[Tree] = list(tree())
 

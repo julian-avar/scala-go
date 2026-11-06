@@ -19,5 +19,11 @@ object Main {
     names.map(n => s"Hello, $n!").foreach(println)
     val g = "Grüße".toGoString
     println(s"${g.toJavaString}: ${g.byteLength} bytes as a Go string")
+
+    // Calling Go: a standard library package, and a local Go module
+    val words = textstats.Words("It's a truth universally acknowledged...")
+    println(s"${words.length} words, the longest is ${strconv.Quote(textstats.Longest(words))}")
+    try textstats.Longest(Array.empty)
+    catch case e: GoException => println(s"Go error: ${e.getMessage}")
   }
 }

@@ -88,6 +88,7 @@ final class ClassEmitter(ctx: LinkContext, cls: ClassDef):
       line(s"func (this *$struct) ${Mangling.virtualMethod(m)}${signature(m, args)} { $body }")
     for i <- program.allInterfaces(name) do line(s"func (this *$struct) ${Mangling.marker(i)}() {}")
     line(s"func (this *$struct) ScalaClassName() string { return ${FunctionEmitter.goStringLiteral(name)} }")
+    ctx.interop.exportedMethods(cls, struct).foreach(line(_))
     line()
     for ctor <- cls.methods if ctor.name.isConstructor && analyzer.reachedMethods.contains((name, ctor.name)) do
       val args = ctor.params.map(p => Mangling.local(p.name))

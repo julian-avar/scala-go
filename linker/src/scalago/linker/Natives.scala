@@ -146,6 +146,17 @@ object Natives:
   for t <- List("Z", "I", "J", "F", "D") do staticFn(S, s"valueOf($t)Ljava.lang.String;", "rt.StringValueOf")
   staticFn(S, "format(Ljava.lang.String;[Ljava.lang.Object;)Ljava.lang.String;", "rt.StringFormat")
   instanceFn(S, "getChars(II[CI)V", "rt.StringGetChars")
+  // Charsets are represented by their names (see rt.NewStringFromBytes).
+  private val utf8 = "rt.Str(\"UTF-8\")"
+  static(S, "<init>([B)V")(as => s"rt.NewStringFromBytes(${as.head}, $utf8)")
+  staticFn(S, "<init>([BLjava.lang.String;)V", "rt.NewStringFromBytes")
+  staticFn(S, "<init>([BLjava.nio.charset.Charset;)V", "rt.NewStringFromBytes")
+  instance(S, "getBytes()[B")((r, _) => s"rt.StringGetBytes($r, $utf8)")
+  instanceFn(S, "getBytes(Ljava.lang.String;)[B", "rt.StringGetBytes")
+  instanceFn(S, "getBytes(Ljava.nio.charset.Charset;)[B", "rt.StringGetBytes")
+  for (field, name) <- List("UTF_8" -> "UTF-8", "ISO_8859_1" -> "ISO-8859-1", "US_ASCII" -> "US-ASCII") do
+    staticFields(("java.nio.charset.StandardCharsets", field)) = s"any(rt.Str(\"$name\"))"
+  instanceFn("java.nio.charset.Charset", "name()Ljava.lang.String;", "rt.ToString")
 
   // ---- java.lang.Class ------------------------------------------------------------------------
 

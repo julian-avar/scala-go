@@ -1,0 +1,6 @@
+Main.scala:16:35: Go facade member strings.NoSuchFunction: Go package strings has no exported function, variable or constant NoSuchFunction
+Main.scala:17:27: Go facade member strings.Repeat: cannot pass Scala type java.lang.String as Go type int
+Main.scala:18:26: Go facade member strings.Split: cannot convert Go type []string to Scala type java.lang.String
+Main.scala:19:26: Go facade member strings.Count: the Go declaration has 2 parameters: (string, string) int
+Main.scala:20:42: Go facade member strings.Builder.Missing: Go type strings.Builder has no exported method or field Missing
+Main.scala:21:13: new strings.Nope: Go package strings has no exported type Nope (facade strings.Nope)

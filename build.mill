@@ -165,8 +165,12 @@ object linker extends ScalaGoModule with Published {
       .sortBy(_.last)
     files.foreach(f => os.copy.into(f, dest))
     os.write(dest / "files.txt", files.map(_.last).mkString("", "\n", "\n"))
+    // The goapi helper, which the linker runs to read the APIs of Go packages.
+    os.copy(goApiHelper().path, Task.dest / "scalago" / "goapi" / "main.go", createFolders = true)
     PathRef(Task.dest)
   }
+
+  def goApiHelper = Task.Source(moduleDir / os.up / "runtime" / "goapi" / "main.go")
 
   def resources = Task { super.resources() :+ goRuntimeResources() }
 
@@ -207,4 +211,5 @@ object example extends UserScalaGoModule {
   def scalaGoLibraryIR = Task { Seq(javalib.compile().classes, stdlib.ir()) }
   def scalaGoLibraryDeps = Task { Seq.empty[Dep] }
   def moduleDeps = Seq(library)
+  def goLocalModules = Task.Sources(moduleDir / "go" / "textstats")
 }

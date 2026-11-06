@@ -333,3 +333,61 @@ func StringGetChars(s *String, srcBegin, srcEnd int32, dst *Array[uint16], dstBe
 	s.checkRange(srcBegin, srcEnd)
 	copy(dst.Data[dstBegin:], s.chars[srcBegin:srcEnd])
 }
+
+// ---- Charsets ------------------------------------------------------------------------------------
+//
+// A java.nio.charset.Charset is represented by its name (a *String). UTF-8, ISO-8859-1 and
+// US-ASCII are supported.
+
+func charsetOf(charset any) string {
+	name := strings.ToUpper(strings.ReplaceAll(ToGoString(charset), "_", "-"))
+	switch name {
+	case "UTF-8", "UTF8":
+		return "UTF-8"
+	case "ISO-8859-1", "ISO8859-1", "LATIN1":
+		return "ISO-8859-1"
+	case "US-ASCII", "ASCII":
+		return "US-ASCII"
+	}
+	ThrowKind(UnsupportedOperation, "unsupported charset: "+ToGoString(charset))
+	return ""
+}
+
+// NewStringFromBytes implements new String(bytes, charset).
+func NewStringFromBytes(a *Array[int8], charset any) *String {
+	bytes := Reinterpret[int8, byte](a.Data)
+	switch charsetOf(charset) {
+	case "UTF-8":
+		return Str(string(bytes))
+	default:
+		chars := make([]uint16, len(bytes))
+		for i, b := range bytes {
+			chars[i] = uint16(b)
+			if b >= 0x80 && charsetOf(charset) == "US-ASCII" {
+				chars[i] = 0xfffd
+			}
+		}
+		return newString(chars)
+	}
+}
+
+// StringGetBytes implements String.getBytes(charset).
+func StringGetBytes(s *String, charset any) *Array[int8] {
+	switch charsetOf(charset) {
+	case "UTF-8":
+		return ArrayOfSlice(Reinterpret[byte, int8]([]byte(s.GoString())))
+	default:
+		limit := uint16(0xff)
+		if charsetOf(charset) == "US-ASCII" {
+			limit = 0x7f
+		}
+		out := make([]int8, len(s.chars))
+		for i, c := range s.chars {
+			if c > limit {
+				c = '?'
+			}
+			out[i] = int8(c)
+		}
+		return ArrayOfSlice(out)
+	}
+}

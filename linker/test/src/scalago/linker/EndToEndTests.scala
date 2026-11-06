@@ -36,7 +36,8 @@ class EndToEndTests extends munit.FunSuite:
 
   for dir <- cases do
     test(dir.getFileName.toString) {
-      val expected = Files.readString(dir.resolve("expected.txt"), UTF_8)
+      val expectedErrors = dir.resolve("link-errors.txt")
+      val expected = if Files.exists(expectedErrors) then "" else Files.readString(dir.resolve("expected.txt"), UTF_8)
       // The entry point is `Main` unless the case names another one in `main.txt`.
       val mainClass =
         if Files.exists(dir.resolve("main.txt")) then Files.readString(dir.resolve("main.txt"), UTF_8).trim else "Main"
@@ -44,16 +45,41 @@ class EndToEndTests extends munit.FunSuite:
       val classes = Files.createDirectories(work.resolve("classes"))
 
       compile(dir, classes)
-      val jvmClasspath = (classes.toString +: userLibrary +: scalaLibrary).mkString(File.pathSeparator)
-      assertNoDiff(run(Seq(javaBinary, "-cp", jvmClasspath, mainClass), work), expected, "JVM output")
+      // Programs calling Go code (`go-only.txt` says why) cannot run on the JVM.
+      if !Files.exists(dir.resolve("go-only.txt")) then
+        val jvmClasspath = (classes.toString +: userLibrary +: scalaLibrary).mkString(File.pathSeparator)
+        assertNoDiff(run(Seq(javaBinary, "-cp", jvmClasspath, mainClass), work), expected, "JVM output")
 
+      // Subdirectories with a go.mod are local Go modules the program uses.
+      val goModules = Using.resource(Files.list(dir))(_.iterator.asScala.filter(d => Files.exists(d.resolve("go.mod"))).toList)
+        .map(d => goModulePath(d.resolve("go.mod")) -> d.toAbsolutePath.toString)
+      val config = Linker.Config(
+        mainObject = mainClass,
+        goRequires = goModules.map((m, _) => m -> "v0.0.0"),
+        goReplaces = goModules
+      )
       val goDir = work.resolve("go")
-      Linker.link(classes +: Path.of(userLibrary) +: libraryIR, goDir, Linker.Config(mainObject = mainClass))
-      assertEquals(run(Seq("go", "vet", "."), goDir), "", "go vet output")
-      assertEquals(run(Seq("go", "build", "-o", "app", "."), goDir), "", "go build output")
-      assertNoDiff(run(Seq(goDir.resolve("app").toString), goDir), expected, "Go output")
-      deleteRecursively(work) // kept on failure, for inspection
+      val classpath = classes +: Path.of(userLibrary) +: libraryIR
+      if Files.exists(expectedErrors) then
+        // The case must fail to link, with (at least) the errors listed in `link-errors.txt`.
+        val e = intercept[Linker.LinkingException](Linker.link(classpath, goDir, config))
+        for line <- Files.readAllLines(expectedErrors, UTF_8).asScala if line.trim.nonEmpty do
+          assert(e.errors.exists(_.contains(line.trim)), s"missing link error: $line\nactual errors:\n${e.errors.mkString("\n")}")
+        deleteRecursively(work)
+      else
+        linkAndRun(classpath, goDir, config, expected)
+        deleteRecursively(work) // kept on failure, for inspection
     }
+
+  private def linkAndRun(classpath: Seq[Path], goDir: Path, config: Linker.Config, expected: String): Unit =
+    Linker.link(classpath, goDir, config)
+    assertEquals(run(Seq("go", "vet", "./..."), goDir), "", "go vet output")
+    assertEquals(run(Seq("go", "build", "-o", "app", "."), goDir), "", "go build output")
+    assertNoDiff(run(Seq(goDir.resolve("app").toString), goDir), expected, "Go output")
+
+  private def goModulePath(goMod: Path): String =
+    Files.readAllLines(goMod, UTF_8).asScala.collectFirst { case s"module $path" => path.trim }
+      .getOrElse(throw IllegalStateException(s"no module line in $goMod"))
 
   private def deleteRecursively(dir: Path): Unit =
     Using.resource(Files.walk(dir))(_.iterator.asScala.toList.reverse.foreach(Files.delete))

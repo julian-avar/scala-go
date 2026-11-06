@@ -125,7 +125,7 @@ func Caught(r any) any {
 }
 
 // HandleUncaught reports an exception that escaped main, like the JVM, and exits with status 1.
-// It must be deferred directly by main.
+// It must be deferred directly by the function that runs the program (scala.Main).
 func HandleUncaught() {
 	if r := recover(); r != nil {
 		stdout.Flush()

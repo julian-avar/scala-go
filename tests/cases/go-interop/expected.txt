@@ -1,0 +1,30 @@
+ababab
+GRÜßE
+true
+[a,b,c]
+x-y-z
+a|b|c
+bAnAnA
+3.141592653589793
+2147483647
+1.4142135623730951
+true
+43
+caught: strconv.Atoi: parsing "forty-two": invalid syntax
+false true strconv.ParseBool: parsing "maybe": invalid syntax
+true
+custom failure
+wrapped: custom failure
+hello, go (9)
+12c12
+https example.com:8080 example.com /a/b scala
+https://example.com:8080/c?q=scala&x=1
+bad url: parse ":bad": missing protocol scheme
+1s 1.0
+ABC
+7-seven-true-1.50
+scala, go, 1 two
+scala again
+SCALA AND GO (12 bytes)
+writer failed: java.lang.IllegalStateException: no bangs
+1+2=3 5 true true

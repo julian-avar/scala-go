@@ -68,19 +68,37 @@ trait ScalaGoModule extends ScalaModule {
   /** Module path of the generated Go module. */
   def goModulePath: T[String] = Task { "scalagoapp" }
 
+  /** Go modules that the program's Go facades import, as `module@version`
+   *  (e.g. `github.com/google/uuid@v1.6.0`). Standard library packages need nothing here.
+   */
+  def goRequires: T[Seq[String]] = Task { Seq.empty[String] }
+
+  /** Directories of local Go modules (each with its own `go.mod`) that the program's Go facades
+   *  import, e.g. `Task.Sources(moduleDir / "go" / "mylib")`.
+   */
+  def goLocalModules: T[Seq[PathRef]] = Task { Seq.empty[PathRef] }
+
   /** Links the program's IR (and its dependencies') into a Go module. */
   def goLink: T[PathRef] = Task {
     val out = Task.dest / "go"
     val sep = _root_.java.io.File.pathSeparator
     val classpath = (runClasspath() ++ scalaGoLibraryIR()).map(_.path).filter(os.exists(_))
     val javaExe = os.Path(sys.props("java.home")) / "bin" / "java"
+    val localModules = goLocalModules().map { dir =>
+      val goMod = dir.path / "go.mod"
+      val modulePath = os.read.lines(goMod).collectFirst { case l if l.startsWith("module ") => l.stripPrefix("module ").trim }
+        .getOrElse(throw new Exception(s"scala-go: no module line in $goMod"))
+      Seq("--go-require", s"$modulePath@v0.0.0", "--go-replace", s"$modulePath=${dir.path}")
+    }
     val result = os.proc(
       javaExe, "-cp", scalaGoLinkerClasspath().map(_.path).mkString(sep),
       "scalago.linker.Main",
       "--classpath", classpath.mkString(sep),
       "--out", out,
       "--main", scalaGoMainObject(),
-      "--go-module", goModulePath()
+      "--go-module", goModulePath(),
+      goRequires().flatMap(r => Seq("--go-require", r)),
+      localModules.flatten
     ).call(stdout = os.Inherit, stderr = os.Inherit, check = false)
     if (result.exitCode != 0) throw new Exception("scala-go: linking failed (see errors above)")
     PathRef(out)

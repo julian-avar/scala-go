@@ -22,8 +22,19 @@ final case class ClassDef(
     interfaces: List[ClassName],
     fields: List[FieldDef],
     methods: List[MethodDef],
-    pos: Position
+    pos: Position,
+    /** Set for Go facades: classes standing for a Go package or a Go type (see [[GoFacade]]). */
+    goFacade: Option[GoFacade] = None
 )
+
+/** A Scala declaration of Go code (`@GoImport`). Facades have no IR bodies: the linker turns uses
+ *  of their members into Go code, converting values at the boundary.
+ *
+ *  @param pkg  the Go import path; `""` for builtin types (`error`)
+ *  @param name the Go type name, or `""` for an object standing for a whole Go package
+ */
+final case class GoFacade(pkg: String, name: String):
+  def isPackage: Boolean = name.isEmpty
 
 final case class FieldDef(name: String, tpe: Type, isStatic: Boolean, pos: Position)
 
@@ -36,9 +47,36 @@ final case class MethodDef(
     body: Option[Tree],
     isStatic: Boolean,
     isPrivate: Boolean,
-    pos: Position
+    pos: Position,
+    /** Members of Go facades: the Go name and the Scala (pre-erasure) signature. */
+    goMember: Option[GoMember] = None
 ):
   def isAbstract: Boolean = body.isEmpty
+
+/** A member of a Go facade.
+ *
+ *  @param goName     the Go function, method, field or variable it stands for
+ *  @param params     the Scala types of the parameters, before erasure
+ *  @param result     the Scala result type, before erasure
+ *  @param isProperty declared without a parameter list (`def X: T`): may be a Go field or variable
+ */
+final case class GoMember(goName: String, params: List[ScalaType], result: ScalaType, isProperty: Boolean)
+
+/** A Scala type before erasure, as far as Go interop needs it: type arguments of functions,
+ *  tuples, sequences and arrays, and opaque types such as `scalago.go.GoString`.
+ */
+enum ScalaType:
+  /** A primitive type, or `Void` for `Unit`. */
+  case Prim(tpe: Type)
+  /** A class or trait (binary name) or an opaque type (full name), with its type arguments. */
+  case Ref(name: String, args: List[ScalaType])
+  case Arr(elem: ScalaType)
+
+  override def toString: String = this match
+    case Prim(t)         => t.toString
+    case Ref(name, Nil)  => name
+    case Ref(name, args) => args.mkString(s"$name[", ", ", "]")
+    case Arr(elem)       => s"Array[$elem]"
 
 /** Local variable names are unique within a method body (the plugin renames shadowed locals). */
 type LocalName = String

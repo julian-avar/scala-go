@@ -381,6 +381,9 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
           initStatics(cls)
           Mangling.staticField(cls, field)
 
+    case New(cls, _, _) if program.isFacade(cls) =>
+      ctx.interop.zeroValue(cls, tree.pos)
+
     case New(cls, ctor, args) =>
       Natives.lookup(cls, ctor) match
         case Some(native) => genNative(native, None, args, ctor.params)
@@ -512,6 +515,9 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     def hijackedNative = Hijacked.instanceGoType.collectFirst {
       case (h, goType) if goType == receiverGoType && Natives.lookup(h, m).isDefined => Natives.lookup(h, m).get
     }
+    program.facadeMember(declaringClass, m) match
+      case Some((facade, member)) => return genFacadeUse(tree, facade, member)
+      case None                   => ()
     Natives.lookup(declaringClass, m) match
       case Some(native) => genNative(native, Some(receiver), args, m.params)
       case None if isVirtual =>
@@ -524,9 +530,28 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
             val r :: as = genExprs(receiver :: args, receiver.tpe :: m.params): @unchecked
             s"${ctx.dispatcher(m)}(${(r :: as).mkString(", ")})"
 
+  /** A use of a Go facade member. Arguments are evaluated into variables first, then buffered
+   *  Scala output is flushed, so that output stays ordered with what Go code writes.
+   */
+  private def genFacadeUse(tree: Apply, facade: ClassDef, member: MethodDef): String =
+    val (argTrees, argTypes) = GoInterop.facadeArgs(tree.args, member.goMember.get.params).unzip
+    val isPackage = facade.goFacade.exists(_.isPackage)
+    val trees = if isPackage then argTrees else tree.receiver :: argTrees
+    val types = if isPackage then argTypes.map(GoInterop.erased) else tree.receiver.tpe :: argTypes.map(GoInterop.erased)
+    val values = genExprs(trees, types).zip(types).map { (e, t) =>
+      if isSimple(e) && e != "nil" then e
+      else
+        val temp = freshTemp()
+        emit(s"var $temp ${ctx.goType(t)} = $e")
+        temp
+    }
+    emit("rt.FlushStdout()")
+    val (receiver, args) = if isPackage then (None, values) else (Some(values.head), values.tail)
+    ctx.interop.use(facade, member, receiver, args, argTypes, tree.pos, emit)
+
   private def genApplyStatically(tree: ApplyStatically): String =
     val ApplyStatically(receiver, cls, m, args, _) = tree
-    if Natives.isNoOpConstructor(cls, m) then ""
+    if Natives.isNoOpConstructor(cls, m) || program.isFacade(cls) then ""
     else Natives.lookup(cls, m) match
       case Some(native) => genNative(native, Some(receiver), args, m.params)
       case None =>

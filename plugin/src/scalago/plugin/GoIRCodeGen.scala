@@ -9,6 +9,8 @@ import dotty.tools.dotc.ast.tpd.*
 import dotty.tools.dotc.core.Constants.*
 import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Flags.*
+import dotty.tools.dotc.core.NameOps.*
+import dotty.tools.dotc.core.Phases.erasurePhase
 import dotty.tools.dotc.core.StdNames.nme
 import dotty.tools.dotc.core.Symbols.*
 import dotty.tools.dotc.core.Types.*
@@ -61,12 +63,13 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
     val sym = td.symbol.asClass
     currentClass = sym
     val impl = td.rhs.asInstanceOf[Template]
+    goFacadeOf(sym) match
+      case Some(facade) => genFacadeClass(td, impl, facade)
+      case None         => genOrdinaryClass(td, impl)
 
-    val kind =
-      if sym.is(Trait) then ir.ClassKind.Interface
-      else if sym.is(ModuleClass) && sym.isStatic then ir.ClassKind.ModuleClass
-      else ir.ClassKind.Class
-
+  private def genOrdinaryClass(td: TypeDef, impl: Template): ir.ClassDef =
+    val sym = td.symbol.asClass
+    val kind = classKind(sym)
     val superClass =
       if sym.is(Trait) then None
       else Option(sym.superClass).filter(_.exists).map(className)
@@ -77,6 +80,143 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
     val methods = members.collect { case dd: DefDef => genMethod(dd) }
 
     ir.ClassDef(className(sym), kind, sym.is(Abstract), superClass, interfaces, fields, methods, position(td))
+
+  private def classKind(sym: ClassSymbol): ir.ClassKind =
+    if sym.is(Trait) then ir.ClassKind.Interface
+    else if sym.is(ModuleClass) && sym.isStatic then ir.ClassKind.ModuleClass
+    else ir.ClassKind.Class
+
+  // -------------------------------------------------------------------------------------------
+  // Go facades
+  // -------------------------------------------------------------------------------------------
+
+  private lazy val GoImportAnnot: Symbol = getClassIfDefined("scalago.go.GoImport")
+  private lazy val GoNameAnnot: Symbol = getClassIfDefined("scalago.go.GoName")
+  private val GoStringName = "scalago.go.GoString"
+
+  private def annotationArg(sym: Symbol, annot: Symbol, index: Int): Option[String] =
+    if !annot.exists then None
+    else sym.getAnnotation(annot).flatMap(_.argumentConstantString(index))
+
+  private def goNameOf(sym: Symbol): Option[String] = annotationArg(sym, GoNameAnnot, 0)
+
+  /** `@GoImport` on the class (or its module), or membership in a `@GoImport` object. */
+  private def goFacadeOf(sym: ClassSymbol): Option[ir.GoFacade] =
+    if !GoImportAnnot.exists then None
+    else
+      val annotated = if sym.is(ModuleClass) then List(sym, sym.sourceModule) else List(sym)
+      annotated.find(_.hasAnnotation(GoImportAnnot)) match
+        case Some(holder) =>
+          val path = annotationArg(holder, GoImportAnnot, 0).getOrElse("")
+          if sym.is(ModuleClass) then Some(ir.GoFacade(path, ""))
+          else
+            val name = annotationArg(holder, GoImportAnnot, 1).filter(_.nonEmpty)
+              .orElse(goNameOf(sym)).getOrElse(sym.name.stripModuleClassSuffix.toString)
+            Some(ir.GoFacade(path, name))
+        case None =>
+          // Classes are flattened by now: look at the owner before `flatten`.
+          val owner = atPhase(erasurePhase)(sym.owner)
+          if owner.is(ModuleClass) && !sym.is(ModuleClass) then
+            goFacadeOf(owner.asClass).filter(_.isPackage).map { pkg =>
+              ir.GoFacade(pkg.pkg, goNameOf(sym).getOrElse(atPhase(erasurePhase)(sym.name).toString))
+            }
+          else None
+
+  private def genFacadeClass(td: TypeDef, impl: Template, facade: ir.GoFacade): ir.ClassDef =
+    val sym = td.symbol.asClass
+    val parent = sym.superClass
+    val superClass = if sym.is(Trait) || !parent.exists then None else Some(className(parent))
+    if parent.exists && parent != defn.ObjectClass && goFacadeOf(parent.asClass).isEmpty then
+      report.error("scala-go: a Go facade class can only extend other Go facades", td.srcPos)
+    val interfaces = sym.info.parents.map(_.classSymbol).filter(_.is(Trait)).map(className)
+    val methods = (impl.constr :: impl.body).flatMap {
+      case dd: DefDef if isIgnoredMember(dd.symbol) => Nil
+      case dd: DefDef if dd.symbol.isConstructor =>
+        if dd.termParamss.flatten.nonEmpty then
+          report.error("scala-go: Go facade classes cannot have constructor parameters (`new` makes a Go zero value)", dd.srcPos)
+        List(ir.MethodDef(methodName(dd.symbol), Nil, None, isStatic = false, isPrivate = false, position(dd)))
+      case dd: DefDef if dd.symbol.is(Synthetic) || dd.symbol.name.toString == "$init$" => Nil
+      case dd: DefDef => genFacadeMember(dd).toList
+      case vd: ValDef if vd.symbol.is(Synthetic) || isModuleField(vd.symbol) => Nil
+      case vd: ValDef =>
+        report.error("scala-go: Go facade members must be methods (`def`), not fields", vd.srcPos)
+        Nil
+      case EmptyTree | _: TypeDef => Nil
+      case other =>
+        report.error("scala-go: unexpected definition in a Go facade", other.srcPos)
+        Nil
+    }
+    ir.ClassDef(className(sym), classKind(sym), sym.is(Abstract), superClass, interfaces, Nil, methods, position(td),
+      Some(facade))
+
+  private def isModuleField(sym: Symbol): Boolean = sym.name.toString == "MODULE$"
+
+  private def genFacadeMember(dd: DefDef): Option[ir.MethodDef] =
+    val sym = dd.symbol
+    if !dd.rhs.isEmpty && !isNativeCall(dd.rhs) then
+      report.error("scala-go: Go facade members must be implemented as `= native`", dd.rhs.srcPos)
+    if sym.is(Private) then report.error("scala-go: Go facade members cannot be private", dd.srcPos)
+    locals = LocalNames()
+    val params = dd.termParamss.flatten.map(p => ir.ParamDef(locals.define(p.symbol), toIRType(p.symbol.info)))
+    // The signature before erasure: it keeps type arguments and opaque types such as GoString.
+    val (paramTypes, resultType, isProperty) = atPhase(erasurePhase)(sym.info) match
+      case ExprType(res)   => (Nil, res, true)
+      case mt: MethodType  => (mt.paramInfos, mt.resultType, false)
+      case pt: PolyType    =>
+        report.error("scala-go: Go facade members cannot have type parameters", dd.srcPos)
+        (Nil, pt.resultType, false)
+      case other           => (Nil, other, true)
+    resultType match
+      case _: MethodType => report.error("scala-go: Go facade members can have at most one parameter list", dd.srcPos)
+      case _             => ()
+    val goName = goNameOf(sym).getOrElse(sym.name.toString.stripSuffix("_="))
+    val member = ir.GoMember(goName, paramTypes.map(scalaType), scalaType(resultType), isProperty)
+    Some(ir.MethodDef(methodName(sym), params, None, isStatic = false, isPrivate = false, position(dd), Some(member)))
+
+  private def isNativeCall(tree: Tree): Boolean = tree match
+    case Apply(fun, Nil)  => isNativeCall(fun)
+    case Typed(expr, _)   => isNativeCall(expr)
+    case Block(Nil, expr) => isNativeCall(expr)
+    case _                => tree.symbol.exists && tree.symbol.name.toString == "native" &&
+                               tree.symbol.owner.showFullName.startsWith("scalago.go.")
+
+  /** The Scala type `tpe` (as seen before erasure), for Go interop. */
+  private def scalaType(tpe: Type): ir.ScalaType =
+    tpe match
+      case tr: TypeRef if tr.symbol.isAliasType || tr.symbol.isOpaqueAlias =>
+        if isGoString(tr.symbol) then ir.ScalaType.Ref(GoStringName, Nil)
+        else scalaType(tr.translucentSuperType)
+      case ExprType(res) => scalaType(res)
+      case AnnotatedType(underlying, _) => scalaType(underlying)
+      case AppliedType(tycon, args) =>
+        val cls = tycon.typeSymbol
+        if cls == defn.ArrayClass then ir.ScalaType.Arr(scalaType(args.head))
+        else if cls == defn.RepeatedParamClass then ir.ScalaType.Ref("scala.collection.immutable.Seq", args.map(scalaArg))
+        else if cls.isAliasType || cls.isOpaqueAlias then scalaType(tpe.dealias)
+        else if cls.isClass then ir.ScalaType.Ref(className(cls), args.map(scalaArg))
+        else erasedScalaType(tpe)
+      case _ => erasedScalaType(tpe)
+
+  /** The opaque type `scalago.go.GoString` (a top-level definition, so owned by a package object). */
+  private def isGoString(sym: Symbol): Boolean =
+    sym.name.toString == "GoString" && sym.owner.is(ModuleClass) && sym.owner.owner.showFullName == "scalago.go"
+
+  private def scalaArg(arg: Type): ir.ScalaType = arg match
+    case bounds: TypeBounds => scalaType(bounds.hi)
+    case t                  => scalaType(t)
+
+  private def erasedScalaType(tpe: Type): ir.ScalaType =
+    toIRTypeOrObject(tpe) match
+      case ir.Type.Class(name)   => ir.ScalaType.Ref(name, Nil)
+      case ir.Type.Array(elem)   => ir.ScalaType.Arr(fromErased(elem))
+      case ir.Type.Nothing       => ir.ScalaType.Prim(ir.Type.Nothing)
+      case ir.Type.Null          => ir.ScalaType.Ref(ir.ClassName.Object, Nil)
+      case prim                  => ir.ScalaType.Prim(prim)
+
+  private def fromErased(t: ir.Type): ir.ScalaType = t match
+    case ir.Type.Class(name) => ir.ScalaType.Ref(name, Nil)
+    case ir.Type.Array(elem) => ir.ScalaType.Arr(fromErased(elem))
+    case prim                => ir.ScalaType.Prim(prim)
 
   /** Members that only exist for the JVM (Java serialization of modules). */
   private def isIgnoredMember(sym: Symbol): Boolean =

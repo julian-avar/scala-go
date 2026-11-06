@@ -63,6 +63,9 @@ func ToGoString(x any) string {
 	case scalaToString:
 		return ToGoString(v.M_toString_p_rLjava_dlang_dString_e())
 	}
+	if s, ok := foreignToString(x); ok {
+		return s
+	}
 	return defaultToString(x)
 }
 
@@ -123,7 +126,7 @@ func ObjectEquals(a, b any) bool {
 		w, ok := b.(float64)
 		return ok && math.Float64bits(v) == math.Float64bits(w)
 	}
-	return a == b
+	return foreignEquals(a, b)
 }
 
 // Equals implements Scala's universal equality (==) on references: null-safe, and cooperative
@@ -212,7 +215,7 @@ func HashCode(x any) int32 {
 	case scalaHashCode:
 		return v.M_hashCode_p_rI()
 	}
-	return IdentityHashCode(x)
+	return foreignHashCode(x)
 }
 
 // IdentityHashCode implements System.identityHashCode. Go's garbage collector does not move

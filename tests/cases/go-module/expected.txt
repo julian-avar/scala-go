@@ -1,0 +1,14 @@
+Hello, Ada!
+Hi, Grace! 2 Hi
+square: 4.0
+circle(1.0): 3.0
+true circle(2.0)
+a circle of radius 2.0
+false
+(3,2)
+GoException: division by zero
+10,20,30 10,20,30 false
+212.0
+3 4 25
+GO!
+recovered: boom
