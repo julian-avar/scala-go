@@ -70,13 +70,14 @@ published with the full Scala version as suffix.
 | Go facade of a struct type `T`   | `*T` inside an `any` (see [Go interop](#go-interop))            |
 | Go facade of any other Go type   | the Go value inside an `any`                                    |
 | `Array[prim]` / `Array[AnyRef]`  | `*rt.Array[prim]` / `*rt.Array[any]` (covariance works)         |
-| class `C`                        | struct `S_C` embedding the superclass's struct                  |
+| class `C`                        | struct `S_C` embedding the superclass's struct (root classes embed `rt.ObjectHeader`, which holds the monitor) |
 | reference of static type `C`     | interface `C_C`: embeds parents' interfaces, lists called methods |
 | trait `T`                        | interface `C_T`, with a marker method `I_T()`                   |
 | method body                      | free function `Impl_C_m(this C_C, ...)`                         |
 | virtual method                   | forwarding method on each instantiated struct                   |
-| `object O`                       | lazily initialized singleton `Mod_O_S()`                        |
-| `@static` fields, `<clinit>`     | package variables, plus a guarded `Clinit_C()` run on first use |
+| `object O`                       | singleton `Mod_O_S()`, constructed on first use under an `rt.InitLock` |
+| `@static` fields, `<clinit>`     | package variables, plus `Clinit_C()`, run once under an `rt.InitLock` |
+| `@volatile` field                | `rt.Volatile[T]` (atomic loads, stores, compare-and-set)        |
 
 - **Calls through `this` stay virtual.** Method bodies take `this` as an interface, so calls on it
   stay virtual even in inherited code. Go's struct embedding alone cannot do that.
@@ -122,8 +123,9 @@ internal/rt/            the runtime
   `return` or `break` from inside the closure sets `ctl` and is replayed after the closure
   returns, after the `finally` block if there is one. Uncaught exceptions print
   `Exception in thread "main" ...` and exit with status 1.
-- **`lazy val`** relies on JVM `VarHandle`s. The plugin rewrites that into plain field
-  compare-and-set.
+- **`lazy val`** relies on JVM `VarHandle`s. The plugin rewrites the handle's compare-and-set
+  into IR `CompareAndSet` on the (volatile) lazy val field, so lazy vals are thread-safe as on
+  the JVM (see [Concurrency](#concurrency-and-the-memory-model)).
 
 ## Go interop
 
@@ -197,8 +199,49 @@ object url:
 
 Not supported yet: maps, channels, pointers to non-struct types, Go functions *returned* to Scala,
 generic Go functions and types, unnamed struct and interface types, variadic callbacks, and Scala
-implementations of Go methods with several non-error results. Go code calling Scala from other
-goroutines is unsafe until the runtime is thread-safe (see Concurrency).
+implementations of Go methods with several non-error results. Go code may call Scala code from any
+goroutine (see [Concurrency](#concurrency-and-the-memory-model)).
+
+## Concurrency and the memory model
+
+Go code calls whatever Scala code it is given from any goroutine, so the runtime and the
+generated code are goroutine-safe, with the JVM's guarantees where Scala code relies on them:
+
+- **Initialization.** Module construction and static initializers run once, under an
+  `rt.InitLock`: a goroutine that finds one in progress in another goroutine waits for it, and
+  the initializing goroutine re-entering (a module referring to itself during construction, or
+  initialization cycles) sees the partially initialized state, as on the JVM. If an initializer
+  throws, the exception propagates, and later uses throw `NoClassDefFoundError`. The fast path
+  is one atomic load.
+- **Monitors.** `synchronized` is a reentrant per-object monitor, and `wait`/`notify`/`notifyAll`
+  work as on the JVM (with timeouts and interrupts). The plugin lowers `synchronized` to
+  enter/exit around `try`/`finally`, so `return` and exceptions release the monitor. Scala
+  objects carry their monitor in an `rt.ObjectHeader`, created on first use. Strings, boxes and
+  Go values use a global table, whose entries are never removed. Reentrancy needs the current
+  goroutine's id, which Go does not expose: the runtime parses it from `runtime.Stack`, which
+  costs about a microsecond per monitor operation.
+- **Volatile fields** (`@volatile`, and the state field of each `lazy val`) are `rt.Volatile[T]`:
+  sequentially consistent, which is what the JMM requires of volatiles. javalib's
+  `java.util.concurrent.atomic` classes (`AtomicInteger`, `AtomicLong`, `AtomicBoolean`,
+  `AtomicReference`) are volatile fields plus the `scalago.runtime.Intrinsics.compareAndSet`
+  intrinsic, which becomes IR `CompareAndSet`.
+- **Lazy vals** follow Scala 3's scheme: compare-and-set on the volatile field, and goroutines
+  that find the value being computed wait on a `Waiting` marker (a monitor).
+- **Threads.** `java.lang.Thread` runs on a goroutine. `start`, `join` (with timeouts),
+  `sleep`, `interrupt`, `currentThread`, names, daemon status and uncaught-exception handlers
+  work. A goroutine that did not start as a `Thread` (the main goroutine, or one started by Go
+  code) gets a `Thread` object the first time it asks for one. As on the JVM, `Main()` waits for
+  the non-daemon threads before returning, and an exception in a thread is reported
+  (`Exception in thread "name" ...`) without ending the program.
+- **Runtime state.** The stdout buffer (one lock per write, so lines do not interleave), string
+  interning, the `Class` table and `String.hashCode`'s cache are goroutine-safe.
+
+What is *not* guaranteed: ordinary fields are plain Go memory, so a data race on them is a bug,
+as on the JVM. But the JMM gives racy programs some guarantees, and Go does not: a racy read of a
+reference (an interface or a slice header in Go) can see a torn value and crash. `final` fields
+get no special publication guarantee either: share objects through `synchronized`, volatiles,
+atomics, `Thread.start`/`join` or Go channels, which are all happens-before edges. Programs can
+be checked with Go's race detector (`go build -race`). The `concurrency` test case runs under it.
 
 ## Semantics handled explicitly
 
@@ -224,14 +267,17 @@ Supported and covered by end-to-end tests:
 - `scalago.go.GoString`
 - Go interop: facades of standard-library packages and of a local Go module, Go interfaces
   implemented in Scala, errors and callbacks. Mismatched facades are tested as link errors.
+- concurrency: threads, `synchronized`, `wait`/`notify`, volatile fields, atomics, interrupts,
+  and concurrent first use of modules and lazy vals (also under Go's race detector)
 
 Known gaps:
 - `BigDecimal` (`java.math.BigDecimal` is not implemented), regular expressions,
   `String.format` beyond the common conversions, `java.util` collections, `java.time`, and I/O
   beyond stdout/stderr.
 - Reflection: `getClass` and `Class` names work; nothing else.
-- Concurrency: everything assumes a single goroutine (module initialization, lazy vals,
-  `synchronized`).
+- Concurrency: `java.util.concurrent` beyond the atomics (executors, locks, concurrent
+  collections, `CompletableFuture`), `ThreadLocal`, thread groups. `scala.concurrent.Future`
+  needs an `ExecutionContext` on `java.util.concurrent`.
 - `Enumeration` (it uses reflection).
 - Stack traces: exceptions carry none.
 
@@ -260,17 +306,13 @@ earlier has to be redone:
 1. **Output layout** (done). Generated code lives in `internal/scala`, not in `package main`, and
    the root package is a thin layer over it. Exports and library builds add a public root package
    here. Everything later emits into this layout, so it came first.
-2. **A goroutine-safe runtime.** Go code calls whatever it is given from any goroutine (HTTP
-   handlers, callbacks, exported functions). Scala.js never needed this, since JavaScript is
-   single-threaded, so this is where scala-go must go beyond it. The work:
-   - module and static initialization (`sync.Once`-style), and lazy vals (atomic compare-and-set);
-   - `synchronized`, `wait`/`notify` (per-object monitors), and `@volatile`;
-   - the runtime's own global state: stdout buffer, string interning, `Class` cache;
-   - a memory model, documented against the JMM;
-   - `java.lang.Thread` on goroutines.
-   This has to come before exports, which would otherwise be unsafe by default, and before gears,
-   which needs it too. Changing how initialization is generated is cheap now and costly once
-   exports and gears depend on it.
+2. **A goroutine-safe runtime** (done, see
+   [Concurrency](#concurrency-and-the-memory-model)). Go code calls whatever it is given from
+   any goroutine (HTTP handlers, callbacks, exported functions). Scala.js never needed this,
+   since JavaScript is single-threaded, so this is where scala-go goes beyond it: init locks for
+   modules and static initializers, atomic lazy vals, monitors, volatiles and atomics,
+   `java.lang.Thread` on goroutines, a goroutine-safe runtime, and a documented memory model.
+   It came before exports, which would otherwise be unsafe by default, and before gears.
 3. **Go types as Scala types.** These are zero-copy types for Go's own data, usable in facades and
    in exports: `GoSlice[T]`, `GoMap[K, V]`, `GoChan[T]`, `GoPtr[T]`, and Go funcs as values (in
    both directions). They are opaque types, like `GoString`, with a JVM implementation where

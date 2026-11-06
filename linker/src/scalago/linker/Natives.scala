@@ -25,6 +25,14 @@ object Natives:
 
   def lookup(cls: ClassName, m: MethodName): Option[Native] = methods.get((cls, m))
 
+  /** Virtual methods a native calls (on its arguments), which must therefore be reachable. */
+  def calledBy(cls: ClassName, m: MethodName): List[MethodName] = nativeCalls.getOrElse((cls, m), Nil)
+
+  private val nativeCalls = mutable.HashMap.empty[(ClassName, MethodName), List[MethodName]]
+
+  private def calls(cls: ClassName, desc: String, called: MethodName*): Unit =
+    nativeCalls((cls, parseMethod(desc))) = called.toList
+
   /** Methods of java.lang.Object, valid on any receiver. */
   def objectMethod(m: MethodName): Option[Native] = methods.get((ClassName.Object, m))
 
@@ -90,8 +98,16 @@ object Natives:
   instanceFn(Object, "equals(Ljava.lang.Object;)Z", "rt.ObjectEquals")
   instanceFn(Object, "getClass()Ljava.lang.Class;", "rt.GetClass")
   instanceFn(Object, "clone()Ljava.lang.Object;", "rt.Clone")
-  instanceFn(Object, "notify()V", "rt.Nop")
-  instanceFn(Object, "notifyAll()V", "rt.Nop")
+  instanceFn(Object, "notify()V", "rt.ObjectNotify")
+  instanceFn(Object, "notifyAll()V", "rt.ObjectNotifyAll")
+  instance(Object, "wait()V")((r, _) => s"rt.ObjectWait($r, 0, 0)")
+  instance(Object, "wait(J)V")((r, as) => s"rt.ObjectWait($r, ${as.head}, 0)")
+  instanceFn(Object, "wait(JI)V", "rt.ObjectWait")
+
+  // Monitor operations generated for `synchronized` by the plugin.
+  private val Monitor = "scalago.runtime.Monitor"
+  staticFn(Monitor, "enter(Ljava.lang.Object;)V", "rt.MonitorEnter")
+  staticFn(Monitor, "exit(Ljava.lang.Object;)V", "rt.MonitorExit")
 
   // ---- java.lang.String -----------------------------------------------------------------------
 
@@ -482,6 +498,23 @@ object Natives:
   do staticFn(Boxes, desc, "rt.AnyHash")
   staticFn(Boxes, "isBoxedNumber(Ljava.lang.Object;)Z", "rt.IsBoxedNumber")
   staticFn(Boxes, "isBoxedNumberOrBoolean(Ljava.lang.Object;)Z", "rt.IsBoxedNumberOrBoolean")
+
+  // java.lang.Thread's native side (javalib/src/scalago/runtime/Threads.scala).
+  private val Threads = "scalago.runtime.Threads$"
+  /** The method a started thread runs on its goroutine (javalib's Thread). */
+  val ThreadRunMethod: MethodName = MethodName("runOnGoroutine", Nil, Type.Void)
+  static(Threads, "start(Ljava.lang.Object;Z)V") { as =>
+    val run = Mangling.virtualMethod(ThreadRunMethod)
+    s"rt.StartThread(${as(0)}, ${as(1)}, func(t any) { t.(interface{ $run() }).$run() })"
+  }
+  calls(Threads, "start(Ljava.lang.Object;Z)V", ThreadRunMethod)
+  staticFn(Threads, "current()Ljava.lang.Object;", "rt.CurrentThread")
+  staticFn(Threads, "attach(Ljava.lang.Object;)V", "rt.AttachThread")
+  staticFn(Threads, "isMainGoroutine()Z", "rt.IsMainGoroutine")
+  staticFn(Threads, "interrupt(Ljava.lang.Object;)V", "rt.InterruptThread")
+  staticFn(Threads, "isInterrupted(Ljava.lang.Object;Z)Z", "rt.ThreadIsInterrupted")
+  staticFn(Threads, "sleep(JI)V", "rt.Sleep")
+  staticFn(Threads, "yieldNow()V", "rt.Yield")
 
   private val GoConsole = "scalago.runtime.Console$"
   staticFn(GoConsole, "writeStdout(Ljava.lang.String;)V", "rt.WriteStdout")

@@ -11,7 +11,7 @@ import scala.collection.mutable
  */
 object Serialization:
   val Magic: Int = 0x53474f49 // "SGOI"
-  val FormatVersion: Int = 3
+  val FormatVersion: Int = 4
   val FileExtension: String = ".goir"
 
   final class IRFormatException(msg: String) extends IOException(msg)
@@ -72,6 +72,7 @@ object Serialization:
     final val LoadModule = 22
     final val Select = 23
     final val SelectStatic = 24
+    final val CompareAndSet = 25
     final val New = 30
     final val Apply = 31
     final val ApplyStatically = 32
@@ -129,7 +130,7 @@ object Serialization:
       bool(c.isAbstract)
       option(c.superClass)(str)
       list(c.interfaces)(str)
-      list(c.fields) { f => str(f.name); tpe(f.tpe); bool(f.isStatic); pos(f.pos) }
+      list(c.fields) { f => str(f.name); tpe(f.tpe); bool(f.isStatic); pos(f.pos); bool(f.isVolatile) }
       list(c.methods) { m =>
         method(m.name)
         list(m.params) { p => str(p.name); tpe(p.tpe) }
@@ -175,6 +176,7 @@ object Serialization:
         case LoadModule(cls)                  => { tag(Tags.LoadModule); str(cls) }
         case Select(q, cls, f, ty)            => { tag(Tags.Select); tree(q); str(cls); str(f); tpe(ty) }
         case SelectStatic(cls, f, ty)         => { tag(Tags.SelectStatic); str(cls); str(f); tpe(ty) }
+        case CompareAndSet(f, e, u)           => { tag(Tags.CompareAndSet); tree(f); tree(e); tree(u) }
         case New(cls, ctor, args)             => { tag(Tags.New); str(cls); method(ctor); trees(args) }
         case Apply(r, rc, m, args, ty) =>
           tag(Tags.Apply); tree(r); str(rc); method(m); trees(args); tpe(ty)
@@ -233,7 +235,7 @@ object Serialization:
       val isAbstract = bool()
       val superClass = option(str())
       val interfaces = list(str())
-      val fields = list(FieldDef(str(), tpe(), bool(), pos()))
+      val fields = list(FieldDef(str(), tpe(), bool(), pos(), bool()))
       val methods = list {
         val name = method()
         val params = list(ParamDef(str(), tpe()))
@@ -277,6 +279,7 @@ object Serialization:
         case Tags.LoadModule      => LoadModule(str())(p)
         case Tags.Select          => Select(tree(), str(), str(), tpe())(p)
         case Tags.SelectStatic    => SelectStatic(str(), str(), tpe())(p)
+        case Tags.CompareAndSet   => CompareAndSet(tree(), tree(), tree())(p)
         case Tags.New             => New(str(), method(), trees())(p)
         case Tags.Apply           => Apply(tree(), str(), method(), trees(), tpe())(p)
         case Tags.ApplyStatically => ApplyStatically(tree(), str(), method(), trees(), tpe())(p)

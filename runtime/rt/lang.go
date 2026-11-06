@@ -334,5 +334,9 @@ func Clone(x any) any {
 	}
 	copied := reflect.New(v.Elem().Type())
 	copied.Elem().Set(v.Elem())
-	return copied.Interface()
+	clone := copied.Interface()
+	if h, ok := clone.(hasObjectHeader); ok {
+		h.objectHeader().monitor.Store(nil) // the clone is a new object, with its own monitor
+	}
+	return clone
 }

@@ -1,0 +1,16 @@
+current thread: main
+synchronized count: 8000
+atomics: 8000 16000
+compareAndSet: set winners=1 true
+Slow constructed 1 time(s)
+lazy val evaluated 1 time(s)
+wait/notify sum: 5050
+balance: 10
+volatile flag stopped the spinner: true
+interrupted, status cleared: true
+interrupted(): true false
+in worker
+uncaught in failing: boom
+notify without the monitor: IllegalMonitorStateException
+main done
+non-daemon thread finished after main

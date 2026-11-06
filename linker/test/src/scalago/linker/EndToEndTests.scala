@@ -67,15 +67,19 @@ class EndToEndTests extends munit.FunSuite:
           assert(e.errors.exists(_.contains(line.trim)), s"missing link error: $line\nactual errors:\n${e.errors.mkString("\n")}")
         deleteRecursively(work)
       else
-        linkAndRun(classpath, goDir, config, expected)
+        // `race.txt`: the Go build also runs under the race detector.
+        linkAndRun(classpath, goDir, config, expected, race = Files.exists(dir.resolve("race.txt")))
         deleteRecursively(work) // kept on failure, for inspection
     }
 
-  private def linkAndRun(classpath: Seq[Path], goDir: Path, config: Linker.Config, expected: String): Unit =
+  private def linkAndRun(classpath: Seq[Path], goDir: Path, config: Linker.Config, expected: String, race: Boolean): Unit =
     Linker.link(classpath, goDir, config)
     assertEquals(run(Seq("go", "vet", "./..."), goDir), "", "go vet output")
     assertEquals(run(Seq("go", "build", "-o", "app", "."), goDir), "", "go build output")
     assertNoDiff(run(Seq(goDir.resolve("app").toString), goDir), expected, "Go output")
+    if race then
+      assertEquals(run(Seq("go", "build", "-race", "-o", "app-race", "."), goDir), "", "go build -race output")
+      assertNoDiff(run(Seq(goDir.resolve("app-race").toString), goDir), expected, "Go output under the race detector")
 
   private def goModulePath(goMod: Path): String =
     Files.readAllLines(goMod, UTF_8).asScala.collectFirst { case s"module $path" => path.trim }

@@ -36,7 +36,8 @@ final case class ClassDef(
 final case class GoFacade(pkg: String, name: String):
   def isPackage: Boolean = name.isEmpty
 
-final case class FieldDef(name: String, tpe: Type, isStatic: Boolean, pos: Position)
+/** A field. `isVolatile` fields (`@volatile`, and lazy val states) are accessed atomically. */
+final case class FieldDef(name: String, tpe: Type, isStatic: Boolean, pos: Position, isVolatile: Boolean = false)
 
 final case class ParamDef(name: LocalName, tpe: Type)
 
@@ -174,6 +175,13 @@ object Tree:
   final case class Select(qualifier: Tree, cls: ClassName, field: String, tpe: Type)(val pos: Position) extends Tree
   final case class SelectStatic(cls: ClassName, field: String, tpe: Type)(val pos: Position) extends Tree
 
+  /** Atomically sets a volatile field (a `Select` or `SelectStatic`) to `update` if it holds
+   *  `expected` (reference identity for objects); true if it did. Lazy vals and
+   *  `scalago.runtime.Intrinsics.compareAndSet` produce it.
+   */
+  final case class CompareAndSet(field: Tree, expected: Tree, update: Tree)(val pos: Position) extends Tree:
+    def tpe: Type = Type.Boolean
+
   // ---- Calls ---------------------------------------------------------------------------------
 
   /** Allocates an instance of `cls` and runs constructor `ctor` on it. */
@@ -297,6 +305,7 @@ object Traversal:
     case While(c, b)                            => List(c, b)
     case Assign(l, r)                           => List(l, r)
     case Select(q, _, _, _)                     => List(q)
+    case CompareAndSet(f, e, u)                 => List(f, e, u)
     case New(_, _, args)                        => args
     case Apply(r, _, _, args, _)                => r :: args
     case ApplyStatically(r, _, _, args, _)      => r :: args
@@ -343,6 +352,7 @@ object Traversal:
       case While(c, b)                        => While(t(c), t(b))(p)
       case Assign(l, r)                       => Assign(t(l), t(r))(p)
       case Select(q, c, fl, tp)               => Select(t(q), c, fl, tp)(p)
+      case CompareAndSet(f, e, u)             => CompareAndSet(t(f), t(e), t(u))(p)
       case New(c, m, args)                    => New(c, m, ts(args))(p)
       case Apply(r, c, m, args, tp)           => Apply(t(r), c, m, ts(args), tp)(p)
       case ApplyStatically(r, c, m, args, tp) => ApplyStatically(t(r), c, m, ts(args), tp)(p)

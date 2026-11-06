@@ -60,7 +60,10 @@ object Linker:
     "NumberFormat"           -> "java.lang.NumberFormatException",
     "UnsupportedOperation"   -> "java.lang.UnsupportedOperationException",
     "ArrayStore"             -> "java.lang.ArrayStoreException",
-    "RuntimeError"           -> "java.lang.RuntimeException"
+    "RuntimeError"           -> "java.lang.RuntimeException",
+    "IllegalMonitorState"    -> "java.lang.IllegalMonitorStateException",
+    "Interrupted"            -> "java.lang.InterruptedException",
+    "NoClassDefFound"        -> "java.lang.NoClassDefFoundError"
   )
   private val MessageConstructor = MethodName(MethodName.ConstructorSimpleName, List(Type.String), Type.Void)
 
@@ -170,10 +173,11 @@ object Linker:
         sb ++= s"\t\t\treturn ${Mangling.newInstance(cls, MessageConstructor)}(message)\n"
       sb ++= "\t\t}\n\t\treturn nil\n\t}\n}\n\n"
     sb ++= "// Main runs the Scala program's entry point with the command-line arguments.\n"
+    sb ++= "// Like the JVM, it then waits for the non-daemon threads the program started.\n"
     sb ++= "func Main() {\n"
-    sb ++= "\tdefer rt.HandleUncaught()\n"
-    sb ++= s"\t$entry\n"
-    sb ++= "\trt.FlushStdout()\n"
+    sb ++= "\trt.RunMain(func() {\n"
+    sb ++= s"\t\t${entry.replace("\n\t", "\n\t\t")}\n"
+    sb ++= "\t})\n"
     sb ++= "}\n"
     sb.toString
 

@@ -57,7 +57,7 @@ func RecoverAsError(err *error) {
 
 // GoCallback runs a Scala callback called from Go: buffered Scala output is flushed afterwards,
 // so that it stays ordered with output written by Go code.
-func GoCallback() { stdout.Flush() }
+func GoCallback() { FlushStdout() }
 
 // ---- Values -----------------------------------------------------------------------------------
 

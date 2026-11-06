@@ -263,7 +263,7 @@ type BoxedUnit struct{}
 var UnitValue = &BoxedUnit{}
 
 // Object is an instance of java.lang.Object itself (`new Object()`, used as a lock or sentinel).
-type Object struct{ _ byte }
+type Object struct{ ObjectHeader }
 
 func NewObject() any { return &Object{} }
 

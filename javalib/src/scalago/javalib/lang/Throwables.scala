@@ -137,3 +137,16 @@ class StackOverflowError(message: String) extends Error(message):
 
 class OutOfMemoryError(message: String) extends Error(message):
   def this() = this(null)
+
+class IllegalMonitorStateException(message: String) extends RuntimeException(message):
+  def this() = this(null)
+
+class IllegalThreadStateException(message: String) extends IllegalArgumentException(message):
+  def this() = this(null)
+
+class LinkageError(message: String, cause: Throwable) extends Error(message, cause):
+  def this(message: String) = this(message, null)
+  def this() = this(null, null)
+
+class NoClassDefFoundError(message: String) extends LinkageError(message):
+  def this() = this(null)

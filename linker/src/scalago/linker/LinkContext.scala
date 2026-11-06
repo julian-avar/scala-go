@@ -36,6 +36,14 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
     case Type.Array(elem)         => s"*rt.Array[${goArrayElemType(elem)}]"
     case prim                     => Hijacked.primitiveGoType(prim)
 
+  /** Whether field `cls.field` is volatile: it then has Go type `rt.Volatile[T]`. */
+  def isVolatile(cls: ClassName, field: String): Boolean =
+    program.get(cls).exists(_.fields.exists(f => f.name == field && f.isVolatile))
+
+  /** The Go type of a field's storage. */
+  def fieldGoType(f: FieldDef): String =
+    if f.isVolatile then s"rt.Volatile[${goType(f.tpe)}]" else goType(f.tpe)
+
   /** Arrays of references all share one Go type, so that array covariance works. */
   def goArrayElemType(elem: Type): String =
     if elem.isPrimitive then Hijacked.primitiveGoType(elem) else "any"

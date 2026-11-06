@@ -74,6 +74,7 @@ object Mangling:
   def fileName(cls: ClassName): String = s"${escape(cls)}.go"
   def marker(iface: ClassName): String = s"I_${escape(iface)}"
   def clinit(cls: ClassName): String = s"Clinit_${escape(cls)}"
-  def clinitDone(cls: ClassName): String = s"clinitDone_${escape(cls)}"
+  def clinitLock(cls: ClassName): String = s"clinitLock_${escape(cls)}"
+  def moduleInitLock(cls: ClassName): String = s"modLock_${escape(cls)}"
   def dispatcher(m: MethodName): String = s"Disp_${method(m)}"
   def instanceTest(cls: ClassName): String = s"InstanceOf_${escape(cls)}"

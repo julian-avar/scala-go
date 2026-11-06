@@ -2,6 +2,8 @@ package rt
 
 import (
 	"strings"
+	"sync"
+	"sync/atomic"
 	"unicode"
 	"unicode/utf16"
 )
@@ -11,7 +13,7 @@ import (
 // Go strings (UTF-8) are only used at the edges: literals in generated code, I/O and interop.
 type String struct {
 	chars []uint16
-	hash  int32 // cached hashCode; 0 means not computed yet (as in the JDK)
+	hash  atomic.Int32 // cached hashCode; 0 means not computed yet (as in the JDK)
 }
 
 // Str converts a Go (UTF-8) string, such as a literal in generated code.
@@ -133,14 +135,14 @@ func StringEqualsIgnoreCase(s *String, o *String) bool {
 }
 
 func StringHashCode(s *String) int32 {
-	if s.hash == 0 {
-		var h int32
+	h := s.hash.Load()
+	if h == 0 {
 		for _, c := range s.chars {
 			h = 31*h + int32(c)
 		}
-		s.hash = h
+		s.hash.Store(h)
 	}
-	return s.hash
+	return h
 }
 
 func StringCompareTo(s *String, o *String) int32 {
@@ -285,10 +287,15 @@ func StringRepeat(s *String, n int32) *String {
 	return newString(chars)
 }
 
-var internTable = map[string]*String{}
+var (
+	internMu    sync.Mutex
+	internTable = map[string]*String{}
+)
 
 func StringIntern(s *String) *String {
 	key := string(utf16.Decode(s.chars))
+	internMu.Lock()
+	defer internMu.Unlock()
 	if t, ok := internTable[key]; ok && stringEq(t, s) {
 		return t
 	}

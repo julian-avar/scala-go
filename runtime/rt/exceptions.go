@@ -1,7 +1,6 @@
 package rt
 
 import (
-	"os"
 	"regexp"
 	"runtime"
 	"strings"
@@ -29,6 +28,9 @@ const (
 	UnsupportedOperation
 	ArrayStore
 	RuntimeError // any other Go runtime error
+	IllegalMonitorState
+	Interrupted
+	NoClassDefFound
 )
 
 var kindNames = [...]string{
@@ -37,7 +39,8 @@ var kindNames = [...]string{
 	"java.lang.ClassCastException", "java.lang.IllegalArgumentException",
 	"java.lang.NegativeArraySizeException", "java.lang.NumberFormatException",
 	"java.lang.UnsupportedOperationException", "java.lang.ArrayStoreException",
-	"java.lang.RuntimeException",
+	"java.lang.RuntimeException", "java.lang.IllegalMonitorStateException",
+	"java.lang.InterruptedException", "java.lang.NoClassDefFoundError",
 }
 
 // MakeException is installed by the generated program: it instantiates the Scala exception
@@ -122,14 +125,4 @@ func Caught(r any) any {
 		return NewException(RuntimeError, msg)
 	}
 	return NewException(RuntimeError, ToGoString(r))
-}
-
-// HandleUncaught reports an exception that escaped main, like the JVM, and exits with status 1.
-// It must be deferred directly by the function that runs the program (scala.Main).
-func HandleUncaught() {
-	if r := recover(); r != nil {
-		stdout.Flush()
-		os.Stderr.WriteString("Exception in thread \"main\" " + ToGoString(Caught(r)) + "\n")
-		os.Exit(1)
-	}
 }

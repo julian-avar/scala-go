@@ -42,7 +42,7 @@ final class ClassEmitter(ctx: LinkContext, cls: ClassDef):
     if isInstantiated && program.isInstantiable(cls) then emitInstanceMembers()
     if cls.kind == ClassKind.ModuleClass && isInstantiated then emitModuleAccessor()
     for f <- cls.fields if f.isStatic && analyzer.usedStaticFields.contains((name, f.name)) do
-      line(s"var ${Mangling.staticField(name, f.name)} ${ctx.goType(f.tpe)}")
+      line(s"var ${Mangling.staticField(name, f.name)} ${ctx.fieldGoType(f)}")
     if analyzer.staticInit.contains(name) then emitStaticInitializer()
     for m <- cls.methods if analyzer.reachedMethods.contains((name, m.name)) do emitImplementation(m)
     if sb.isEmpty then "" else s"// ${kindString} $name\n\n$sb"
@@ -57,8 +57,11 @@ final class ClassEmitter(ctx: LinkContext, cls: ClassDef):
   private def emitTypes(): Unit =
     if !isInterface then
       line(s"type $struct struct {")
-      cls.superClass.filter(program.contains).foreach(s => line(s"\t${Mangling.struct(s)}"))
-      for f <- cls.fields if !f.isStatic do line(s"\t${Mangling.field(f.name)} ${ctx.goType(f.tpe)}")
+      // Root classes embed the object header (the monitor); subclasses inherit it.
+      cls.superClass.filter(program.contains) match
+        case Some(s) => line(s"\t${Mangling.struct(s)}")
+        case None    => line("\trt.ObjectHeader")
+      for f <- cls.fields if !f.isStatic do line(s"\t${Mangling.field(f.name)} ${ctx.fieldGoType(f)}")
       line("}")
       line()
     line(s"type $iface interface {")
@@ -100,32 +103,39 @@ final class ClassEmitter(ctx: LinkContext, cls: ClassDef):
       line("}")
       line()
 
+  /** `Mod_C()`: the module instance, constructed on first use under an init lock (`rt.InitLock`),
+   *  with the JVM's class initialization semantics: other goroutines wait for the construction,
+   *  and code that refers to the module during its own construction (in the same goroutine) gets
+   *  the instance, which is published before its constructor runs, as Scala.js does.
+   */
   private def emitModuleAccessor(): Unit =
     val v = Mangling.moduleVar(name)
+    val lock = Mangling.moduleInitLock(name)
     val ctor = MethodName(MethodName.ConstructorSimpleName, Nil, Type.Void)
-    // The instance is published before its constructor runs (as Scala.js does), so a module that
-    // refers to itself during initialization sees the instance. Not yet safe for concurrent first access.
     line(s"var $v *$struct")
+    line(s"var $lock rt.InitLock")
     line()
     line(s"func ${Mangling.module(name)}() ${ctx.goType(Type.Class(name))} {")
-    line(s"\tif $v == nil {")
-    if analyzer.staticInit.contains(name) then line(s"\t\t${Mangling.clinit(name)}()")
-    line(s"\t\t$v = &$struct{}")
-    line(s"\t\t${Mangling.impl(name, ctor)}($v)")
+    line(s"\tif !$lock.Done() {")
+    line(s"\t\t$lock.Run(${FunctionEmitter.goStringLiteral(name)}, func() {")
+    if analyzer.staticInit.contains(name) then line(s"\t\t\t${Mangling.clinit(name)}()")
+    line(s"\t\t\t$v = &$struct{}")
+    line(s"\t\t\t${Mangling.impl(name, ctor)}($v)")
+    line("\t\t})")
     line("\t}")
     line(s"\treturn $v")
     line("}")
     line()
 
+  /** `Clinit_C()`: runs the static initializer once, under an init lock (see the module accessor). */
   private def emitStaticInitializer(): Unit =
-    val done = Mangling.clinitDone(name)
+    val lock = Mangling.clinitLock(name)
     val init = program.clinit(name).get
-    line(s"var $done bool")
+    line(s"var $lock rt.InitLock")
     line()
     line(s"func ${Mangling.clinit(name)}() {")
-    line(s"\tif !$done {")
-    line(s"\t\t$done = true")
-    line(s"\t\t${Mangling.impl(name, init.name)}()")
+    line(s"\tif !$lock.Done() {")
+    line(s"\t\t$lock.Run(${FunctionEmitter.goStringLiteral(name)}, ${Mangling.impl(name, init.name)})")
     line("\t}")
     line("}")
     line()

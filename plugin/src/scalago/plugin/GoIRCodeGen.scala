@@ -230,7 +230,8 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
 
   private def genField(vd: ValDef): ir.FieldDef =
     val sym = vd.symbol
-    ir.FieldDef(fieldName(sym), toIRType(sym.info), isStaticMember(sym), position(vd))
+    ir.FieldDef(fieldName(sym), toIRType(sym.info), isStaticMember(sym), position(vd),
+      isVolatile = sym.hasAnnotation(defn.VolatileAnnot))
 
   private def genMethod(dd: DefDef): ir.MethodDef =
     val sym = dd.symbol
@@ -428,6 +429,15 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
       case Select(handle, name) if name.toString == "compareAndSet" && isLazyValHandle(handle.symbol) =>
         genLazyValCompareAndSet(tree, handle.symbol)
 
+      case _ if isCompareAndSetIntrinsic(sym) =>
+        val List(field, expected, update) = args: @unchecked
+        def stripCasts(t: G): G = t match
+          case G.AsInstanceOf(inner, _) => stripCasts(inner)
+          case other                    => other
+        stripCasts(genExpr(field)) match
+          case f @ (_: G.Select | _: G.SelectStatic) => G.CompareAndSet(f, genExpr(expected), genExpr(update))(pos)
+          case _ => unsupported(field, "compareAndSet on something other than a field")
+
       case Select(Super(_, _), _) =>
         G.ApplyStatically(G.This(toIRType(currentClass.typeRef))(pos), className(staticOwner(sym)), methodName(sym),
           args.map(genExpr), methodName(sym).result)(pos)
@@ -459,31 +469,20 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
             G.ApplyStatically(receiver, className(staticOwner(sym)), name, genArgs, name.result)(pos)
           else G.Apply(receiver, className(staticOwner(sym)), name, genArgs, name.result)(pos)
 
-  /** `handle.compareAndSet(obj, expected, update)` on a lazy val's `VarHandle`, as a plain
-   *  (non-atomic) compare-and-set of the field. Programs are single-threaded for now.
+  /** `handle.compareAndSet(obj, expected, update)` on a lazy val's `VarHandle`: an atomic
+   *  compare-and-set of the (volatile) lazy val field.
    */
   private def genLazyValCompareAndSet(tree: Apply, handle: Symbol): G =
     val pos = position(tree)
     val List(obj, expected, update) = tree.args.map(genExpr): @unchecked
     val owner = className(handle.owner)
     val field = handle.name.toString.stripSuffix(LazyHandleSuffix)
-    val objVar = locals.fresh("casObj")
-    val updateVar = locals.fresh("casUpdate")
-    val expectedVar = locals.fresh("casExpected")
-    def fieldRef = G.Select(G.VarRef(objVar, obj.tpe)(pos), owner, field, ir.Type.Object)(pos)
-    G.Block(
-      List(
-        G.VarDef(objVar, obj.tpe, mutable = false, obj)(pos),
-        G.VarDef(expectedVar, ir.Type.Object, mutable = false, expected)(pos),
-        G.VarDef(updateVar, ir.Type.Object, mutable = false, update)(pos)
-      ),
-      G.If(
-        G.Binary(ir.BinaryOp.RefEq, ir.Type.Object, fieldRef, G.VarRef(expectedVar, ir.Type.Object)(pos))(pos),
-        G.Block(List(G.Assign(fieldRef, G.VarRef(updateVar, ir.Type.Object)(pos))(pos)), G.BooleanLiteral(true)(pos))(pos),
-        G.BooleanLiteral(false)(pos),
-        ir.Type.Boolean
-      )(pos)
-    )(pos)
+    G.CompareAndSet(G.Select(obj, owner, field, ir.Type.Object)(pos), expected, update)(pos)
+
+  /** `scalago.runtime.Intrinsics.compareAndSet(field, expected, update)`, used by javalib's atomics. */
+  private def isCompareAndSetIntrinsic(sym: Symbol): Boolean =
+    sym.name.toString == "compareAndSet" && sym.owner.is(ModuleClass) &&
+      sym.owner.fullName.toString == "scalago.runtime.Intrinsics$"
 
   /** The receiver of a method selection, recovering implicit prefixes of bare identifiers. */
   private def receiverOf(fun: Tree): Tree = fun match
@@ -507,15 +506,36 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
       G.Binary(ir.BinaryOp.StringConcat, ir.Type.String, genExpr(receiver), genExpr(args.head))(pos)
     else if isCoercion(code) then convert(genExpr(receiver), toIRType(tree.tpe))
     else if isArrayOp(code) then genArrayOp(tree, receiver, code)
-    else if code == SYNCHRONIZED then
-      // Single-threaded for now: evaluate the lock for its effects, then the body.
-      G.Block(List(genStat(receiver)), genExpr(args.head))(pos)
+    else if code == SYNCHRONIZED then genSynchronized(tree, receiver, args.head)
     else if code == HASH then
       val value = genExpr(receiver)
       val boxed = if value.tpe.isPrimitive then G.Box(value)(pos) else value
       G.ApplyStatic("scala.runtime.Statics", ir.MethodName("anyHash", List(ir.Type.Object), ir.Type.Int), List(boxed),
         ir.Type.Int)(pos)
     else unsupported(tree, s"primitive operation `${tree.fun.symbol.showFullName}`")
+
+  /** `lock.synchronized(body)`: the lock's monitor is held while the body runs, and released
+   *  however the body completes.
+   */
+  private def genSynchronized(tree: Apply, receiver: Tree, body: Tree): G =
+    val pos = position(tree)
+    val lockVar = locals.fresh("lock")
+    def lock = G.VarRef(lockVar, ir.Type.Object)(pos)
+    def monitor(op: String, arg: G) =
+      G.ApplyStatic(MonitorClass, ir.MethodName(op, List(ir.Type.Object), ir.Type.Void), List(arg), ir.Type.Void)(pos)
+    val tpe = toIRType(tree.tpe)
+    val genBody = if tpe == ir.Type.Void then genStat(body) else genExpr(body)
+    val lockExpr = genExpr(receiver)
+    G.Block(
+      List(
+        G.VarDef(lockVar, ir.Type.Object, mutable = false, if lockExpr.tpe.isPrimitive then G.Box(lockExpr)(pos) else lockExpr)(pos),
+        monitor("enter", lock)
+      ),
+      G.TryFinally(genBody, monitor("exit", lock), tpe)(pos)
+    )(pos)
+
+  /** Monitor operations, implemented natively by the linker. */
+  private val MonitorClass = "scalago.runtime.Monitor"
 
   private def genUnaryOp(code: Int, arg: G, tpe: ir.Type, pos: ir.Position): G =
     code match

@@ -9,7 +9,9 @@ See [docs/design.md](docs/design.md) for the architecture, object model, status 
 
 **Status:** early, but real programs work. Classes, traits, objects, exceptions, pattern
 matching, lambdas, `lazy val` and the standard collections all run, and Scala code can call Go
-packages. Concurrency, `BigDecimal`, regex and reflection don't work yet.
+packages. Threads run on goroutines, with `synchronized`, `wait`/`notify`, volatiles and atomics,
+and the generated code is safe to call from any goroutine. `BigDecimal`, regex, reflection and
+most of `java.util.concurrent` don't work yet.
 
 ## Using it with Mill
 
@@ -95,7 +97,8 @@ mill example.goRun               # the example, through ScalaGoModule
 
 Each directory in `tests/cases/` holds a program and an `expected.txt`. Cases with a
 `go-only.txt` (they call Go) skip the JVM, subdirectories with a `go.mod` are local Go modules, and
-a `link-errors.txt` lists errors that linking must report instead of running. The entry point is
+a `link-errors.txt` lists errors that linking must report instead of running. Cases with a
+`race.txt` also run under Go's race detector. The entry point is
 `Main` unless `main.txt` names another one. The test compiles the program with the plugin and
 runs it on the JVM. It then links it to Go, runs `go vet` and `go build`, and runs the binary.
 Both outputs must equal `expected.txt`. The work directory of a failing case is kept under

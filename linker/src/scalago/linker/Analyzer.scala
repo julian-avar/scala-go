@@ -145,6 +145,7 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
         loadModule(tree, cls)
 
       case Apply(receiver, decl, m, args, _) =>
+        Natives.calledBy(decl, m).foreach(callVirtual)
         Natives.lookup(decl, m) match
           case Some(Natives.Native.Static(_)) => () // module method: the receiver is not evaluated
           case Some(_)                        => scan(receiver)
@@ -169,6 +170,7 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
         scanAll(args)
 
       case ApplyStatic(cls, m, args, _) =>
+        Natives.calledBy(cls, m).foreach(callVirtual)
         if Natives.lookup(cls, m).isEmpty then
           if program.findMethod(cls, m).exists(d => d.isStatic && !d.isAbstract) then
             reach(cls, m)
