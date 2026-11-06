@@ -1,0 +1,14 @@
+5
+18
+hi #7
+3
+81
+running
+15
+8 7
+6
+side effect
+120
+a
+b
+1;2;

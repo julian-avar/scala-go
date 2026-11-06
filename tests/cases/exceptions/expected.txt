@@ -1,0 +1,15 @@
+ok 20
+bad argument: negative: -3
+arithmetic: / by zero
+try;finally;
+26
+try;finally;
+-1
+2
+name: must not be empty
+caught NPE
+Index 5 out of bounds for length 3
+java.lang.RuntimeException: boom
+true java.lang.IllegalStateException
+cleanup
+outer caught inner

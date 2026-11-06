@@ -1,0 +1,7 @@
+rect with area 6.0
+square! rect with area 4.0
+Square(2.0)
+2
+registry ready
+2
+0

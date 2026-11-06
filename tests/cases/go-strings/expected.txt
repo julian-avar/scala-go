@@ -1,0 +1,6 @@
+12 chars, 14 bytes
+true
+héllo, wörld!
+104
+true
+0

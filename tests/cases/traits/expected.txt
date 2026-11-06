@@ -1,0 +1,9 @@
+Hello, Ada
+HELLO, BOB!
+3
+dog says woof
+Ann's dog
+Ann
+true
+true
+false

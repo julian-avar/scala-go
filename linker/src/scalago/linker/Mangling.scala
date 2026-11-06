@@ -1,0 +1,79 @@
+package scalago.linker
+
+import scalago.ir.*
+
+/** Injective mapping from IR names to Go identifiers.
+ *
+ *  All generated code lives in one Go package (Scala packages may depend on each other
+ *  cyclically; Go packages may not), so class names are encoded into identifiers:
+ *  `[A-Za-z0-9]` is kept, `_` becomes `_u`, `.` becomes `_d`, `$` becomes `_S`, and anything
+ *  else becomes `_x` followed by four hex digits.
+ *
+ *  Package-level declarations use these prefixes:
+ *  {{{
+ *  S_<class>                 struct holding the fields of <class> (embeds the superclass struct)
+ *  C_<class>                 interface: the Go type of references to <class>
+ *  Impl_<class>_<method>     implementation of a method, taking `this` as a C_<class>
+ *  New_<class>_<ctor>        allocates an instance and runs a constructor
+ *  Mod_<class>()             accessor for the instance of a module class
+ *  SF_<class>_<field>        static field
+ *  Clinit_<class>()          runs the static initializer once
+ *  Disp_<method>             dynamic dispatch on receivers that may be strings or boxed values
+ *  InstanceOf_<class>        type test for classes that strings or boxed values may belong to
+ *  SL_<n>                    interned string literal
+ *  }}}
+ *  Methods on structs: `M_<method>` (virtual methods, exported so the runtime can call
+ *  `toString` and friends), `A_<class>` (returns the struct of an ancestor class) and
+ *  `I_<interface>` (marks implemented interfaces, so Go type assertions are exact).
+ */
+object Mangling:
+  def escape(s: String): String =
+    val sb = StringBuilder()
+    s.foreach {
+      case c if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') => sb += c
+      case '_' => sb ++= "_u"
+      case '.' => sb ++= "_d"
+      case '$' => sb ++= "_S"
+      case c   => sb ++= f"_x${c.toInt}%04x"
+    }
+    sb.toString
+
+  /** Type code used inside mangled method names (similar to JVM descriptors). */
+  def typeCode(t: Type): String = t match
+    case Type.Void        => "V"
+    case Type.Boolean     => "Z"
+    case Type.Char        => "C"
+    case Type.Byte        => "B"
+    case Type.Short       => "S"
+    case Type.Int         => "I"
+    case Type.Long        => "J"
+    case Type.Float       => "F"
+    case Type.Double      => "D"
+    case Type.Nothing     => "N"
+    case Type.Null        => "0"
+    case Type.Class(name) => s"L${escape(name)}_e"
+    case Type.Array(elem) => s"A${typeCode(elem)}"
+
+  /** Constructors are named `_init` (escaped names never start with `_i`). */
+  def method(m: MethodName): String =
+    val simple = if m.isConstructor then "_init" else escape(m.simple)
+    s"${simple}_p${m.params.map(typeCode).mkString}_r${typeCode(m.result)}"
+
+  def struct(cls: ClassName): String = s"S_${escape(cls)}"
+  def iface(cls: ClassName): String = s"C_${escape(cls)}"
+  def accessor(cls: ClassName): String = s"A_${escape(cls)}"
+  def impl(cls: ClassName, m: MethodName): String = s"Impl_${escape(cls)}_${method(m)}"
+  def newInstance(cls: ClassName, ctor: MethodName): String = s"New_${escape(cls)}_${method(ctor)}"
+  def module(cls: ClassName): String = s"Mod_${escape(cls)}"
+  def moduleVar(cls: ClassName): String = s"mod_${escape(cls)}"
+  def staticField(cls: ClassName, field: String): String = s"SF_${escape(cls)}_${escape(field)}"
+  def virtualMethod(m: MethodName): String = s"M_${method(m)}"
+  def field(name: String): String = s"f_${escape(name)}"
+  def local(name: LocalName): String = s"l_${escape(name)}"
+  def label(name: String): String = s"L_${escape(name)}"
+  def fileName(cls: ClassName): String = s"${escape(cls)}.go"
+  def marker(iface: ClassName): String = s"I_${escape(iface)}"
+  def clinit(cls: ClassName): String = s"Clinit_${escape(cls)}"
+  def clinitDone(cls: ClassName): String = s"clinitDone_${escape(cls)}"
+  def dispatcher(m: MethodName): String = s"Disp_${method(m)}"
+  def instanceTest(cls: ClassName): String = s"InstanceOf_${escape(cls)}"

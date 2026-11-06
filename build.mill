@@ -1,0 +1,210 @@
+//| mill-version: 1.1.8
+package build
+
+import mill.*
+import mill.scalalib.*
+import mill.scalalib.publish.*
+
+import scalago.mill.ScalaGoModule as UserScalaGoModule
+
+object Versions {
+  /** The plugin hooks compiler internals, so it is built against one exact compiler version.
+   *  User code compiled with the plugin must use this same Scala version.
+   */
+  val scala = UserScalaGoModule.ScalaVersion
+  /** Mill's own Scala version: the Mill plugin is compiled with it. */
+  val millScala = "3.8.2"
+  val mill = "1.1.8"
+  val munit = "1.3.0"
+}
+
+trait ScalaGoModule extends ScalaModule {
+  def scalaVersion = Versions.scala
+  def scalacOptions = Seq("-deprecation", "-feature", "-Wunused:all")
+}
+
+trait Published extends PublishModule {
+  def publishVersion = UserScalaGoModule.Version
+  def pomSettings = PomSettings(
+    description = "scala-go: compile Scala 3 to Go",
+    organization = UserScalaGoModule.Organization,
+    url = "https://github.com/scalago/scala-go",
+    licenses = Seq(License.`Apache-2.0`),
+    versionControl = VersionControl(),
+    developers = Seq()
+  )
+}
+
+/** Compiles a module of this build with the plugin (the plugin jar is not on the classpath). */
+trait WithPlugin extends ScalaGoModule {
+  def pluginOptions: T[Seq[String]] = Task {
+    Seq(s"-Xplugin:${plugin.jar().path}", s"-P:scala-go:plugin-signature:${plugin.jar().sig}")
+  }
+}
+
+/** The IR shared between the compiler plugin (writer) and the linker (reader). No dependencies. */
+object ir extends ScalaGoModule with Published {
+  def artifactName = "scalago-ir"
+}
+
+/** Scala 3 compiler plugin: runs after the JVM lowering phases and emits `.goir` files next to `.class` files. */
+object plugin extends ScalaGoModule with Published {
+  def artifactName = "scalago-plugin"
+  // Tied to one compiler version: published with the full Scala version as suffix.
+  def artifactSuffix = s"_${scalaVersion()}"
+  // The IR classes are compiled into the plugin jar, so that `-Xplugin:<jar>` is self-contained.
+  def sources = Task.Sources(moduleDir / "src", moduleDir / os.up / "ir" / "src")
+  def compileMvnDeps = Seq(mvn"org.scala-lang::scala3-compiler:${Versions.scala}")
+
+  /** Value for `-Xplugin:`. */
+  def pluginClasspath = Task { jar().path.toString }
+}
+
+/** Java standard library classes (and replacements for the Java classes of the Scala library),
+ *  written in Scala and compiled with the plugin. Only their `.goir` files are used: the `.class`
+ *  files must never be put on a JVM classpath.
+ */
+object javalib extends WithPlugin with Published {
+  def artifactName = "scalago-javalib"
+  // Sources live in scalago.javalib / scalago.scalalib, because the Scala compiler does not allow
+  // redefining core java.lang classes; the plugin emits them as java.* / scala.* in the IR (the
+  // .class files keep the scalago.* names, so they are harmless on a JVM classpath).
+  def scalacOptions = Task {
+    Seq("-feature", "-P:scala-go:rename:scalago.javalib:java", "-P:scala-go:rename:scalago.scalalib:scala") ++
+      pluginOptions()
+  }
+
+  /** scala.runtime.function.JProcedure0..22: Java interfaces in the Scala library. */
+  def generatedSources = Task {
+    val sb = new StringBuilder("package scalago.scalalib.runtime.function\n\n")
+    for (n <- 0 to 22) {
+      val tparams = (1 to n).map(i => s"T$i")
+      val params = (1 to n).map(i => s"t$i: T$i").mkString(", ")
+      val args = (1 to n).map(i => s"t$i").mkString(", ")
+      val tps = if (n == 0) "" else tparams.mkString("[", ", ", "]")
+      val fn = s"scala.Function$n[${(tparams :+ "scala.runtime.BoxedUnit").mkString(", ")}]"
+      sb ++= s"trait JProcedure$n$tps extends $fn with java.io.Serializable:\n"
+      sb ++= s"  def applyVoid($params): Unit\n"
+      sb ++= s"  override def apply($params): scala.runtime.BoxedUnit =\n"
+      sb ++= s"    applyVoid($args)\n"
+      sb ++= s"    scala.runtime.BoxedUnit.UNIT\n\n"
+    }
+    os.write(Task.dest / "JProcedures.scala", sb.toString)
+    Seq(PathRef(Task.dest))
+  }
+}
+
+/** User-facing scala-go APIs (e.g. `scalago.go.GoString`). A normal Scala library, compiled with
+ *  the plugin so that its IR ships in the same jar.
+ */
+object library extends WithPlugin with Published {
+  def artifactName = "scalago-library"
+  def scalacOptions = Task { super.scalacOptions() ++ pluginOptions() }
+}
+
+/** IR for the Scala standard library, compiled from the TASTy files it ships (Scala 3.8+). */
+object stdlib extends ScalaGoModule with Published {
+  def artifactName = "scalago-scalalib-ir"
+  def artifactSuffix = s"_${scalaVersion()}"
+  /** The published jar contains only the `.goir` files. */
+  def resources = Task { Seq(ir()) }
+
+  def libraryJar = Task {
+    defaultResolver()
+      .classpath(Seq(mvn"org.scala-lang:scala-library:${Versions.scala}"))
+      .find(_.path.last.startsWith("scala-library"))
+      .get
+  }
+
+  def compilerClasspath = Task {
+    defaultResolver().classpath(Seq(mvn"org.scala-lang::scala3-compiler:${Versions.scala}"))
+  }
+
+  /** Directory of `.goir` files. Untranslatable code becomes `Unsupported` IR (lenient mode), which
+   *  only fails linking if it is reachable. `scala.quoted` (macros only) is skipped: the compiler
+   *  cannot recompile it from TASTy.
+   */
+  def ir = Task {
+    val tastyDir = Task.dest / "tasty"
+    val out = Task.dest / "ir"
+    os.remove.all(tastyDir); os.remove.all(out)
+    os.makeDir.all(tastyDir); os.makeDir.all(out)
+    os.unzip(libraryJar().path, tastyDir, includePatterns = Seq(".*\\.tasty".r))
+    val files = os.walk(tastyDir)
+      .filter(_.ext == "tasty")
+      .filterNot(p => p.segments.contains("quoted"))
+      .map(_.toString)
+    val argsFile = Task.dest / "args.txt"
+    os.write.over(argsFile, files.mkString("\n"))
+    os.proc(
+      "java", "-Xss8m", "-cp", compilerClasspath().map(_.path).mkString(java.io.File.pathSeparator),
+      "dotty.tools.dotc.Main",
+      "-from-tasty", "-experimental", "-nowarn", "-Ystop-after:genGoIR",
+      "-classpath", libraryJar().path.toString,
+      "-d", out.toString,
+      s"-Xplugin:${plugin.jar().path}", "-P:scala-go:lenient",
+      s"@$argsFile"
+    ).call(stdout = os.Inherit)
+    PathRef(out)
+  }
+}
+
+/** Whole-program linker: reads `.goir` files from a classpath and emits a Go module. */
+object linker extends ScalaGoModule with Published {
+  def artifactName = "scalago-linker"
+  def moduleDeps = Seq(ir)
+
+  def goRuntimeDir = Task.Source(moduleDir / os.up / "runtime" / "rt")
+
+  /** Bundles the Go runtime sources as resources under `scalago/rt/`, plus an index file. */
+  def goRuntimeResources = Task {
+    val dest = Task.dest / "scalago" / "rt"
+    os.makeDir.all(dest)
+    val files = os.list(goRuntimeDir().path)
+      .filter(p => p.ext == "go" && !p.last.endsWith("_test.go"))
+      .sortBy(_.last)
+    files.foreach(f => os.copy.into(f, dest))
+    os.write(dest / "files.txt", files.map(_.last).mkString("", "\n", "\n"))
+    PathRef(Task.dest)
+  }
+
+  def resources = Task { super.resources() :+ goRuntimeResources() }
+
+  object test extends ScalaTests with TestModule.Munit {
+    def mvnDeps = Seq(
+      mvn"org.scalameta::munit:${Versions.munit}",
+      mvn"org.scala-lang::scala3-compiler:${Versions.scala}"
+    )
+    def testCasesDir = Task.Source(moduleDir / os.up / os.up / "tests" / "cases")
+    def forkEnv = Task {
+      super.forkEnv() ++ Map(
+        "SCALAGO_PLUGIN_CP" -> plugin.pluginClasspath(),
+        "SCALAGO_LIBRARY_IR" -> Seq(javalib.compile().classes.path, stdlib.ir().path).mkString(java.io.File.pathSeparator),
+        "SCALAGO_USER_LIBRARY" -> library.compile().classes.path.toString,
+        "SCALAGO_TEST_CASES" -> testCasesDir().path.toString
+      )
+    }
+  }
+}
+
+/** The Mill plugin (`scalago.mill.ScalaGoModule`). Its source is in `mill-build/src`, where this
+ *  build also uses it directly (see `example`).
+ */
+object millplugin extends ScalaModule with Published {
+  def scalaVersion = Versions.millScala
+  def artifactName = "mill-scalago"
+  def artifactSuffix = "_mill1_3"
+  def sources = Task.Sources(moduleDir / os.up / "mill-build" / "src")
+  def compileMvnDeps = Seq(mvn"com.lihaoyi::mill-libs:${Versions.mill}")
+}
+
+/** An example program built with ScalaGoModule, using this build's modules instead of published
+ *  artifacts: `mill example.goRun [names...]`.
+ */
+object example extends UserScalaGoModule {
+  def scalaGoPlugin = plugin.jar()
+  def scalaGoLinkerClasspath = linker.runClasspath()
+  def scalaGoLibraryIR = Task { Seq(javalib.compile().classes, stdlib.ir()) }
+  def scalaGoLibraryDeps = Task { Seq.empty[Dep] }
+  def moduleDeps = Seq(library)
+}
