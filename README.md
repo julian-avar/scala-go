@@ -156,7 +156,8 @@ mill example.goRun               # the example, through ScalaGoModule
 Each directory in `tests/cases/` holds a program and an `expected.txt`. Cases with a
 `go-only.txt` (they call Go) skip the JVM, subdirectories with a `go.mod` are local Go modules, and
 a `link-errors.txt` lists errors that linking must report instead of running. Cases with a
-`race.txt` also run under Go's race detector. A `library.txt` case is linked as a library and
+`race.txt` also run under Go's race detector (`allow-race: <Go function>` lines in it tolerate
+known races in third-party libraries). A `library.txt` case is linked as a library and
 used by the Go program in its `consumer/` directory. The entry point is
 `Main` unless `main.txt` names another one. The test compiles the program with the plugin and
 runs it on the JVM. It then links it to Go, runs `go vet` and `go build`, and runs the binary.

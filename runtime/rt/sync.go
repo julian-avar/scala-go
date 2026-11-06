@@ -2,7 +2,6 @@ package rt
 
 import (
 	"reflect"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,22 +16,6 @@ import (
 //
 // Ordinary fields are plain Go memory. A data race on them is a bug, as on the JVM, but its
 // consequences are Go's: a racy read of a reference can see a torn value. See docs/design.md.
-
-// GoID returns the current goroutine's id. Go does not expose it, so it is parsed from the
-// stack header ("goroutine 18 [running]:"); this costs about a microsecond, so it is only used
-// where ownership matters (monitors, initialization in progress).
-func GoID() uint64 {
-	var buf [32]byte
-	n := runtime.Stack(buf[:], false)
-	var id uint64
-	for _, c := range buf[len("goroutine "):n] {
-		if c < '0' || c > '9' {
-			break
-		}
-		id = id*10 + uint64(c-'0')
-	}
-	return id
-}
 
 // ---- Initialization -----------------------------------------------------------------------
 
