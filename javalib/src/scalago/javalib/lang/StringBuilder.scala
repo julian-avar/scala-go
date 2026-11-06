@@ -175,6 +175,8 @@ final class StringBuffer(private val builder: StringBuilder) extends Object with
   def charAt(index: Int): Char = builder.charAt(index)
   def subSequence(start: Int, end: Int): CharSequence = builder.subSequence(start, end)
   def append(s: String): StringBuffer = { builder.append(s); this }
+  def append(s: CharSequence): StringBuffer = { builder.append(s); this }
+  def append(s: CharSequence, start: Int, end: Int): StringBuffer = { builder.append(s, start, end); this }
   def append(obj: Object): StringBuffer = { builder.append(obj); this }
   def append(c: Char): StringBuffer = { builder.append(c); this }
   def append(i: Int): StringBuffer = { builder.append(i); this }

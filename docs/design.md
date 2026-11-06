@@ -407,13 +407,15 @@ Supported and covered by end-to-end tests:
   goroutines (and the same program on JVM virtual threads)
 - exports: a Scala library used by a Go program (functions, an exported class hierarchy,
   errors, panics, callbacks, identity, and calls from 100 goroutines under the race detector)
+- regular expressions: `scala.util.matching.Regex`, `java.util.regex` and the regex `String`
+  methods, on Go's `regexp` (RE2), with Java's UTF-16 offsets and replacement syntax
 - concurrency: threads, `synchronized`, `wait`/`notify`, volatile fields, atomics, interrupts,
   and concurrent first use of modules and lazy vals (also under Go's race detector)
 
 Known gaps:
-- `BigDecimal` (`java.math.BigDecimal` is not implemented), regular expressions beyond
-  `String.split`/`matches`/`replaceAll`/`replaceFirst` (which use Go's RE2: no lookaround or
-  backreferences), `java.util.regex`, `String.format` beyond the common conversions, `java.util` collections, `java.time`, and I/O
+- `BigDecimal` (`java.math.BigDecimal` is not implemented), regular expressions that RE2
+  cannot run (lookaround, backreferences, possessive quantifiers), `String.format` beyond the
+  common conversions, `java.util` collections, `java.time`, and I/O
   beyond stdout/stderr.
 - Reflection: `getClass` and `Class` names work; nothing else.
 - Concurrency: `java.util.concurrent` beyond what gears needs (executors, concurrent maps,
@@ -476,9 +478,11 @@ earlier has to be redone:
 6. **Facade generation** (done, see [Generated facades](#generated-facades)) from Go packages'
    APIs (`goapi`), with the step 3 types. `ScalaGoModule.goFacadePackages` generates facades for
    any Go package, and `scalago-gostd` publishes those of 21 standard library packages.
-7. **Library coverage** (`BigDecimal`, `java.util` collections, regex on Go's `regexp`, more of
-   `java.lang`) and **publishing** (organization `io.github.scalago` is a placeholder). These
-   can happen in parallel with the steps above.
+7. **Library coverage** and **publishing**, in parallel with the steps above. Done so far:
+   regular expressions on Go's `regexp` (`java.util.regex`, Scala's `Regex`), the
+   `java.util.concurrent` subset gears needs, and Scala library dependencies compiled from
+   TASTy. Still to do: `BigDecimal`, `java.util` collections, `java.time`, I/O, stack traces,
+   and publishing (organization `io.github.scalago` is a placeholder).
 
 ## Open questions
 

@@ -535,6 +535,24 @@ object Natives:
     )
   do staticFn(Locks, desc, fn)
 
+  // java.util.regex's native side (javalib/src/scalago/runtime/Regexes.scala).
+  private val Regexes = "scalago.runtime.Regexes$"
+  private val JS = "Ljava.lang.String;"
+  private val JO = "Ljava.lang.Object;"
+  for (desc, fn) <- List(
+      s"compile(${JS}I)$JO" -> "rt.RegexCompile",
+      s"groupCount($JO)I" -> "rt.RegexGroupCount",
+      s"groupIndex($JO$JS)I" -> "rt.RegexGroupIndex",
+      s"newInput($JO$JS)$JO" -> "rt.RegexNewInput",
+      s"find(${JO}I)[I" -> "rt.RegexFind",
+      s"matchStart(${JO}Z)[I" -> "rt.RegexMatchStart",
+      s"split($JO${JS}I)[$JS" -> "rt.RegexSplit",
+      s"replace($JO$JS${JS}Z)$JS" -> "rt.RegexReplace",
+      s"expand($JO$JS[I)$JS" -> "rt.RegexExpand",
+      s"quoteReplacement($JS)$JS" -> "rt.RegexQuoteReplacement"
+    )
+  do staticFn(Regexes, desc, fn)
+
   private val GoConsole = "scalago.runtime.Console$"
   staticFn(GoConsole, "writeStdout(Ljava.lang.String;)V", "rt.WriteStdout")
   staticFn(GoConsole, "writeStderr(Ljava.lang.String;)V", "rt.WriteStderr")

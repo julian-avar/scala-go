@@ -312,11 +312,14 @@ func StringSplit(s *String, regex *String) *Array[any] { return StringSplitLimit
 // start yields no leading empty string, limit > 0 caps the number of parts, and limit == 0
 // drops trailing empty strings.
 func StringSplitLimit(s *String, regex *String, limit int32) *Array[any] {
+	return splitWith(compileRegex(regex.GoString()), s, limit)
+}
+
+func splitWith(re *regexp.Regexp, s *String, limit int32) *Array[any] {
 	str := s.GoString()
 	if len(str) == 0 {
 		return &Array[any]{Data: []any{s}}
 	}
-	re := compileRegex(regex.GoString())
 	var parts []string
 	start := 0
 	for _, m := range re.FindAllStringIndex(str, -1) {

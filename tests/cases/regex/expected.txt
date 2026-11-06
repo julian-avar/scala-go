@@ -1,0 +1,15 @@
+year 2026, month 11, day 06
+no date
+Some(the)
+List(2, 13)
+the@0 cat@4 sat@8
+the CAT SAT on 2 MATs and 13 HATs
+List(a, b, c)
+Some((1999,13))
+Some(null)
+\Q1+1=2\E true
+true
+Some(List())
+1a,2b,3c
+true
+tel: 1234-555
