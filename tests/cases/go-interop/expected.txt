@@ -28,3 +28,8 @@ scala again
 SCALA AND GO (12 bytes)
 writer failed: java.lang.IllegalStateException: no bangs
 1+2=3 5 true true
+4 fields: the|quick|brown|fox
+contains fox: true, index of brown: 2
+max: 3
+sorted: 1,2,3
+sorted longs: -1,4,9

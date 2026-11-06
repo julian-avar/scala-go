@@ -24,7 +24,9 @@ final case class ClassDef(
     methods: List[MethodDef],
     pos: Position,
     /** Set for Go facades: classes standing for a Go package or a Go type (see [[GoFacade]]). */
-    goFacade: Option[GoFacade] = None
+    goFacade: Option[GoFacade] = None,
+    /** Set for classes exported to Go (`@GoExport`): the Go type name. */
+    goExport: Option[String] = None
 )
 
 /** A Scala declaration of Go code (`@GoImport`). Facades have no IR bodies: the linker turns uses
@@ -50,7 +52,9 @@ final case class MethodDef(
     isPrivate: Boolean,
     pos: Position,
     /** Members of Go facades: the Go name and the Scala (pre-erasure) signature. */
-    goMember: Option[GoMember] = None
+    goMember: Option[GoMember] = None,
+    /** Methods and constructors exported to Go (`@GoExport`). */
+    goExport: Option[GoExport] = None
 ):
   def isAbstract: Boolean = body.isEmpty
 
@@ -62,6 +66,16 @@ final case class MethodDef(
  *  @param isProperty declared without a parameter list (`def X: T`): may be a Go field or variable
  */
 final case class GoMember(goName: String, params: List[ScalaType], result: ScalaType, isProperty: Boolean)
+
+/** A method (of a top-level object or an exported class) or constructor exported to Go.
+ *
+ *  @param goName       the Go function or method name (`New<Type>` for constructors)
+ *  @param params       the Scala types of the parameters, before erasure
+ *  @param result       the Scala result type, before erasure
+ *  @param returnsError the method declares `@throws`: Scala exceptions become a trailing `error`
+ *                      result (otherwise they are Go panics)
+ */
+final case class GoExport(goName: String, params: List[ScalaType], result: ScalaType, returnsError: Boolean)
 
 /** A Scala type before erasure, as far as Go interop needs it: type arguments of functions,
  *  tuples, sequences and arrays, and opaque types such as `scalago.go.GoString`.

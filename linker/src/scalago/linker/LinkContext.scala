@@ -14,9 +14,13 @@ final class Errors:
 /** Shared state for code generation after analysis: Go types, and the program-wide helpers
  *  (string literals, dispatchers, type tests) that method bodies request.
  */
-final class LinkContext(val program: Program, val analyzer: Analyzer, val errors: Errors, val goApi: GoApi = GoApi.empty):
+final class LinkContext(val program: Program, val analyzer: Analyzer, val errors: Errors, val goApi: GoApi = GoApi.empty,
+    val libraryMode: Boolean = false):
   /** Go facades: conversions, calls and Go types (see [[GoInterop]]). */
   val interop: GoInterop = GoInterop(this)
+
+  /** Exports to Go (library builds, see [[Exports]]). */
+  lazy val exports: ExportEmitter = ExportEmitter(this)
 
   /** Classes that exist at run time: instantiated ones and their ancestors. They get Go types. */
   val declared: Set[ClassName] =

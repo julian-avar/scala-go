@@ -74,3 +74,14 @@ object Main:
     fmt.Fprintf(w, "%d+%d", 1, 2)
     buf.WriteString("=3")
     println(s"${buf.String()} ${buf.Len()} ${w.isInstanceOf[bytes.Buffer]} ${(shouting: Any).isInstanceOf[io.Writer]}")
+
+    val fields = strings.goFields("  the quick  brown fox ")
+    println(s"${fields.length} fields: ${fields.iterator.map(_.toJavaString).mkString("|")}")
+    println(s"contains fox: ${slices.Contains(fields, GoString("fox"))}, index of brown: ${slices.indexOf(fields, GoString("brown"))}")
+    val ints = GoSlice.of(GoInt(3), GoInt(1), GoInt(2))
+    println(s"max: ${slices.Max(ints).toLong}")
+    sort.Ints(ints) // sorts the shared slice in place
+    println(s"sorted: ${ints.iterator.map(_.toLong).mkString(",")}")
+    val longs = GoSlice.of(9L, -1L, 4L)
+    slices.Sort(longs)
+    println(s"sorted longs: ${longs.mkString(",")}")

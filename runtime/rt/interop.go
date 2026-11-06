@@ -69,6 +69,21 @@ func FromPtr[T any](p *T) any {
 	return p
 }
 
+// ConvertGo converts a Go value held by Scala code (a slice, map, channel or pointer) to Go type
+// T: as is if it has that type, otherwise with a Go conversion (a bidirectional channel to a
+// receive-only one, a slice to a named slice type). Null becomes the zero value (nil).
+func ConvertGo[T any](x any) T {
+	if v, ok := x.(T); ok || x == nil {
+		return v
+	}
+	v := reflect.ValueOf(x)
+	t := reflect.TypeFor[T]()
+	if !v.CanConvert(t) {
+		ThrowKind(ClassCast, GetClass(x).name+" cannot be converted to Go type "+t.String())
+	}
+	return v.Convert(t).Interface().(T)
+}
+
 // Addr stores a Go struct value as a Scala reference (facades of struct types hold pointers).
 func Addr[T any](v T) any { return &v }
 

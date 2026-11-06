@@ -1,0 +1,17 @@
+slice: 3,1,2 length=3
+after writes: 30,10,2; tail 10,2
+appended: 30,10,2,4,5 (xs still 3)
+sum: 51, as Seq: Vector(30, 10, 2, 4, 5)
+bytes: 255 0
+GoStrings: go scala
+copied 2: 7,8
+out of range: Index 10 out of bounds for length 3
+map: and=1 cat=1 hat=1 the=2 size=4
+after remove: contains the=false cat=Some(1)
+nested: one
+channel: List(1, 4, 9, 16, 25)
+closed: None
+trySend: true true false
+buffered: length=2 capacity=2 first=Some(a)
+pointer: 3.0
+zero: 0

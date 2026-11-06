@@ -11,7 +11,7 @@ import scala.collection.mutable
  */
 object Serialization:
   val Magic: Int = 0x53474f49 // "SGOI"
-  val FormatVersion: Int = 4
+  val FormatVersion: Int = 5
   val FileExtension: String = ".goir"
 
   final class IRFormatException(msg: String) extends IOException(msg)
@@ -139,9 +139,11 @@ object Serialization:
         bool(m.isPrivate)
         pos(m.pos)
         option(m.goMember) { g => str(g.goName); list(g.params)(scalaType); scalaType(g.result); bool(g.isProperty) }
+        option(m.goExport) { g => str(g.goName); list(g.params)(scalaType); scalaType(g.result); bool(g.returnsError) }
       }
       pos(c.pos)
       option(c.goFacade) { f => str(f.pkg); str(f.name) }
+      option(c.goExport)(str)
 
     def scalaType(t: ScalaType): Unit = t match
       case ScalaType.Prim(p)         => { out.writeByte(0); tpe(p) }
@@ -240,9 +242,11 @@ object Serialization:
         val name = method()
         val params = list(ParamDef(str(), tpe()))
         MethodDef(name, params, option(tree()), bool(), bool(), pos(),
-          option(GoMember(str(), list(scalaType()), scalaType(), bool())))
+          option(GoMember(str(), list(scalaType()), scalaType(), bool())),
+          option(GoExport(str(), list(scalaType()), scalaType(), bool())))
       }
-      ClassDef(name, kind, isAbstract, superClass, interfaces, fields, methods, pos(), option(GoFacade(str(), str())))
+      ClassDef(name, kind, isAbstract, superClass, interfaces, fields, methods, pos(), option(GoFacade(str(), str())),
+        option(str()))
 
     def scalaType(): ScalaType = in.readUnsignedByte() match
       case 0     => ScalaType.Prim(tpe())

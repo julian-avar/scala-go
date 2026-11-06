@@ -263,6 +263,12 @@ func typ(t types.Type) string {
 	case *types.Map:
 		return "(map " + typ(t.Key()) + " " + typ(t.Elem()) + ")"
 	case *types.Chan:
+		switch t.Dir() {
+		case types.RecvOnly:
+			return "(recv-chan " + typ(t.Elem()) + ")"
+		case types.SendOnly:
+			return "(send-chan " + typ(t.Elem()) + ")"
+		}
 		return "(chan " + typ(t.Elem()) + ")"
 	case *types.Signature:
 		return "(func " + signature(t) + ")"

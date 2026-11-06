@@ -202,6 +202,11 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
         case FunctionArity(n) =>
           // Go calls the Scala function: apply(Object, ...)Object.
           callVirtual(MethodName("apply", List.fill(n)(Type.Object), Type.Object))
+          // A Go func returned to Scala is wrapped into a scalago.go.GoFunctionN.
+          val wrapper = GoInterop.goFunctionClass(n)
+          if toScala && program.findMethod(wrapper, GoInterop.GoFunctionConstructor).isDefined then
+            instantiate(wrapper)
+            reach(wrapper, GoInterop.GoFunctionConstructor)
           args.init.foreach(useScalaType(_, toScala = true))
           args.lastOption.foreach(useScalaType(_, toScala = false))
         case TupleArity(n) if toScala =>
@@ -218,6 +223,19 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
           args.foreach(useScalaType(_, toScala))
     case ScalaType.Arr(elem) => useScalaType(elem, toScala)
     case ScalaType.Prim(_)   => ()
+
+  /** Makes reachable what an export's conversions need (Go arguments to Scala, result to Go). */
+  def useExport(e: GoExport): Unit =
+    e.params.foreach(useScalaType(_, toScala = true))
+    useScalaType(e.result, toScala = false)
+    if e.returnsError then reachGoException()
+
+  /** A module used as a root (exported functions are its methods). */
+  def loadModuleRoot(cls: ClassName): Unit =
+    val ctor = MethodName(MethodName.ConstructorSimpleName, Nil, Type.Void)
+    instantiate(cls)
+    reach(cls, ctor)
+    initializeStatics(cls)
 
   private var goExceptionReached = false
 

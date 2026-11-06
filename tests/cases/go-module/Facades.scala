@@ -12,6 +12,14 @@ object greet:
   def Move(p: Point, dx: Int, dy: Int): Point = native
   @GoName("Shout") def shout(s: GoString): GoString = native
   def Panic(msg: String): Unit = native
+  def Counts(words: GoSlice[GoString]): GoMap[GoString, Long] = native
+  def Adder(n: Int): Long => Long = native
+  def Checker(): String => Unit = native
+  def Squares(n: Int): GoChan[Long] = native
+  def Sum(c: GoChan[Long]): Long = native
+  def Increment(p: GoPtr[GoInt]): Unit = native
+  def Reverse(xs: GoSlice[GoInt]): Unit = native
+  def Total(m: GoMap[GoString, GoInt]): Int = native
 
   class Greeter:
     def Greeting: String = native

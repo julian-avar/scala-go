@@ -31,6 +31,7 @@ const (
 	IllegalMonitorState
 	Interrupted
 	NoClassDefFound
+	IndexOutOfBounds
 )
 
 var kindNames = [...]string{
@@ -41,6 +42,7 @@ var kindNames = [...]string{
 	"java.lang.UnsupportedOperationException", "java.lang.ArrayStoreException",
 	"java.lang.RuntimeException", "java.lang.IllegalMonitorStateException",
 	"java.lang.InterruptedException", "java.lang.NoClassDefFoundError",
+	"java.lang.IndexOutOfBoundsException",
 }
 
 // MakeException is installed by the generated program: it instantiates the Scala exception

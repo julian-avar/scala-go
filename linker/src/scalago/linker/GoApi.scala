@@ -17,7 +17,8 @@ enum GoType:
   case Slice(elem: GoType)
   case ArrayOf(length: Long, elem: GoType)
   case MapOf(key: GoType, value: GoType)
-  case Chan(elem: GoType)
+  /** `dir`: "" (both directions), "recv" (`<-chan`) or "send" (`chan<-`). */
+  case Chan(elem: GoType, dir: String = "")
   case Func(sig: GoSignature)
   /** `any` / `interface{}`. */
   case EmptyInterface
@@ -32,7 +33,9 @@ enum GoType:
     case Slice(e)          => s"[]$e"
     case ArrayOf(n, e)     => s"[$n]$e"
     case MapOf(k, v)       => s"map[$k]$v"
-    case Chan(e)           => s"chan $e"
+    case Chan(e, "recv")   => s"<-chan $e"
+    case Chan(e, "send")   => s"chan<- $e"
+    case Chan(e, _)        => s"chan $e"
     case Func(sig)         => s"func$sig"
     case EmptyInterface    => "any"
     case Other(d)          => d
@@ -168,6 +171,8 @@ object GoApi:
     case SList(List(Atom("array"), Atom(n), t))            => GoType.ArrayOf(n.toLong, goType(t))
     case SList(List(Atom("map"), k, v))                    => GoType.MapOf(goType(k), goType(v))
     case SList(List(Atom("chan"), t))                      => GoType.Chan(goType(t))
+    case SList(List(Atom("recv-chan"), t))                 => GoType.Chan(goType(t), "recv")
+    case SList(List(Atom("send-chan"), t))                 => GoType.Chan(goType(t), "send")
     case SList(List(Atom("func"), sig))                    => GoType.Func(signature(sig))
     case SList(List(Atom("interface")))                    => GoType.EmptyInterface
     case SList(List(Atom("generic"), Str(pkg), Atom(name))) => GoType.Other(s"$pkg.$name[...] (generic)")

@@ -40,3 +40,26 @@ object Main:
 
     try greet.Panic("boom")
     catch case e: RuntimeException => println(s"recovered: ${e.getMessage}")
+
+    // Go data shared with Go code, and Go funcs as Scala functions.
+    val words = GoSlice.of("a b a c a".split(" ").map(GoString(_))*)
+    val counts = greet.Counts(words)
+    println(counts.iterator.map((k, v) => s"${k.toJavaString}=$v").toSeq.sorted.mkString(" "))
+    counts(GoString("z")) = 10
+    println(s"total ${greet.Total(counts.asInstanceOf[GoMap[GoString, GoInt]])}")
+    val add2 = greet.Adder(2)
+    println(s"${add2(40)} ${List(1L, 2L).map(add2)}")
+    val check = greet.Checker()
+    check("fine")
+    try check("")
+    catch case e: GoException => println(s"Go func failed: ${e.getMessage}")
+    println(s"squares: ${greet.Squares(4).iterator.toList}")
+    val ch = GoChan.make[Long](3)
+    ch.send(1); ch.send(2); ch.send(3); ch.close()
+    println(s"sum: ${greet.Sum(ch)}")
+    val n = GoPtr.to(GoInt(41))
+    greet.Increment(n)
+    println(s"incremented: ${n.get.toLong}")
+    val ints = GoSlice.of(GoInt(1), GoInt(2), GoInt(3))
+    greet.Reverse(ints)
+    println(s"reversed in place: ${ints.iterator.map(_.toLong).mkString(",")}")

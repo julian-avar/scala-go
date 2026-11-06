@@ -73,6 +73,12 @@ trait ScalaGoModule extends ScalaModule {
    */
   def goRequires: T[Seq[String]] = Task { Seq.empty[String] }
 
+  /** Whether this module links into a Go library (see `ScalaGoLibraryModule`). */
+  def goLibrary: T[Boolean] = Task { false }
+
+  /** Package name of a library's root Go package ("" for the module path's last element). */
+  def goPackageName: T[String] = Task { "" }
+
   /** Directories of local Go modules (each with its own `go.mod`) that the program's Go facades
    *  import, e.g. `Task.Sources(moduleDir / "go" / "mylib")`.
    */
@@ -95,7 +101,8 @@ trait ScalaGoModule extends ScalaModule {
       "scalago.linker.Main",
       "--classpath", classpath.mkString(sep),
       "--out", out,
-      "--main", scalaGoMainObject(),
+      if (goLibrary()) Seq("--library", "true") else Seq("--main", scalaGoMainObject()),
+      if (goPackageName().nonEmpty) Seq("--package", goPackageName()) else Seq.empty[String],
       "--go-module", goModulePath(),
       goRequires().flatMap(r => Seq("--go-require", r)),
       localModules.flatten
@@ -120,6 +127,21 @@ trait ScalaGoModule extends ScalaModule {
       check = false
     )
     if (result.exitCode != 0) throw new Exception(s"program exited with status ${result.exitCode}")
+  }
+}
+
+/** A Scala library compiled to a Go module that other Go code requires and imports: its Go API
+ *  is the definitions marked `@scalago.go.GoExport`. `goLink` produces the module; set
+ *  `goModulePath` to the path Go code imports it by.
+ */
+trait ScalaGoLibraryModule extends ScalaGoModule {
+  override def goLibrary: T[Boolean] = Task { true }
+  override def scalaGoMainObject: T[String] = Task { "" }
+
+  /** Type-checks the linked library with `go vet` (a library has no executable). */
+  override def goBuild: T[PathRef] = Task {
+    os.proc("go", "vet", "./...").call(cwd = goLink().path, stdout = os.Inherit, stderr = os.Inherit)
+    goLink()
   }
 }
 

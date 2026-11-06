@@ -81,3 +81,65 @@ func Move(p Point, dx, dy int) Point { return Point{p.X + dx, p.Y + dy} }
 func Shout(s string) string { return strings.ToUpper(s) + "!" }
 
 func Panic(msg string) { panic(msg) }
+
+// Counts counts the words: a map returned to Scala.
+func Counts(words []string) map[string]int {
+	m := map[string]int{}
+	for _, w := range words {
+		m[w]++
+	}
+	return m
+}
+
+// Adder returns a func: Go funcs returned to Scala become Scala functions.
+func Adder(n int) func(int) int { return func(x int) int { return x + n } }
+
+// Checker returns a func whose error result becomes an exception in Scala.
+func Checker() func(string) error {
+	return func(s string) error {
+		if s == "" {
+			return errors.New("empty")
+		}
+		return nil
+	}
+}
+
+// Squares sends the first n squares on a receive-only channel, then closes it.
+func Squares(n int) <-chan int {
+	c := make(chan int)
+	go func() {
+		for i := 1; i <= n; i++ {
+			c <- i * i
+		}
+		close(c)
+	}()
+	return c
+}
+
+// Sum receives from a channel Scala made until it is closed.
+func Sum(c <-chan int64) int64 {
+	var total int64
+	for x := range c {
+		total += x
+	}
+	return total
+}
+
+// Increment increments through a pointer.
+func Increment(p *int) { *p++ }
+
+// Reverse reverses a slice in place.
+func Reverse(xs []int) {
+	for i, j := 0, len(xs)-1; i < j; i, j = i+1, j-1 {
+		xs[i], xs[j] = xs[j], xs[i]
+	}
+}
+
+// Total sums the map's values.
+func Total(m map[string]int) int {
+	t := 0
+	for _, v := range m {
+		t += v
+	}
+	return t
+}

@@ -77,9 +77,11 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
 
     val members = (impl.constr :: impl.body).filterNot(t => isIgnoredMember(t.symbol))
     val fields = members.collect { case vd: ValDef if !vd.symbol.is(Method) => genField(vd) }
-    val methods = members.collect { case dd: DefDef => genMethod(dd) }
+    val exportedType = goExportedType(td)
+    val methods = members.collect { case dd: DefDef => genMethod(dd).copy(goExport = goExport(dd, exportedType)) }
 
-    ir.ClassDef(className(sym), kind, sym.is(Abstract), superClass, interfaces, fields, methods, position(td))
+    ir.ClassDef(className(sym), kind, sym.is(Abstract), superClass, interfaces, fields, methods, position(td),
+      goExport = exportedType)
 
   private def classKind(sym: ClassSymbol): ir.ClassKind =
     if sym.is(Trait) then ir.ClassKind.Interface
@@ -87,12 +89,65 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
     else ir.ClassKind.Class
 
   // -------------------------------------------------------------------------------------------
+  // Exports to Go
+  // -------------------------------------------------------------------------------------------
+
+  private lazy val GoExportAnnot: Symbol = getClassIfDefined("scalago.go.GoExport")
+
+  private def isExported(sym: Symbol): Boolean = GoExportAnnot.exists && sym.hasAnnotation(GoExportAnnot)
+
+  /** The Go name of an exported definition: the annotation's, or the Scala name capitalized. */
+  private def exportName(sym: Symbol, scalaName: String, pos: dotty.tools.dotc.util.SrcPos): String =
+    val name = annotationArg(sym, GoExportAnnot, 0).filter(_.nonEmpty).getOrElse(scalaName.capitalize)
+    if !name.matches("[A-Z][A-Za-z0-9_]*") then
+      report.error(s"scala-go: `$name` is not an exported Go identifier (use @GoExport(\"Name\"))", pos)
+    name
+
+  /** For an exported class (`@GoExport class C`): its Go type name. */
+  private def goExportedType(td: TypeDef): Option[String] =
+    val sym = td.symbol
+    if !isExported(sym) then None
+    else if sym.is(Trait) then
+      report.error("scala-go: traits cannot be exported to Go yet; export the classes implementing them", td.srcPos)
+      None
+    else if sym.is(ModuleClass) then
+      report.error("scala-go: export the methods of an object (`@GoExport def`), not the object", td.srcPos)
+      None
+    else Some(exportName(sym, atPhase(erasurePhase)(sym.name).toString, td.srcPos))
+
+  /** The export of a method (`@GoExport def`) or of an exported class's primary constructor. */
+  private def goExport(dd: DefDef, exportedType: Option[String]): Option[ir.GoExport] =
+    val sym = dd.symbol
+    val owner = sym.owner
+    val isPrimaryConstructor = sym.isPrimaryConstructor && exportedType.isDefined && !owner.is(Abstract)
+    if !isExported(sym) && !isPrimaryConstructor then None
+    else
+      val inTopLevelObject = owner.is(ModuleClass) && owner.isStatic
+      if !isPrimaryConstructor && !inTopLevelObject && exportedType.isEmpty then
+        report.error("scala-go: only methods of top-level objects and of exported classes (@GoExport class) can be exported", dd.srcPos)
+      if sym.is(Private) then report.error("scala-go: private methods cannot be exported", dd.srcPos)
+      val (params, result) = atPhase(erasurePhase)(sym.info) match
+        case ExprType(res)  => (Nil, res)
+        case mt: MethodType =>
+          if mt.resultType.isInstanceOf[MethodType] then
+            report.error("scala-go: exported methods can have at most one parameter list", dd.srcPos)
+          (mt.paramInfos, mt.resultType)
+        case pt: PolyType =>
+          report.error("scala-go: exported methods cannot have type parameters", dd.srcPos)
+          (Nil, pt.resultType)
+        case other => (Nil, other)
+      val goName =
+        if isPrimaryConstructor then s"New${exportedType.get}"
+        else exportName(sym, sym.name.toString, dd.srcPos)
+      val resultType = if isPrimaryConstructor then ir.ScalaType.Prim(ir.Type.Void) else scalaType(result)
+      Some(ir.GoExport(goName, params.map(scalaType), resultType, returnsError = sym.hasAnnotation(defn.ThrowsAnnot)))
+
+  // -------------------------------------------------------------------------------------------
   // Go facades
   // -------------------------------------------------------------------------------------------
 
   private lazy val GoImportAnnot: Symbol = getClassIfDefined("scalago.go.GoImport")
   private lazy val GoNameAnnot: Symbol = getClassIfDefined("scalago.go.GoName")
-  private val GoStringName = "scalago.go.GoString"
 
   private def annotationArg(sym: Symbol, annot: Symbol, index: Int): Option[String] =
     if !annot.exists then None
@@ -184,22 +239,32 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
   private def scalaType(tpe: Type): ir.ScalaType =
     tpe match
       case tr: TypeRef if tr.symbol.isAliasType || tr.symbol.isOpaqueAlias =>
-        if isGoString(tr.symbol) then ir.ScalaType.Ref(GoStringName, Nil)
-        else scalaType(tr.translucentSuperType)
+        goOpaqueType(tr.symbol) match
+          case Some(name) => ir.ScalaType.Ref(name, Nil)
+          case None if !(tr.translucentSuperType eq tr) => scalaType(tr.translucentSuperType)
+          case None => erasedScalaType(tr)
       case ExprType(res) => scalaType(res)
       case AnnotatedType(underlying, _) => scalaType(underlying)
       case AppliedType(tycon, args) =>
         val cls = tycon.typeSymbol
         if cls == defn.ArrayClass then ir.ScalaType.Arr(scalaType(args.head))
         else if cls == defn.RepeatedParamClass then ir.ScalaType.Ref("scala.collection.immutable.Seq", args.map(scalaArg))
-        else if cls.isAliasType || cls.isOpaqueAlias then scalaType(tpe.dealias)
+        else if goOpaqueType(cls).isDefined then ir.ScalaType.Ref(goOpaqueType(cls).get, args.map(scalaArg))
+        else if (cls.isAliasType || cls.isOpaqueAlias) && !(tpe.dealias eq tpe) then scalaType(tpe.dealias)
         else if cls.isClass then ir.ScalaType.Ref(className(cls), args.map(scalaArg))
         else erasedScalaType(tpe)
       case _ => erasedScalaType(tpe)
 
-  /** The opaque type `scalago.go.GoString` (a top-level definition, so owned by a package object). */
-  private def isGoString(sym: Symbol): Boolean =
-    sym.name.toString == "GoString" && sym.owner.is(ModuleClass) && sym.owner.owner.showFullName == "scalago.go"
+  /** The opaque types of `scalago.go` that stand for Go types (`GoString`, `GoSlice`, ...), by
+   *  their full name. They are top-level definitions, so owned by package objects.
+   */
+  private def goOpaqueType(sym: Symbol): Option[String] =
+    val name = sym.name.toString
+    Option.when(GoOpaqueTypes(name) && sym.owner.is(ModuleClass) &&
+      sym.owner.owner.showFullName == "scalago.go")(s"scalago.go.$name")
+
+  private val GoOpaqueTypes = Set("GoString", "GoSlice", "GoMap", "GoChan", "GoPtr",
+    "GoInt", "GoUint", "GoUint64", "GoUintptr", "GoUint32", "GoByte")
 
   private def scalaArg(arg: Type): ir.ScalaType = arg match
     case bounds: TypeBounds => scalaType(bounds.hi)

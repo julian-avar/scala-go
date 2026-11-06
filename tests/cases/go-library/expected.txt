@@ -1,0 +1,12 @@
+Hello, Go!
+10
+42 <nil>
+error: true
+18
+recovered: java.lang.IllegalStateException: boom
+2 2 1 4
+circle of area 3.14 / circle
+square of area 4.00 / square
+largest: square true
+none: true
+110 true false

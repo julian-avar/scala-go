@@ -7,6 +7,7 @@ object strings:
   def Repeat(s: String, count: String): String = native
   def Split(s: String, sep: String): String = native
   def Count(s: String): Int = native
+  def Fields(s: String): GoSlice[String] = native
   class Builder:
     def Missing(): Int = native
   class Nope
@@ -19,3 +20,4 @@ object Main:
     println(strings.Count("a"))
     println(new strings.Builder().Missing())
     println(new strings.Nope)
+    println(strings.Fields("a b"))

@@ -64,11 +64,43 @@ object strconv:
 object io:
   trait Writer:                                               // Go interfaces can be implemented in Scala
     def Write(p: Array[Byte]): Int                            // ([]byte) (int, error)
+
+@GoImport("slices")
+object slices:
+  def Max(xs: GoSlice[GoInt]): GoInt = native                 // generic: Go infers [[]int, int]
+  def Sort(xs: GoSlice[Long]): Unit = native                  // sorts the shared []int64 in place
 ```
+
+`GoSlice`, `GoMap`, `GoChan` and `GoPtr` are Go data shared without copying
+(`GoSlice.make[GoInt](n)` is an `[]int`, `GoMap.make[GoString, Long]` a `map[string]int64`). They
+also run on the JVM. Go funcs returned by facades are Scala functions.
 
 Go modules other than the standard library go in `goRequires` (`"module@version"`), or in
 `goLocalModules` for local directories with a `go.mod` (see `example/`). Facade members throw on
 the JVM. See [docs/design.md](docs/design.md#go-interop) for the conversion rules.
+
+## Calling Scala from Go
+
+Mark the API with `@GoExport` and link the module as a library (`ScalaGoLibraryModule`, with
+`goModulePath` set to the import path). `goLink` produces a Go module that Go code requires and
+imports:
+
+```scala
+object Api:
+  @GoExport def greet(name: String): String = s"Hello, $name!"     // func Greet(name string) string
+
+@GoExport class Counter(start: Int):                              // type Counter interface { ... }
+  private var count = start                                       // func NewCounter(start int32) Counter
+  @GoExport def increment(): Unit = synchronized { count += 1 }   // Increment()
+```
+
+```go
+c := mylib.NewCounter(1)
+go c.Increment() // Scala code is safe to call from any goroutine
+```
+
+Methods annotated with `@throws` return a Go `error`. Other exceptions are panics. See
+`tests/cases/go-library` and docs/design.md.
 
 ## Layout
 
@@ -98,8 +130,9 @@ mill example.goRun               # the example, through ScalaGoModule
 Each directory in `tests/cases/` holds a program and an `expected.txt`. Cases with a
 `go-only.txt` (they call Go) skip the JVM, subdirectories with a `go.mod` are local Go modules, and
 a `link-errors.txt` lists errors that linking must report instead of running. Cases with a
-`race.txt` also run under Go's race detector. The entry point is
+`race.txt` also run under Go's race detector. A `library.txt` case is linked as a library and
+used by the Go program in its `consumer/` directory. The entry point is
 `Main` unless `main.txt` names another one. The test compiles the program with the plugin and
 runs it on the JVM. It then links it to Go, runs `go vet` and `go build`, and runs the binary.
 Both outputs must equal `expected.txt`. The work directory of a failing case is kept under
-`/tmp/scalago-<case>-*` for inspection.
+`/tmp/scalago-<case>-*` for inspection. Set `SCALAGO_KEEP_WORK=1` to keep passing ones too.

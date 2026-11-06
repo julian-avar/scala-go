@@ -535,6 +535,49 @@ object Natives:
   )
   static(GoString, "sameAs(Ljava.lang.Object;Ljava.lang.Object;)Z")(as => s"(${goStr(as(0))} == ${goStr(as(1))})")
 
+  // Go slices, maps, channels and pointers (library/src/scalago/go/internal/GoNatives.scala).
+  private val GoNatives = "scalago.go.internal.GoNatives$"
+  private val O = "Ljava.lang.Object;"
+  for (desc, fn) <- List(
+      s"basicType(Ljava.lang.String;)$O" -> "rt.GoTypeBasic",
+      s"sliceType($O)$O" -> "rt.GoTypeSlice",
+      s"mapType($O$O)$O" -> "rt.GoTypeMap",
+      s"chanType($O)$O" -> "rt.GoTypeChan",
+      s"ptrType($O)$O" -> "rt.GoTypePtr",
+      s"isNil($O)Z" -> "rt.GoIsNil",
+      s"makeSlice(${O}II)$O" -> "rt.GoMakeSlice",
+      s"sliceLength($O)I" -> "rt.GoSliceLength",
+      s"sliceCapacity($O)I" -> "rt.GoSliceCapacity",
+      s"sliceGet(${O}I)$O" -> "rt.GoSliceGet",
+      s"sliceSet(${O}I$O)V" -> "rt.GoSliceSet",
+      s"sliceSlice(${O}II)$O" -> "rt.GoSliceSlice",
+      s"sliceAppend($O$O)$O" -> "rt.GoSliceAppend",
+      s"sliceAppendAll($O$O)$O" -> "rt.GoSliceAppendAll",
+      s"sliceCopy($O$O)I" -> "rt.GoSliceCopy",
+      s"makeMap($O$O)$O" -> "rt.GoMakeMap",
+      s"mapSize($O)I" -> "rt.GoMapSize",
+      s"mapLookup($O$O$O)$O" -> "rt.GoMapLookup",
+      s"mapStore($O$O$O)V" -> "rt.GoMapStore",
+      s"mapDelete($O$O)V" -> "rt.GoMapDelete",
+      s"mapEntries($O)[$O" -> "rt.GoMapEntries",
+      s"makeChan(${O}I)$O" -> "rt.GoMakeChan",
+      s"chanSend($O$O)V" -> "rt.GoChanSend",
+      s"chanReceive($O$O)$O" -> "rt.GoChanReceive",
+      s"chanTrySend($O$O)Z" -> "rt.GoChanTrySend",
+      s"chanTryReceive($O$O$O)$O" -> "rt.GoChanTryReceive",
+      s"chanClose($O)V" -> "rt.GoChanClose",
+      s"chanLength($O)I" -> "rt.GoChanLength",
+      s"chanCapacity($O)I" -> "rt.GoChanCapacity",
+      s"newPtr($O)$O" -> "rt.GoNewPtr",
+      s"ptrGet($O)$O" -> "rt.GoPtrGet",
+      s"ptrSet($O$O)V" -> "rt.GoPtrSet",
+      s"call0($O)$O" -> "rt.GoCall0",
+      s"call1($O$O)$O" -> "rt.GoCall1",
+      s"call2($O$O$O)$O" -> "rt.GoCall2",
+      s"call3($O$O$O$O)$O" -> "rt.GoCall3"
+    )
+  do staticFn(GoNatives, desc, fn)
+
   // Arrays: `clone` is the only method called on array receivers.
   instanceFn("scala.Array", "clone()Ljava.lang.Object;", "rt.ArrayClone")
 

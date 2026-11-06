@@ -47,6 +47,29 @@ import scala.annotation.StaticAnnotation
  */
 final class GoImport(path: String, name: String = "") extends StaticAnnotation
 
+/** Exports Scala code to Go, for library builds (Scala.js's `@JSExportTopLevel`/`@JSExport`).
+ *
+ *  On a method of a top-level `object`, it becomes a Go function of the library's package. On a
+ *  class, it becomes a Go interface type of the same name, with a constructor function
+ *  `New<Name>` for its primary constructor; its methods marked `@GoExport` are the interface's
+ *  methods. Go names are the Scala names capitalized, unless `name` is given:
+ *  {{{
+ *  object Api:
+ *    @GoExport def greet(name: String): String = s"Hello, $name"   // func Greet(name string) string
+ *
+ *  @GoExport class Counter(start: Int):                            // type Counter interface { ... }
+ *    private var n = start                                         // func NewCounter(start int32) Counter
+ *    @GoExport def inc(): Unit = synchronized { n += 1 }           // Inc()
+ *    @GoExport("Value") def current: Int = synchronized(n)         // Value() int32
+ *  }}}
+ *  Signatures are converted with the same rules as facades, with Go types chosen from the Scala
+ *  types: `Int` is `int32`, `GoInt` is `int`, `String` and `GoString` are `string`, `GoSlice[T]`
+ *  is `[]T`, exported classes are their interface types, Scala functions are Go funcs. A method
+ *  annotated with `@throws` gets a trailing `error` result, which Scala exceptions become;
+ *  otherwise exceptions are Go panics. Exported code may be called from any goroutine.
+ */
+final class GoExport(name: String = "") extends StaticAnnotation
+
 /** The Go name of a facade member or type, when it differs from the Scala name. */
 final class GoName(name: String) extends StaticAnnotation
 

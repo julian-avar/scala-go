@@ -69,6 +69,7 @@ published with the full Scala version as suffix.
 | `BigInteger`                     | `*rt.BigInteger` (`math/big`)                                   |
 | Go facade of a struct type `T`   | `*T` inside an `any` (see [Go interop](#go-interop))            |
 | Go facade of any other Go type   | the Go value inside an `any`                                    |
+| `GoSlice[T]`, `GoMap[K, V]`, `GoChan[T]`, `GoPtr[T]` | the Go slice, map, channel or pointer inside an `any` |
 | `Array[prim]` / `Array[AnyRef]`  | `*rt.Array[prim]` / `*rt.Array[any]` (covariance works)         |
 | class `C`                        | struct `S_C` embedding the superclass's struct (root classes embed `rt.ObjectHeader`, which holds the monitor) |
 | reference of static type `C`     | interface `C_C`: embeds parents' interfaces, lists called methods |
@@ -175,7 +176,8 @@ object url:
   | Scala class                | a Go interface it implements                                       |
   | `Array[T]`                 | `[]T`. Memory is shared when the representations match (`Array[Byte]`/`[]byte`, `Array[Long]`/`[]int64`, ...); otherwise elements are copied |
   | `T*`, `Array[T]`           | variadic `...T`. Literal varargs skip the `Seq`                    |
-  | `(A, B) => C`              | `func(A, B) C`: calls `apply` through a dispatcher                 |
+  | `(A, B) => C`              | `func(A, B) C`: calls `apply` through a dispatcher. A Go func *returned* to Scala becomes a `GoFunctionN` wrapping a Go closure that converts with the facade's types |
+  | `GoSlice[T]`, `GoMap[K, V]`, `GoChan[T]`, `GoPtr[T]` | the Go value as is (no copy), if `T` is the canonical view of the Go element type (see below); directional channels and named types are converted |
   | `(A, B)` result            | two results                                                        |
   | `Any`                      | `any`; Scala strings become Go strings                             |
 
@@ -197,10 +199,94 @@ object url:
 - **Imports.** Packages are imported with aliases (`gp_url "net/url"`) so they cannot clash with
   generated names or each other.
 
-Not supported yet: maps, channels, pointers to non-struct types, Go functions *returned* to Scala,
-generic Go functions and types, unnamed struct and interface types, variadic callbacks, and Scala
-implementations of Go methods with several non-error results. Go code may call Scala code from any
+- **Generic Go functions** are called through monomorphic facades: `def Max(xs: GoSlice[GoInt]):
+  GoInt` for `slices.Max`. The Go types that mention type parameters are taken from the facade's
+  Scala types, and the call passes values of those types, so Go infers the type arguments. A
+  function needs one facade member per instantiation (`@GoName` allows several).
+
+### Go data in Scala
+
+`GoSlice[T]`, `GoMap[K, V]`, `GoChan[T]` and `GoPtr[T]` (`library/src/scalago/go/`) are opaque
+types whose values are Go slices, maps, channels and pointers, shared with Go code without
+copying (Scala.js's `js.Array` and `js.Dictionary`). As in Scala.js, the elements have
+**canonical** Scala representations, decided by the Go element type alone, so erasure loses
+nothing:
+
+| Go element type                          | Scala view                                |
+|------------------------------------------|-------------------------------------------|
+| `int`, `int64`, `uint`, `uint64`, `uintptr` | `Long` (or `GoInt`, `GoUint`, ...)     |
+| `int32`, `uint32`                        | `Int` (or `GoUint32`)                     |
+| `int16`, `uint16`, `int8`, `uint8`       | `Short`, `Char`, `Byte` (or `GoByte`)     |
+| `float32`, `float64`, `bool`             | `Float`, `Double`, `Boolean`              |
+| `string`                                 | `GoString`                                |
+| struct values                            | the facade (a pointer to a copy)          |
+| anything else                            | the Go value: facades, `GoSlice`, ..., `Any` |
+
+The runtime (`rt/gotypes.go`) converts by the actual Go type (with fast paths for common slice
+types, reflection otherwise). Facades are checked at link time: `GoSlice[String]` for a Go
+`[]string` is an error that names the right type, `GoSlice[GoString]`. Creating Go data needs
+the Go element type, which a `GoType[T]` given supplies: `GoSlice.make[GoInt](n)` makes an
+`[]int`, `GoSlice.make[Long](n)` an `[]int64`. `GoInt`, `GoByte` and the other Go numeric types are
+opaque over Scala numbers, so they only matter there and in facades. Every operation has a JVM
+implementation with Go's semantics (`GoNatives`), so code that uses Go data without facades also
+runs on the JVM. The `go-data` test case checks that both agree.
+
+Not supported yet: generic Go *types*, `GoType` instances for facade types, facades using
+`GoSlice`/`GoMap` for *named* slice and map types, `select` over channels, unnamed struct and
+interface types, variadic callbacks, Go funcs with more than 3 parameters returned to Scala, and
+Scala implementations of Go methods with several non-error results. Go code may call Scala code from any
 goroutine (see [Concurrency](#concurrency-and-the-memory-model)).
+
+## Exports and library builds
+
+Go code calls Scala code through **exports**, in the style of Scala.js's `@JSExportTopLevel`:
+
+```scala
+object Api:
+  @GoExport def greet(name: String): String = s"Hello, $name!"     // func Greet(name string) string
+  @GoExport @throws[NumberFormatException]
+  def parse(s: String): Int = s.trim.toInt                         // func Parse(s string) (int32, error)
+
+@GoExport class Counter(start: Int):                              // type Counter (interface)
+  private var count = start                                       // func NewCounter(start int32) Counter
+  @GoExport def increment(): Unit = synchronized { count += 1 }   // Increment()
+  @GoExport("Value") def current: Int = synchronized(count)       // Value() int32
+```
+
+- **Library links** (`Linker.Config.library`, `--library true`, `ScalaGoLibraryModule` in Mill)
+  have no entry point: the roots are the exported definitions. The output module's root package
+  (named after the module path) is the library's public Go API, in `exports.go`. Other Go modules
+  require the output module and import it. Modules and static initializers run on first use, as
+  in programs.
+- **Exported functions** are methods of top-level objects. **Exported classes** become Go
+  interface types (`type Counter = scala.X_Counter`) whose methods are the class's `@GoExport`
+  methods (and those of exported superclasses). Their primary constructor becomes `New<Name>`.
+  Go names are the Scala names capitalized, unless given.
+- **Identity.** The interface value holds the generated struct pointer, so a Scala object is the
+  same Go value every time it crosses the boundary (`==` works in Go), with no wrappers. Each
+  instantiated subclass's struct gets its own Go methods, which call the Scala methods virtually.
+  Methods promoted from an embedded struct would lose the outer receiver.
+- **Conversions** follow the facade rules, with the Go types chosen from the Scala types
+  (`GoInterop.goTypeOf`): `Int` is `int32`, `GoInt` is `int`, `String` and `GoString` are
+  `string`, `Array[T]` and `GoSlice[T]` are `[]T`, `GoMap`, `GoChan` and `GoPtr` are Go's,
+  exported classes are their interfaces, facades are their Go types, and Scala functions are Go
+  funcs (a Go func passed in becomes a `GoFunctionN`).
+- **Errors.** A method annotated with `@throws` gets a trailing `error` result: a Scala exception
+  becomes it (`rt.RecoverAsError`; a `GoException` gives back its Go error). Otherwise the
+  exception is a Go panic whose value is an `error` describing it.
+- **Goroutines.** Exported code may be called from any goroutine (see
+  [Concurrency](#concurrency-and-the-memory-model)). Buffered Scala output is flushed when each
+  call returns.
+- **No import cycles.** Go forbids them, so a Go package that the library imports through a
+  facade cannot import the library. Such Go code receives Scala code as values instead: Go
+  interfaces implemented in Scala, or Go funcs.
+- **One Scala library per Go binary.** Linking is whole-program, so two separately linked Scala
+  libraries in one binary would each have their own runtime and standard library, as with
+  separately linked Scala.js modules.
+
+Not supported yet: exported traits (Go code implementing Scala traits), exported vals and fields,
+secondary constructors, tuple results, overloaded exports with the same Go name, and generic
+exported methods.
 
 ## Concurrency and the memory model
 
@@ -266,7 +352,10 @@ Supported and covered by end-to-end tests:
   string interpolation, `StringBuilder`, `BigInt`
 - `scalago.go.GoString`
 - Go interop: facades of standard-library packages and of a local Go module, Go interfaces
-  implemented in Scala, errors and callbacks. Mismatched facades are tested as link errors.
+  implemented in Scala, errors and callbacks, Go slices, maps, channels, pointers and funcs
+  shared with Go, and generic Go functions. Mismatched facades are tested as link errors.
+- exports: a Scala library used by a Go program (functions, an exported class hierarchy,
+  errors, panics, callbacks, identity, and calls from 100 goroutines under the race detector)
 - concurrency: threads, `synchronized`, `wait`/`notify`, volatile fields, atomics, interrupts,
   and concurrent first use of modules and lazy vals (also under Go's race detector)
 
@@ -313,26 +402,19 @@ earlier has to be redone:
    modules and static initializers, atomic lazy vals, monitors, volatiles and atomics,
    `java.lang.Thread` on goroutines, a goroutine-safe runtime, and a documented memory model.
    It came before exports, which would otherwise be unsafe by default, and before gears.
-3. **Go types as Scala types.** These are zero-copy types for Go's own data, usable in facades and
-   in exports: `GoSlice[T]`, `GoMap[K, V]`, `GoChan[T]`, `GoPtr[T]`, and Go funcs as values (in
-   both directions). They are opaque types, like `GoString`, with a JVM implementation where
-   sensible. With them, facades support maps, channels, pointers and returned funcs, and generic
-   Go functions with explicit type arguments. This vocabulary must exist before exports, so that
-   exported signatures can say "this is a Go slice" instead of copying `Array`s.
-4. **Exports and library builds.** `@GoExport` on functions of top-level objects, and on classes,
-   with Go names and Go types. A library link emits a public root package with typed Go
-   wrappers, converted with the same rules as facades, in the other direction. Scala exceptions
-   become `error` results when the Go signature has one, panics otherwise. `ScalaGoModule` gets a
-   library mode that produces a Go module other Go modules can require. Design points:
-   - **Identity.** The Go value of an exported Scala object is the generated struct pointer, so it
-     is the same object every time it crosses the boundary. Wrappers would create new values each
-     time.
-   - **No import cycles.** Go forbids them, so a Go package that Scala imports (`@GoImport`) cannot
-     import the Scala library's exports. Such Go code calls Scala through interfaces and funcs it
-     is given (step 3), or through registration at initialization.
-   - **One Scala library per Go binary.** Linking is whole-program. Two separately linked Scala
-     libraries in one Go binary would each have their own runtime and standard library, as with
-     separately linked Scala.js modules.
+3. **Go types as Scala types** (done, see [Go data in Scala](#go-data-in-scala)). Zero-copy types
+   for Go's own data: `GoSlice[T]`, `GoMap[K, V]`, `GoChan[T]`, `GoPtr[T]`, Go numeric types, and
+   Go funcs as Scala functions. They are opaque types with canonical element representations and
+   a JVM implementation. Facades use them for maps, channels, pointers and returned funcs, and
+   call generic Go functions through monomorphic facades. This vocabulary had to exist before
+   exports, so that exported signatures can say "this is a Go slice" instead of copying `Array`s.
+4. **Exports and library builds** (done, see [Exports](#exports-and-library-builds)). `@GoExport`
+   on methods of top-level objects and on classes. A library link emits a public root package
+   with typed Go functions and interface types, converted with the facade rules in the other
+   direction, and `ScalaGoLibraryModule` produces a Go module other Go modules require. Exported
+   objects keep their identity across the boundary, Scala exceptions become `error` results
+   (`@throws`) or panics, and there are no import cycles: Go code that Scala imports gets Scala
+   code as interfaces and funcs.
 5. **Concurrency API: gears on goroutines.** `Async`/`Future` on goroutines, channels on `GoChan`,
    and cancellation bridged to `context.Context` at the boundary. This needs steps 2 and 3, and is
    independent of step 4.
@@ -351,5 +433,5 @@ earlier has to be redone:
   tested there. Facades could take an optional JVM implementation, or be generated from Go
   packages (the `goapi` helper already reads their APIs).
 - **Shared or copied slices.** `Array[T]` ↔ `[]T` shares memory only when the representations
-  match. Roadmap step 3 adds `GoSlice[T]` for explicit sharing. Should `Array` conversions then
-  stay as a convenience (current plan) or require `GoSlice`?
+  match, and `GoSlice[T]` always does. Should `Array` conversions stay as a convenience (current
+  behavior) or require `GoSlice`?

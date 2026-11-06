@@ -12,3 +12,11 @@ GoException: division by zero
 3 4 25
 GO!
 recovered: boom
+a=3 b=1 c=1
+total 15
+42 List(3, 4)
+Go func failed: empty
+squares: List(1, 4, 9, 16)
+sum: 6
+incremented: 42
+reversed in place: 3,2,1

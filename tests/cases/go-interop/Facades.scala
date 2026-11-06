@@ -3,6 +3,7 @@ import scalago.go.*
 @GoImport("strings")
 object strings:
   def Repeat(s: String, count: Int): String = native
+  @GoName("Fields") def goFields(s: String): GoSlice[GoString] = native
   def ToUpper(s: GoString): GoString = native
   def Contains(s: String, substr: String): Boolean = native
   def Fields(s: String): Array[String] = native
@@ -80,3 +81,15 @@ object url:
     @GoName("String") def show(): String = native
   class Values:
     def Get(key: String): String = native
+
+// Generic Go functions, through monomorphic facades (Go infers the type arguments).
+@GoImport("slices")
+object slices:
+  def Max(xs: GoSlice[GoInt]): GoInt = native
+  def Contains(xs: GoSlice[GoString], v: GoString): Boolean = native
+  def Sort(xs: GoSlice[Long]): Unit = native
+  @GoName("Index") def indexOf(xs: GoSlice[GoString], v: GoString): Int = native
+
+@GoImport("sort")
+object sort:
+  def Ints(xs: GoSlice[GoInt]): Unit = native

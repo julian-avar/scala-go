@@ -45,8 +45,10 @@ class EndToEndTests extends munit.FunSuite:
       val classes = Files.createDirectories(work.resolve("classes"))
 
       compile(dir, classes)
+      // A library (`library.txt`) is linked and used by the Go module in `consumer/`.
+      val isLibrary = Files.exists(dir.resolve("library.txt"))
       // Programs calling Go code (`go-only.txt` says why) cannot run on the JVM.
-      if !Files.exists(dir.resolve("go-only.txt")) then
+      if !Files.exists(dir.resolve("go-only.txt")) && !isLibrary then
         val jvmClasspath = (classes.toString +: userLibrary +: scalaLibrary).mkString(File.pathSeparator)
         assertNoDiff(run(Seq(javaBinary, "-cp", jvmClasspath, mainClass), work), expected, "JVM output")
 
@@ -55,8 +57,10 @@ class EndToEndTests extends munit.FunSuite:
         .map(d => goModulePath(d.resolve("go.mod")) -> d.toAbsolutePath.toString)
       val config = Linker.Config(
         mainObject = mainClass,
+        goModulePath = if isLibrary then LibraryModule else "scalagoapp",
         goRequires = goModules.map((m, _) => m -> "v0.0.0"),
-        goReplaces = goModules
+        goReplaces = goModules,
+        library = isLibrary
       )
       val goDir = work.resolve("go")
       val classpath = classes +: Path.of(userLibrary) +: libraryIR
@@ -66,14 +70,38 @@ class EndToEndTests extends munit.FunSuite:
         for line <- Files.readAllLines(expectedErrors, UTF_8).asScala if line.trim.nonEmpty do
           assert(e.errors.exists(_.contains(line.trim)), s"missing link error: $line\nactual errors:\n${e.errors.mkString("\n")}")
         deleteRecursively(work)
+      else if isLibrary then
+        Linker.link(classpath, goDir, config)
+        assertEquals(run(Seq("go", "vet", "./..."), goDir), "", "go vet output (library)")
+        val consumer = copyDirectory(dir.resolve("consumer"), work.resolve("consumer"))
+        Files.writeString(consumer.resolve("go.mod"),
+          s"\nrequire $LibraryModule v0.0.0\n\nreplace $LibraryModule => ${goDir.toAbsolutePath}\n",
+          java.nio.file.StandardOpenOption.APPEND)
+        runGo(consumer, expected, race = Files.exists(dir.resolve("race.txt")))
+        deleteRecursively(work)
       else
         // `race.txt`: the Go build also runs under the race detector.
         linkAndRun(classpath, goDir, config, expected, race = Files.exists(dir.resolve("race.txt")))
         deleteRecursively(work) // kept on failure, for inspection
     }
 
+  /** Module path of libraries linked by the tests (their consumers import it). */
+  private val LibraryModule = "scalagolib"
+
+  private def copyDirectory(from: Path, to: Path): Path =
+    Using.resource(Files.walk(from)) { paths =>
+      for p <- paths.iterator.asScala do
+        val target = to.resolve(from.relativize(p).toString)
+        if Files.isDirectory(p) then Files.createDirectories(target) else Files.copy(p, target)
+    }
+    to
+
   private def linkAndRun(classpath: Seq[Path], goDir: Path, config: Linker.Config, expected: String, race: Boolean): Unit =
     Linker.link(classpath, goDir, config)
+    runGo(goDir, expected, race)
+
+  /** Vets, builds and runs the Go main package in `goDir`, checking its output. */
+  private def runGo(goDir: Path, expected: String, race: Boolean): Unit =
     assertEquals(run(Seq("go", "vet", "./..."), goDir), "", "go vet output")
     assertEquals(run(Seq("go", "build", "-o", "app", "."), goDir), "", "go build output")
     assertNoDiff(run(Seq(goDir.resolve("app").toString), goDir), expected, "Go output")
@@ -85,8 +113,9 @@ class EndToEndTests extends munit.FunSuite:
     Files.readAllLines(goMod, UTF_8).asScala.collectFirst { case s"module $path" => path.trim }
       .getOrElse(throw IllegalStateException(s"no module line in $goMod"))
 
+  /** Work directories are deleted after passing cases, unless SCALAGO_KEEP_WORK is set. */
   private def deleteRecursively(dir: Path): Unit =
-    Using.resource(Files.walk(dir))(_.iterator.asScala.toList.reverse.foreach(Files.delete))
+    if !sys.env.contains("SCALAGO_KEEP_WORK") then Using.resource(Files.walk(dir))(_.iterator.asScala.toList.reverse.foreach(Files.delete))
 
   private def compile(sourceDir: Path, outDir: Path): Unit =
     val sources = Using.resource(Files.list(sourceDir))(_.iterator.asScala.map(_.toString).filter(_.endsWith(".scala")).toList)

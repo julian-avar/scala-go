@@ -20,9 +20,12 @@ import scalago.ir.*
  *    entry.go                Main(): runs <mainObject>.main(args); runtime hooks
  *  internal/rt/              the runtime support package
  *  }}}
- *  The generated code is not in `package main`, and the root package is a thin facade over it:
- *  that is where a Go API for Scala code (exports, library builds) will go. `internal/` keeps
- *  the generated names out of reach of other modules.
+ *  The generated code is not in `package main`, and the root package is a thin facade over it.
+ *  `internal/` keeps the generated names out of reach of other modules.
+ *
+ *  A library link (`Config.library`) has no entry point: its roots are the definitions marked
+ *  `@GoExport`, and the root package is the library's public Go API (`exports.go`, see
+ *  [[Exports]]) instead of `main.go`. Other Go modules require the output module and import it.
  */
 object Linker:
   final case class Config(
@@ -34,8 +37,17 @@ object Linker:
       /** Go modules the program's facades need, as (module path, version). */
       goRequires: Seq[(String, String)] = Nil,
       /** Local directories replacing Go modules, as (module path, directory). */
-      goReplaces: Seq[(String, String)] = Nil
-  )
+      goReplaces: Seq[(String, String)] = Nil,
+      /** Link a library (`@GoExport`ed definitions) instead of a program. */
+      library: Boolean = false,
+      /** The Go package name of a library's root package (default: the module path's last element). */
+      packageName: Option[String] = None
+  ):
+    def rootPackageName: String =
+      packageName.getOrElse {
+        val last = goModulePath.split('/').last.takeWhile(_ != '.').filter(c => c.isLetterOrDigit || c == '_').toLowerCase
+        if last.isEmpty || last.head.isDigit then "lib" else last
+      }
 
   final class LinkingException(val errors: List[String])
       extends Exception(errors.mkString(s"Linking failed with ${errors.size} error(s):\n", "\n", ""))
@@ -63,7 +75,8 @@ object Linker:
     "RuntimeError"           -> "java.lang.RuntimeException",
     "IllegalMonitorState"    -> "java.lang.IllegalMonitorStateException",
     "Interrupted"            -> "java.lang.InterruptedException",
-    "NoClassDefFound"        -> "java.lang.NoClassDefFoundError"
+    "NoClassDefFound"        -> "java.lang.NoClassDefFoundError",
+    "IndexOutOfBounds"       -> "java.lang.IndexOutOfBoundsException"
   )
   private val MessageConstructor = MethodName(MethodName.ConstructorSimpleName, List(Type.String), Type.Void)
 
@@ -72,10 +85,16 @@ object Linker:
     val errors = Errors()
     val analyzer = Analyzer(program, Lambdas(program), errors)
 
-    // Roots: the entry point, the methods the runtime calls dynamically, and the exceptions it throws.
+    // Roots: the entry point (or the exports), the methods the runtime calls dynamically, and the
+    // exceptions it throws.
     val mainModule = config.mainObject + "$"
     val entry =
-      if program.vtable(mainModule).get(MainMethod).exists(o => program.findMethod(o, MainMethod).exists(!_.isAbstract)) then
+      if config.library then
+        Exports.addRoots(program, analyzer)
+        if Exports.functions(program).isEmpty && Exports.classes(program).isEmpty then
+          throw LinkingException(List("nothing to link into a library: no definition is marked @GoExport"))
+        ""
+      else if program.vtable(mainModule).get(MainMethod).exists(o => program.findMethod(o, MainMethod).exists(!_.isAbstract)) then
         analyzer.instantiate(mainModule)
         analyzer.reach(mainModule, ModuleConstructor)
         analyzer.callVirtual(MainMethod)
@@ -103,17 +122,22 @@ object Linker:
       try GoApi.load(outputDir, goPackages)
       catch case e: GoApi.GoApiException => throw LinkingException(List(s"loading Go packages failed: ${e.getMessage}"))
 
-    val ctx = LinkContext(program, analyzer, errors, goApi)
+    val ctx = LinkContext(program, analyzer, errors, goApi, libraryMode = config.library)
     val classFiles = program.classes.toList
       .sortBy(_.name)
       .map(c => Mangling.fileName(c.name) -> ClassEmitter(ctx, c).emit())
       .filter(_._2.nonEmpty)
     val entryFile = entryCode(ctx, entry, exceptionClasses)
+    val exportsFile = Option.when(config.library)(ctx.exports.internalFile)
+    val rootFile = Option.when(config.library)(ctx.exports.rootFile(config.rootPackageName, s"${config.goModulePath}/$ScalaPackageDir"))
     val support = supportFile(ctx)
     if errors.all.nonEmpty then throw LinkingException(errors.all)
 
     val scalaDir = Files.createDirectories(outputDir.resolve(ScalaPackageDir))
-    write(outputDir.resolve("main.go"), mainFile(config))
+    rootFile match
+      case Some(root) => write(outputDir.resolve("exports.go"), root)
+      case None       => write(outputDir.resolve("main.go"), mainFile(config))
+    exportsFile.foreach(f => write(scalaDir.resolve("exports.go"), goFile(ctx, config, f)))
     write(scalaDir.resolve("entry.go"), goFile(ctx, config, entryFile))
     write(scalaDir.resolve("support.go"), goFile(ctx, config, support))
     for (fileName, body) <- classFiles do write(scalaDir.resolve(fileName), goFile(ctx, config, body))
@@ -172,6 +196,7 @@ object Linker:
         sb ++= s"\t\tcase rt.$kind:\n"
         sb ++= s"\t\t\treturn ${Mangling.newInstance(cls, MessageConstructor)}(message)\n"
       sb ++= "\t\t}\n\t\treturn nil\n\t}\n}\n\n"
+    if entry.isEmpty then return sb.toString // a library: no entry point
     sb ++= "// Main runs the Scala program's entry point with the command-line arguments.\n"
     sb ++= "// Like the JVM, it then waits for the non-daemon threads the program started.\n"
     sb ++= "func Main() {\n"
