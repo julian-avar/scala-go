@@ -1,3 +1,5 @@
+import gears.async.*
+import gears.async.default.given
 import scalago.go.*
 
 sealed trait Expr
@@ -25,5 +27,11 @@ object Main {
     println(s"${words.length} words, the longest is ${strconv.Quote(textstats.Longest(words))}")
     try textstats.Longest(Array.empty)
     catch case e: GoException => println(s"Go error: ${e.getMessage}")
+
+    // gears (a Scala library dependency) on goroutines
+    Async.blocking {
+      val lengths = names.map(n => Future(n.length))
+      println(s"name lengths, computed concurrently: ${lengths.awaitAll}")
+    }
   }
 }

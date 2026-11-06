@@ -2,6 +2,7 @@ package rt
 
 import (
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -88,5 +89,42 @@ func TestRuntimeErrorsBecomeJavaExceptions(t *testing.T) {
 	var s *String
 	if got := ToGoString(Try(func() { StringLength(s) })); got != "java.lang.NullPointerException" {
 		t.Errorf("got %q", got)
+	}
+}
+
+func TestRegexSplitAndReplace(t *testing.T) {
+	split := func(s, re string, limit int32) []string {
+		var out []string
+		for _, p := range StringSplitLimit(Str(s), Str(re), limit).Data {
+			out = append(out, p.(*String).GoString())
+		}
+		return out
+	}
+	cases := []struct {
+		s, re string
+		limit int32
+		want  string
+	}{
+		{"a b  c", `\s+`, 0, "a|b|c"},
+		{" a b ", `\s+`, 0, "|a|b"},
+		{"a,b,,", ",", 0, "a|b"},
+		{"a,b,,", ",", -1, "a|b||"},
+		{"a,b,c", ",", 2, "a|b,c"},
+		{"abc", "", 0, "a|b|c"},
+		{"x", ",", 0, "x"},
+	}
+	for _, c := range cases {
+		if got := strings.Join(split(c.s, c.re, c.limit), "|"); got != c.want {
+			t.Errorf("split(%q, %q, %d) = %q, want %q", c.s, c.re, c.limit, got, c.want)
+		}
+	}
+	if !StringMatches(Str("abc123"), Str(`[a-z]+\d+`)) || StringMatches(Str("abc123x"), Str(`[a-z]+\d+`)) {
+		t.Error("matches")
+	}
+	if got := StringReplaceAll(Str("a1b22"), Str(`(\d+)`), Str("<$1>")).GoString(); got != "a<1>b<22>" {
+		t.Errorf("replaceAll: %q", got)
+	}
+	if got := StringReplaceFirst(Str("a1b22"), Str(`\d`), Str(`\$`)).GoString(); got != "a$b22" {
+		t.Errorf("replaceFirst: %q", got)
 	}
 }

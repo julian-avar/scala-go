@@ -1,0 +1,10 @@
+sum: 3
+squares: Vector(1, 4, 9, 16, 25)
+race: fast
+cancelled: true
+timeout: None
+in time: Some(42)
+channel: List(10, 20, 30, 40, 50)
+failure: Success(boom)
+Go channel: List(1, 2, 3)
+blocked receive cancelled: true

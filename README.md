@@ -9,9 +9,10 @@ See [docs/design.md](docs/design.md) for the architecture, object model, status 
 
 **Status:** early, but real programs work. Classes, traits, objects, exceptions, pattern
 matching, lambdas, `lazy val` and the standard collections all run, and Scala code can call Go
-packages. Threads run on goroutines, with `synchronized`, `wait`/`notify`, volatiles and atomics,
-and the generated code is safe to call from any goroutine. `BigDecimal`, regex, reflection and
-most of `java.util.concurrent` don't work yet.
+packages, and Go code can call Scala libraries. Threads run on goroutines, with `synchronized`,
+`wait`/`notify`, volatiles and atomics, and gears runs on them. The generated code is safe to
+call from any goroutine. `BigDecimal`, `java.util.regex`, reflection and most of
+`java.util.concurrent` don't work yet.
 
 ## Using it with Mill
 
@@ -79,6 +80,24 @@ Go modules other than the standard library go in `goRequires` (`"module@version"
 `goLocalModules` for local directories with a `go.mod` (see `example/`). Facade members throw on
 the JVM. See [docs/design.md](docs/design.md#go-interop) for the conversion rules.
 
+## Concurrency with gears
+
+[gears](https://github.com/lampepfl/gears) runs on goroutines, unchanged: add it as a normal
+dependency, plus `scalago-gears`. Scala library dependencies are compiled to Go from the TASTy
+in their jars.
+
+```scala
+import gears.async.*
+import gears.async.default.given
+
+Async.blocking:
+  val lengths = names.map(n => Future(n.length))   // each Future is a goroutine
+  println(lengths.awaitAll)
+```
+
+`scalago.gears` adds cancellable Go channel operations (`awaitReceive`, `awaitSend`) and
+`withGoContext(ctx)(body)`, which cancels `body` when a Go `context.Context` is done.
+
 ## Calling Scala from Go
 
 Mark the API with `@GoExport` and link the module as a library (`ScalaGoLibraryModule`, with
@@ -112,8 +131,9 @@ Methods annotated with `@throws` return a Go `error`. Other exceptions are panic
 | `runtime/rt/`        | Go runtime package (strings, exceptions, natives), bundled in the linker |
 | `runtime/goapi/`     | Helper the linker runs to read the APIs of Go packages                  |
 | `javalib/`           | JDK classes in Scala (emitted as `java.*`) and Scala-library overrides  |
-| `library/`           | User-facing APIs (`GoString`, Go facades: `GoImport`, `GoException`)    |
-| `mill-build/src/`    | `ScalaGoModule`, used by this build and published as `mill-scalago`     |
+| `library/`           | User-facing APIs: Go facades and exports, `GoString`, `GoSlice`, ...    |
+| `gears/`             | gears on goroutines (`scalago-gears`): an override and Go helpers       |
+| `mill-build/src/`    | `ScalaGoModule`/`ScalaGoLibraryModule` and `TastyIR`, published as `mill-scalago` |
 | `example/`           | A program built with `ScalaGoModule`: `mill example.goRun Ada Grace`    |
 | `tests/cases/`       | End-to-end programs with their expected output                          |
 

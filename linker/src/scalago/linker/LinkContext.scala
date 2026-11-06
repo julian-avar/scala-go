@@ -96,5 +96,8 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
     else if target == "any" then
       to match
         case Type.Class(c) if program.contains(c) && !declared(c) && !Hijacked.hijackedAncestors(c) => s"rt.CastNull($e)"
-        case _ => if source == "any" then e else s"any($e)"
+        case _ =>
+          if source == "any" then e
+          else if source.startsWith("*") then s"rt.AnyRef($e)" // a nil pointer becomes a nil `any`
+          else s"any($e)"
     else s"rt.Cast[$target]($e)"

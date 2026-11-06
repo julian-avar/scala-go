@@ -1,6 +1,7 @@
 package rt
 
 import (
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -303,28 +304,120 @@ func StringIntern(s *String) *String {
 	return s
 }
 
-// StringSplit implements split(regex) for patterns without regular-expression metacharacters
-// (and the common single-character escapes). Full regex support is not implemented yet.
-func StringSplit(s *String, regex *String) *Array[any] {
-	sep := regex.GoString()
-	if len(sep) == 2 && sep[0] == '\\' {
-		sep = sep[1:]
-	} else if strings.ContainsAny(sep, `.$|()[{^?*+\`) {
-		ThrowKind(UnsupportedOperation, "regular expressions are not supported yet: "+sep)
-	}
-	if len(s.chars) == 0 {
+// StringSplit implements split(regex): patterns are Java regular expressions, run by Go's
+// regexp package (see compileRegex).
+func StringSplit(s *String, regex *String) *Array[any] { return StringSplitLimit(s, regex, 0) }
+
+// StringSplitLimit implements split(regex, limit) with Java's rules: a zero-width match at the
+// start yields no leading empty string, limit > 0 caps the number of parts, and limit == 0
+// drops trailing empty strings.
+func StringSplitLimit(s *String, regex *String, limit int32) *Array[any] {
+	str := s.GoString()
+	if len(str) == 0 {
 		return &Array[any]{Data: []any{s}}
 	}
-	parts := strings.Split(s.GoString(), sep)
-	// Java drops trailing empty strings.
-	for len(parts) > 0 && parts[len(parts)-1] == "" {
-		parts = parts[:len(parts)-1]
+	re := compileRegex(regex.GoString())
+	var parts []string
+	start := 0
+	for _, m := range re.FindAllStringIndex(str, -1) {
+		if limit > 0 && int32(len(parts)) == limit-1 {
+			break
+		}
+		if m[1] == 0 { // zero-width match at the beginning
+			continue
+		}
+		if m[0] == m[1] && m[0] >= len(str) {
+			break
+		}
+		parts = append(parts, str[start:m[0]])
+		start = m[1]
+	}
+	parts = append(parts, str[start:])
+	if limit == 0 {
+		for len(parts) > 1 && parts[len(parts)-1] == "" {
+			parts = parts[:len(parts)-1]
+		}
+		if len(parts) == 1 && parts[0] == "" {
+			parts = nil
+		}
 	}
 	out := make([]any, len(parts))
 	for i, p := range parts {
 		out[i] = Str(p)
 	}
 	return &Array[any]{Data: out}
+}
+
+var (
+	regexMu    sync.Mutex
+	regexCache = map[string]*regexp.Regexp{}
+)
+
+// compileRegex compiles a Java regular expression with Go's regexp package (RE2 syntax, which
+// covers the common Java syntax). Features RE2 lacks (lookaround, backreferences, possessive
+// quantifiers) throw UnsupportedOperationException.
+func compileRegex(pattern string) *regexp.Regexp {
+	regexMu.Lock()
+	defer regexMu.Unlock()
+	if re, ok := regexCache[pattern]; ok {
+		return re
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		ThrowKind(UnsupportedOperation, "unsupported regular expression "+pattern+": "+err.Error())
+	}
+	regexCache[pattern] = re
+	return re
+}
+
+// StringMatches implements matches(regex): the whole string must match.
+func StringMatches(s *String, regex *String) bool {
+	re := compileRegex("^(?:" + regex.GoString() + ")$")
+	return re.MatchString(s.GoString())
+}
+
+// StringReplaceAll implements replaceAll(regex, replacement) ($1 and \$ in the replacement, as in Java).
+func StringReplaceAll(s *String, regex *String, replacement *String) *String {
+	return Str(compileRegex(regex.GoString()).ReplaceAllString(s.GoString(), javaReplacement(replacement.GoString())))
+}
+
+// StringReplaceFirst implements replaceFirst(regex, replacement).
+func StringReplaceFirst(s *String, regex *String, replacement *String) *String {
+	re := compileRegex(regex.GoString())
+	str := s.GoString()
+	m := re.FindStringSubmatchIndex(str)
+	if m == nil {
+		return s
+	}
+	var out []byte
+	out = re.ExpandString(out, javaReplacement(replacement.GoString()), str, m)
+	return Str(str[:m[0]] + string(out) + str[m[1]:])
+}
+
+// javaReplacement converts Java's replacement syntax ($1, \$) to Go's (${1}, $$).
+func javaReplacement(r string) string {
+	var b strings.Builder
+	for i := 0; i < len(r); i++ {
+		switch c := r[i]; {
+		case c == '\\' && i+1 < len(r):
+			i++
+			if r[i] == '$' {
+				b.WriteString("$$")
+			} else {
+				b.WriteByte(r[i])
+			}
+		case c == '$':
+			j := i + 1
+			for j < len(r) && r[j] >= '0' && r[j] <= '9' {
+				j++
+			}
+			b.WriteString("${" + r[i+1:j] + "}")
+			i = j - 1
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
 }
 
 // ---- Static methods -----------------------------------------------------------------------

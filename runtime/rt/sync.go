@@ -273,6 +273,13 @@ func ObjectWait(x any, millis int64, nanos int32) {
 		ThrowKind(IllegalArgument, "timeout value is negative or out of range")
 	}
 	m := MonitorOf(x)
+	m.wait(&m.waiters, time.Duration(millis)*time.Millisecond+time.Duration(nanos))
+}
+
+// wait releases the monitor (held by the current goroutine), waits on the wait set `list`
+// until notified, interrupted or the timeout (if positive) expires, and reacquires the
+// monitor. It reports whether it was notified; an interrupt throws InterruptedException.
+func (m *Monitor) wait(list *[]chan struct{}, timeout time.Duration) bool {
 	g := GoID()
 	t := currentThreadState(g)
 	m.mu.Lock()
@@ -282,17 +289,19 @@ func ObjectWait(x any, millis int64, nanos int32) {
 		ThrowKind(Interrupted, "")
 	}
 	ch := make(chan struct{})
-	m.waiters = append(m.waiters, ch)
+	*list = append(*list, ch)
 	saved := m.count
 	m.release()
 	m.mu.Unlock()
 
-	interrupted := t.block(ch, time.Duration(millis)*time.Millisecond+time.Duration(nanos))
+	interrupted := t.block(ch, timeout)
 
 	m.mu.Lock()
-	for i, w := range m.waiters {
+	notified := true
+	for i, w := range *list {
 		if w == ch {
-			m.waiters = append(m.waiters[:i], m.waiters[i+1:]...)
+			*list = append((*list)[:i], (*list)[i+1:]...)
+			notified = false
 			break
 		}
 	}
@@ -301,6 +310,7 @@ func ObjectWait(x any, millis int64, nanos int32) {
 	if interrupted {
 		ThrowKind(Interrupted, "")
 	}
+	return notified
 }
 
 // ObjectNotify implements Object.notify.
@@ -325,4 +335,88 @@ func ObjectNotifyAll(x any) {
 	}
 	m.waiters = nil
 	m.mu.Unlock()
+}
+
+// ---- java.util.concurrent.locks ----------------------------------------------------------
+
+// ReentrantLock and its Conditions use a monitor (of a private object of the lock).
+
+// MonitorTryEnter acquires x's monitor if that does not block.
+func MonitorTryEnter(x any) bool {
+	m := MonitorOf(x)
+	g := GoID()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.owner != 0 && m.owner != g {
+		return false
+	}
+	m.owner = g
+	m.count++
+	return true
+}
+
+func MonitorHeldByCurrent(x any) bool {
+	m := MonitorOf(x)
+	g := GoID()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.owner == g
+}
+
+func MonitorIsLocked(x any) bool {
+	m := MonitorOf(x)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.owner != 0
+}
+
+// Condition is a wait set of a monitor, separate from the monitor's own (Lock.newCondition).
+type Condition struct {
+	m       *Monitor
+	waiters []chan struct{}
+}
+
+func NewCondition(lock any) any { return &Condition{m: MonitorOf(lock)} }
+
+// ConditionAwait waits until signaled or interrupted (which throws), or until nanos have elapsed
+// if nanos >= 0. It returns an estimate of the remaining nanoseconds (<= 0 on timeout).
+func ConditionAwait(c any, nanos int64) int64 {
+	cond := Cast[*Condition](c)
+	if nanos == 0 {
+		return 0
+	}
+	start := time.Now()
+	timeout := time.Duration(nanos)
+	if nanos < 0 {
+		timeout = 0
+	}
+	if cond.m.wait(&cond.waiters, timeout) {
+		if nanos < 0 {
+			return 1
+		}
+		return max(nanos-int64(time.Since(start)), 1)
+	}
+	return nanos - int64(time.Since(start))
+}
+
+func ConditionSignal(c any) {
+	cond := Cast[*Condition](c)
+	cond.m.mu.Lock()
+	cond.m.checkOwner(GoID())
+	if len(cond.waiters) > 0 {
+		close(cond.waiters[0])
+		cond.waiters = cond.waiters[1:]
+	}
+	cond.m.mu.Unlock()
+}
+
+func ConditionSignalAll(c any) {
+	cond := Cast[*Condition](c)
+	cond.m.mu.Lock()
+	cond.m.checkOwner(GoID())
+	for _, w := range cond.waiters {
+		close(w)
+	}
+	cond.waiters = nil
+	cond.m.mu.Unlock()
 }

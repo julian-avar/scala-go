@@ -314,17 +314,48 @@ func GoMakeChan(elem any, capacity int32) any {
 	return reflect.MakeChan(reflect.ChanOf(reflect.BothDir, goType(elem)), int(capacity)).Interface()
 }
 
+// Blocking channel operations of a java.lang.Thread can be interrupted (Thread.interrupt), which
+// throws InterruptedException, as blocking queue operations do on the JVM. gears cancels
+// blocked operations this way.
+
 func GoChanSend(c any, x any) {
 	v := valueOf(c)
 	FlushStdout()
-	v.Send(fromScalaValue(x, v.Type().Elem()))
+	value := fromScalaValue(x, v.Type().Elem())
+	if t := currentThreadState(GoID()); t != nil {
+		cases := []reflect.SelectCase{{Dir: reflect.SelectSend, Chan: v, Send: value}, {Dir: reflect.SelectRecv, Chan: reflect.ValueOf(t.wake)}}
+		for {
+			if chosen, _, _ := reflect.Select(cases); chosen == 0 {
+				return
+			}
+			if t.interrupted.Swap(false) {
+				ThrowKind(Interrupted, "")
+			}
+		}
+	}
+	v.Send(value)
 }
 
 // GoChanReceive blocks for a value; it returns closed once the channel is closed and drained.
 func GoChanReceive(c any, closed any) any {
 	v := valueOf(c)
 	FlushStdout()
-	r, ok := v.Recv()
+	var r reflect.Value
+	var ok bool
+	if t := currentThreadState(GoID()); t != nil {
+		cases := []reflect.SelectCase{{Dir: reflect.SelectRecv, Chan: v}, {Dir: reflect.SelectRecv, Chan: reflect.ValueOf(t.wake)}}
+		for {
+			var chosen int
+			if chosen, r, ok = reflect.Select(cases); chosen == 0 {
+				break
+			}
+			if t.interrupted.Swap(false) {
+				ThrowKind(Interrupted, "")
+			}
+		}
+	} else {
+		r, ok = v.Recv()
+	}
 	if !ok {
 		return closed
 	}

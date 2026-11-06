@@ -274,3 +274,35 @@ func ObjectDefaultToString(x any) *String {
 
 // ObjectDefaultEquals is java.lang.Object's own equals: reference identity.
 func ObjectDefaultEquals(x any, other any) bool { return x == other }
+
+// ---- Null ---------------------------------------------------------------------------------
+
+// Scala references with a concrete Go pointer type (strings, arrays, BigIntegers, classes) are
+// nil pointers when null. Stored in an `any`, such a nil pointer would not be a nil `any`, so
+// conversions to `any` go through AnyRef, and null tests on `any` values through IsNull.
+
+type nilRef interface{ isNilRef() bool }
+
+func (s *String) isNilRef() bool     { return s == nil }
+func (a *Array[T]) isNilRef() bool   { return a == nil }
+func (b *BigInteger) isNilRef() bool { return b == nil }
+func (c *Class) isNilRef() bool      { return c == nil }
+
+// AnyRef converts a Scala reference of a pointer type to `any`, keeping null a nil `any`.
+func AnyRef[T nilRef](x T) any {
+	if x.isNilRef() {
+		return nil
+	}
+	return x
+}
+
+// IsNull tests an `any` holding a Scala reference for null.
+func IsNull(x any) bool {
+	if x == nil {
+		return true
+	}
+	if r, ok := x.(nilRef); ok {
+		return r.isNilRef()
+	}
+	return false
+}

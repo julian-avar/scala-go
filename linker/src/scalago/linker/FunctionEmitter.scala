@@ -631,11 +631,22 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       case Le     => infix("<=")
       case Gt     => infix(">")
       case Ge     => infix(">=")
-      case RefEq  => s"(any($a) == any($b))"
-      case RefNe  => s"(any($a) != any($b))"
+      case RefEq  => refEq(lhs, a, rhs, b)
+      case RefNe  => s"(!${refEq(lhs, a, rhs, b)})"
       case UnivEq => s"rt.Equals($a, $b)"
       case UnivNe => s"(!rt.Equals($a, $b))"
       case StringConcat => s"rt.Concat($a, $b)"
+
+  /** Reference equality. Null tests compare with Go's nil directly, except on `any` values, which
+   *  may hold a nil pointer (see `rt.IsNull`).
+   */
+  private def refEq(lhs: Tree, a: String, rhs: Tree, b: String): String =
+    def nullTest(t: Tree, e: String) = if ctx.goType(t.tpe) == "any" then s"rt.IsNull($e)" else s"($e == nil)"
+    (lhs, rhs) match
+      case (_: Null, _: Null) => "true"
+      case (_, _: Null)       => nullTest(lhs, a)
+      case (_: Null, _)       => nullTest(rhs, b)
+      case _                  => s"(any($a) == any($b))"
 
   /** Converts a numeric literal with JVM semantics (Scala's own conversions are the JVM's). */
   private def foldConversion(lit: Tree, to: Type): Option[Tree] =

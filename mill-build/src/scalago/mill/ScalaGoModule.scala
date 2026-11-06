@@ -49,6 +49,26 @@ trait ScalaGoModule extends ScalaModule {
     )
   }
 
+  /** The Scala compiler, for compiling dependencies from TASTy. */
+  def scalaGoCompilerClasspath: T[Seq[PathRef]] = Task {
+    defaultResolver().classpath(Seq(mvn"org.scala-lang::scala3-compiler:${scalaVersion()}"))
+  }
+
+  /** IR of the module's Scala library dependencies, compiled from the TASTy in their jars (jars
+   *  that already contain IR, and the Scala standard library, are skipped).
+   */
+  def scalaGoDependencyIR: T[Seq[PathRef]] = Task {
+    val classpath = runClasspath().map(_.path).filter(os.exists(_))
+    val isStdlib = (p: os.Path) => p.last.startsWith("scala-library") || p.last.startsWith("scala3-library")
+    val jars = classpath.filter(p => os.isFile(p) && p.ext == "jar" && !isStdlib(p) && TastyIR.needsIR(p))
+    jars.map { jar =>
+      val out = Task.dest / "ir" / jar.baseName
+      TastyIR.compile(jar, classpath, out, Task.dest / "work" / jar.baseName,
+        scalaGoCompilerClasspath().map(_.path), scalaGoPlugin().path)
+      PathRef(out)
+    }
+  }
+
   /** The scala-go user library (`scalago.go.GoString`, ...). */
   def scalaGoLibraryDeps: T[Seq[Dep]] = Task {
     Seq(mvn"${ScalaGoModule.Organization}::scalago-library:${scalaGoVersion()}")
@@ -88,7 +108,10 @@ trait ScalaGoModule extends ScalaModule {
   def goLink: T[PathRef] = Task {
     val out = Task.dest / "go"
     val sep = _root_.java.io.File.pathSeparator
-    val classpath = (runClasspath() ++ scalaGoLibraryIR()).map(_.path).filter(os.exists(_))
+    // IR on the classpath: the first definition of a class wins, so the module's own IR (and that
+    // of dependencies compiled with the plugin, such as overrides) precedes dependencies' IR
+    // compiled from TASTy, which precedes javalib and the Scala library.
+    val classpath = (runClasspath() ++ scalaGoDependencyIR() ++ scalaGoLibraryIR()).map(_.path).filter(os.exists(_))
     val javaExe = os.Path(sys.props("java.home")) / "bin" / "java"
     val localModules = goLocalModules().map { dir =>
       val goMod = dir.path / "go.mod"

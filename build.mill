@@ -6,6 +6,7 @@ import mill.scalalib.*
 import mill.scalalib.publish.*
 
 import scalago.mill.ScalaGoModule as UserScalaGoModule
+import scalago.mill.TastyIR
 
 object Versions {
   /** The plugin hooks compiler internals, so it is built against one exact compiler version.
@@ -16,6 +17,7 @@ object Versions {
   val millScala = "3.8.2"
   val mill = "1.1.8"
   val munit = "1.3.0"
+  val gears = "0.3.1"
 }
 
 trait ScalaGoModule extends ScalaModule {
@@ -120,31 +122,39 @@ object stdlib extends ScalaGoModule with Published {
     defaultResolver().classpath(Seq(mvn"org.scala-lang::scala3-compiler:${Versions.scala}"))
   }
 
-  /** Directory of `.goir` files. Untranslatable code becomes `Unsupported` IR (lenient mode), which
-   *  only fails linking if it is reachable. `scala.quoted` (macros only) is skipped: the compiler
-   *  cannot recompile it from TASTy.
+  /** Directory of `.goir` files (see `TastyIR`). `scala.quoted` (macros only) is skipped: the
+   *  compiler cannot recompile it from TASTy.
    */
   def ir = Task {
-    val tastyDir = Task.dest / "tasty"
     val out = Task.dest / "ir"
-    os.remove.all(tastyDir); os.remove.all(out)
-    os.makeDir.all(tastyDir); os.makeDir.all(out)
-    os.unzip(libraryJar().path, tastyDir, includePatterns = Seq(".*\\.tasty".r))
-    val files = os.walk(tastyDir)
-      .filter(_.ext == "tasty")
-      .filterNot(p => p.segments.contains("quoted"))
-      .map(_.toString)
-    val argsFile = Task.dest / "args.txt"
-    os.write.over(argsFile, files.mkString("\n"))
-    os.proc(
-      "java", "-Xss8m", "-cp", compilerClasspath().map(_.path).mkString(java.io.File.pathSeparator),
-      "dotty.tools.dotc.Main",
-      "-from-tasty", "-experimental", "-nowarn", "-Ystop-after:genGoIR",
-      "-classpath", libraryJar().path.toString,
-      "-d", out.toString,
-      s"-Xplugin:${plugin.jar().path}", "-P:scala-go:lenient",
-      s"@$argsFile"
-    ).call(stdout = os.Inherit)
+    TastyIR.compile(libraryJar().path, Nil, out, Task.dest / "work", compilerClasspath().map(_.path), plugin.jar().path,
+      skip = _.segments.contains("quoted"))
+    PathRef(out)
+  }
+}
+
+/** gears (lampepfl/gears) on goroutines. gears itself is compiled from its TASTy (`gearsIR`); this
+ *  module overrides the one class that needs JVM-only APIs (`VThreadScheduler`, which uses
+ *  `Thread.ofVirtual` and a `VarHandle`): its sources in `scalago.gearsrt` are emitted as
+ *  `gears.async` in the IR, and come first on the link classpath. It also has helpers to use Go
+ *  channels and contexts from gears (`scalago.gears`).
+ */
+object gears extends WithPlugin with Published {
+  def artifactName = "scalago-gears"
+  def gearsDep = mvn"ch.epfl.lamp::gears:${Versions.gears}"
+  def mvnDeps = Seq(gearsDep)
+  def moduleDeps = Seq(library)
+  def scalacOptions = Task { super.scalacOptions() ++ pluginOptions() ++ Seq("-P:scala-go:rename:scalago.gearsrt:gears.async") }
+
+  def gearsJar = Task {
+    defaultResolver().classpath(Seq(gearsDep)).find(_.path.last.startsWith("gears_3")).get
+  }
+
+  /** gears' IR, compiled from its TASTy (for the tests; ScalaGoModule does this for users). */
+  def gearsIR = Task {
+    val out = Task.dest / "ir"
+    TastyIR.compile(gearsJar().path, Seq(stdlib.libraryJar().path), out, Task.dest / "work",
+      stdlib.compilerClasspath().map(_.path), plugin.jar().path)
     PathRef(out)
   }
 }
@@ -185,6 +195,10 @@ object linker extends ScalaGoModule with Published {
         "SCALAGO_PLUGIN_CP" -> plugin.pluginClasspath(),
         "SCALAGO_LIBRARY_IR" -> Seq(javalib.compile().classes.path, stdlib.ir().path).mkString(java.io.File.pathSeparator),
         "SCALAGO_USER_LIBRARY" -> library.compile().classes.path.toString,
+        // gears: its jar (to compile and run test programs on the JVM), and its IR with the
+        // scala-go override first.
+        "SCALAGO_EXTRA_CP" -> Seq(gears.compile().classes.path, gears.gearsJar().path).mkString(java.io.File.pathSeparator),
+        "SCALAGO_EXTRA_IR" -> Seq(gears.compile().classes.path, gears.gearsIR().path).mkString(java.io.File.pathSeparator),
         "SCALAGO_TEST_CASES" -> testCasesDir().path.toString
       )
     }
@@ -210,6 +224,8 @@ object example extends UserScalaGoModule {
   def scalaGoLinkerClasspath = linker.runClasspath()
   def scalaGoLibraryIR = Task { Seq(javalib.compile().classes, stdlib.ir()) }
   def scalaGoLibraryDeps = Task { Seq.empty[Dep] }
-  def moduleDeps = Seq(library)
+  def moduleDeps = Seq(library, gears)
+  // gears comes as a plain Scala dependency: ScalaGoModule compiles it from TASTy.
+  def mvnDeps = Seq(gears.gearsDep)
   def goLocalModules = Task.Sources(moduleDir / "go" / "textstats")
 }

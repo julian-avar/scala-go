@@ -154,6 +154,10 @@ object Natives:
   instanceFn(S, "intern()Ljava.lang.String;", "rt.StringIntern")
   instanceFn(S, "repeat(I)Ljava.lang.String;", "rt.StringRepeat")
   instanceFn(S, "split(Ljava.lang.String;)[Ljava.lang.String;", "rt.StringSplit")
+  instanceFn(S, "split(Ljava.lang.String;I)[Ljava.lang.String;", "rt.StringSplitLimit")
+  instanceFn(S, "matches(Ljava.lang.String;)Z", "rt.StringMatches")
+  instanceFn(S, "replaceAll(Ljava.lang.String;Ljava.lang.String;)Ljava.lang.String;", "rt.StringReplaceAll")
+  instanceFn(S, "replaceFirst(Ljava.lang.String;Ljava.lang.String;)Ljava.lang.String;", "rt.StringReplaceFirst")
   staticFn(S, "valueOf(Ljava.lang.Object;)Ljava.lang.String;", "rt.StringValueOf")
   staticFn(S, "valueOf(C)Ljava.lang.String;", "rt.StringValueOfChar")
   staticFn(S, "valueOf([C)Ljava.lang.String;", "rt.NewStringFromChars")
@@ -515,6 +519,21 @@ object Natives:
   staticFn(Threads, "isInterrupted(Ljava.lang.Object;Z)Z", "rt.ThreadIsInterrupted")
   staticFn(Threads, "sleep(JI)V", "rt.Sleep")
   staticFn(Threads, "yieldNow()V", "rt.Yield")
+
+  // java.util.concurrent.locks' native side (javalib/src/scalago/runtime/Locks.scala).
+  private val Locks = "scalago.runtime.Locks$"
+  for (desc, fn) <- List(
+      "enter(Ljava.lang.Object;)V" -> "rt.MonitorEnter",
+      "exit(Ljava.lang.Object;)V" -> "rt.MonitorExit",
+      "tryEnter(Ljava.lang.Object;)Z" -> "rt.MonitorTryEnter",
+      "heldByCurrent(Ljava.lang.Object;)Z" -> "rt.MonitorHeldByCurrent",
+      "isLocked(Ljava.lang.Object;)Z" -> "rt.MonitorIsLocked",
+      "newCondition(Ljava.lang.Object;)Ljava.lang.Object;" -> "rt.NewCondition",
+      "await(Ljava.lang.Object;J)J" -> "rt.ConditionAwait",
+      "signal(Ljava.lang.Object;)V" -> "rt.ConditionSignal",
+      "signalAll(Ljava.lang.Object;)V" -> "rt.ConditionSignalAll"
+    )
+  do staticFn(Locks, desc, fn)
 
   private val GoConsole = "scalago.runtime.Console$"
   staticFn(GoConsole, "writeStdout(Ljava.lang.String;)V", "rt.WriteStdout")

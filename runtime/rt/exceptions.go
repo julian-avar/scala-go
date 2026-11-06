@@ -1,8 +1,10 @@
 package rt
 
 import (
+	"os"
 	"regexp"
 	"runtime"
+	"runtime/debug"
 	"strings"
 )
 
@@ -101,6 +103,10 @@ func Try(body func()) (throwable any) {
 	return nil
 }
 
+// traceRuntimeErrors (SCALAGO_TRACE=1) prints where Go runtime errors (nil dereferences, ...)
+// happen before they become Java exceptions: exceptions carry no stack traces yet.
+var traceRuntimeErrors = os.Getenv("SCALAGO_TRACE") != ""
+
 var indexOutOfRange = regexp.MustCompile(`index out of range \[(-?\d+)\] with length (\d+)`)
 
 // Caught converts a recovered panic value into a Throwable, translating Go runtime errors into
@@ -113,6 +119,9 @@ func Caught(r any) any {
 		return NewException(ClassCast, e.Error())
 	case runtime.Error:
 		msg := e.Error()
+		if traceRuntimeErrors {
+			os.Stderr.WriteString("scala-go: Go runtime error: " + msg + "\n" + string(debug.Stack()))
+		}
 		switch {
 		case strings.Contains(msg, "nil pointer dereference"):
 			return NewException(NullPointer, "")

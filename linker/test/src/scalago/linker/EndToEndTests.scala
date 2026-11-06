@@ -25,6 +25,12 @@ class EndToEndTests extends munit.FunSuite:
   /** IR of javalib and of the Scala library, linked after the program's own classes. */
   private val libraryIR = env("SCALAGO_LIBRARY_IR").split(File.pathSeparator).toSeq.map(Path.of(_))
 
+  /** Third-party Scala libraries (gears): jars to compile and run against, and their IR (with the
+   *  scala-go overrides first), linked before javalib.
+   */
+  private val extraClasspath = env("SCALAGO_EXTRA_CP").split(File.pathSeparator).toSeq.filter(_.nonEmpty)
+  private val extraIR = env("SCALAGO_EXTRA_IR").split(File.pathSeparator).toSeq.filter(_.nonEmpty).map(Path.of(_))
+
   /** The Scala library jars, located from classes on the test classpath. */
   private val scalaLibrary: Seq[String] =
     Seq(classOf[Option[?]], Class.forName("scala.Tuple"))
@@ -49,7 +55,7 @@ class EndToEndTests extends munit.FunSuite:
       val isLibrary = Files.exists(dir.resolve("library.txt"))
       // Programs calling Go code (`go-only.txt` says why) cannot run on the JVM.
       if !Files.exists(dir.resolve("go-only.txt")) && !isLibrary then
-        val jvmClasspath = (classes.toString +: userLibrary +: scalaLibrary).mkString(File.pathSeparator)
+        val jvmClasspath = (classes.toString +: userLibrary +: (extraClasspath ++ scalaLibrary)).mkString(File.pathSeparator)
         assertNoDiff(run(Seq(javaBinary, "-cp", jvmClasspath, mainClass), work), expected, "JVM output")
 
       // Subdirectories with a go.mod are local Go modules the program uses.
@@ -63,7 +69,7 @@ class EndToEndTests extends munit.FunSuite:
         library = isLibrary
       )
       val goDir = work.resolve("go")
-      val classpath = classes +: Path.of(userLibrary) +: libraryIR
+      val classpath = (classes +: Path.of(userLibrary) +: extraIR) ++ libraryIR
       if Files.exists(expectedErrors) then
         // The case must fail to link, with (at least) the errors listed in `link-errors.txt`.
         val e = intercept[Linker.LinkingException](Linker.link(classpath, goDir, config))
@@ -121,7 +127,7 @@ class EndToEndTests extends munit.FunSuite:
     val sources = Using.resource(Files.list(sourceDir))(_.iterator.asScala.map(_.toString).filter(_.endsWith(".scala")).toList)
     val args = Array(
       "-d", outDir.toString,
-      "-classpath", (userLibrary +: scalaLibrary).mkString(File.pathSeparator),
+      "-classpath", (userLibrary +: (extraClasspath ++ scalaLibrary)).mkString(File.pathSeparator),
       s"-Xplugin:$pluginClasspath",
       "-color:never"
     ) ++ sources

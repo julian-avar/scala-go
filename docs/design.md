@@ -29,7 +29,13 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
 3. **Standard library IR** (`stdlib`). Since 3.8 the Scala library ships TASTy, so it is
    recompiled from TASTy with the plugin in lenient mode, stopping after `genGoIR`. This takes
    about 20 s and produces about 2,800 classes. `scala.quoted` is skipped, because the compiler
-   cannot recompile it from TASTy.
+   cannot recompile it from TASTy. **Other Scala 3 libraries** are compiled the same way
+   (`TastyIR`, `ScalaGoModule.scalaGoDependencyIR`): every dependency jar with TASTy and no IR.
+   So published Scala libraries such as gears need no scala-go specific artifact, unlike
+   Scala.js and Scala Native, where each library is published per platform. A library that
+   needs JVM-only APIs can be patched by overriding single classes: a module compiled with the
+   plugin and `-P:scala-go:rename` emits replacements under the library's own names, and its IR
+   comes first on the link classpath (`scalago-gears` does this for one gears class).
 4. **javalib** (`javalib/`). JDK classes written in Scala: exceptions, `StringBuilder`,
    `System.out`, `java.util.Arrays`, `MathContext`, references, and so on. It also replaces the
    few Java-written classes of the Scala library (`*Ref`, `LazyVals`, `JProcedureN`,
@@ -329,6 +335,27 @@ get no special publication guarantee either: share objects through `synchronized
 atomics, `Thread.start`/`join` or Go channels, which are all happens-before edges. Programs can
 be checked with Go's race detector (`go build -race`). The `concurrency` test case runs under it.
 
+## gears
+
+The concurrency API is [gears](https://github.com/lampepfl/gears), used as published. Its JVM
+implementation runs each `Future` on a virtual thread and suspends by blocking it, with
+`ReentrantLock`/`Condition`. Under scala-go a virtual thread is a goroutine-backed
+`java.lang.Thread`, so the same code runs on goroutines:
+
+- gears is compiled from its TASTy like any dependency. The `scalago-gears` module overrides
+  `gears.async.VThreadScheduler`, the one class that needs `Thread.ofVirtual` and a `VarHandle`.
+  `import gears.async.default.given` works unchanged.
+- javalib provides what gears uses: `ReentrantLock` and `Condition` (a monitor and its wait
+  sets, `rt/sync.go`), atomics, `ConcurrentLinkedQueue`, `TimeUnit`, and the
+  `java.util.concurrent` exceptions. Cancellation interrupts the thread (`Thread.interrupt`),
+  which wakes sleeps, waits, conditions and blocked Go channel operations.
+- Go integration (`scalago.gears`): `GoChan.awaitReceive`/`awaitSend` are cancellable channel
+  operations in gears code, and `withGoContext(ctx)(body)` cancels `body` when a Go
+  `context.Context` is done. Exported code uses this to honour its Go callers' contexts.
+
+The `gears` test case runs the same program on JVM virtual threads and on goroutines (also under
+the race detector). `gears-go-context` cancels gears code with a Go deadline.
+
 ## Semantics handled explicitly
 
 - **JVM numeric semantics:** wrapping arithmetic, masked shift counts, `>>>`, saturating
@@ -354,21 +381,25 @@ Supported and covered by end-to-end tests:
 - Go interop: facades of standard-library packages and of a local Go module, Go interfaces
   implemented in Scala, errors and callbacks, Go slices, maps, channels, pointers and funcs
   shared with Go, and generic Go functions. Mismatched facades are tested as link errors.
+- gears: futures, races, cancellation, timeouts, channels, and Go channels and contexts, on
+  goroutines (and the same program on JVM virtual threads)
 - exports: a Scala library used by a Go program (functions, an exported class hierarchy,
   errors, panics, callbacks, identity, and calls from 100 goroutines under the race detector)
 - concurrency: threads, `synchronized`, `wait`/`notify`, volatile fields, atomics, interrupts,
   and concurrent first use of modules and lazy vals (also under Go's race detector)
 
 Known gaps:
-- `BigDecimal` (`java.math.BigDecimal` is not implemented), regular expressions,
-  `String.format` beyond the common conversions, `java.util` collections, `java.time`, and I/O
+- `BigDecimal` (`java.math.BigDecimal` is not implemented), regular expressions beyond
+  `String.split`/`matches`/`replaceAll`/`replaceFirst` (which use Go's RE2: no lookaround or
+  backreferences), `java.util.regex`, `String.format` beyond the common conversions, `java.util` collections, `java.time`, and I/O
   beyond stdout/stderr.
 - Reflection: `getClass` and `Class` names work; nothing else.
-- Concurrency: `java.util.concurrent` beyond the atomics (executors, locks, concurrent
-  collections, `CompletableFuture`), `ThreadLocal`, thread groups. `scala.concurrent.Future`
-  needs an `ExecutionContext` on `java.util.concurrent`.
+- Concurrency: `java.util.concurrent` beyond what gears needs (executors, concurrent maps,
+  `CompletableFuture`), `ThreadLocal`, thread groups. `scala.concurrent.Future` needs an
+  `ExecutionContext` on `java.util.concurrent`; gears is the supported API.
 - `Enumeration` (it uses reflection).
-- Stack traces: exceptions carry none.
+- Stack traces: exceptions carry none. `SCALAGO_TRACE=1` prints the Go stack where a Go runtime
+  error (a nil dereference, ...) becomes a Java exception.
 
 When reachable code uses something missing, linking fails with a "called from" chain naming
 the API.
@@ -415,9 +446,11 @@ earlier has to be redone:
    objects keep their identity across the boundary, Scala exceptions become `error` results
    (`@throws`) or panics, and there are no import cycles: Go code that Scala imports gets Scala
    code as interfaces and funcs.
-5. **Concurrency API: gears on goroutines.** `Async`/`Future` on goroutines, channels on `GoChan`,
-   and cancellation bridged to `context.Context` at the boundary. This needs steps 2 and 3, and is
-   independent of step 4.
+5. **Concurrency API: gears on goroutines** (done, see [gears](#gears)). gears runs as published,
+   compiled from its TASTy, with one class overridden: futures on goroutines, cancellation by
+   thread interruption, cancellable Go channel operations, and Go contexts cancelling gears
+   code. This needed steps 2 and 3. It also brought Scala library dependencies in general
+   (compiled from TASTy) and regex-based `String` methods on Go's `regexp`.
 6. **Facade generation** from Go packages, using `goapi` and the step 3 types. Facades for the
    most-used standard-library packages, published as a library.
 7. **Library coverage** (`BigDecimal`, `java.util` collections, regex on Go's `regexp`, more of
