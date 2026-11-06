@@ -159,6 +159,30 @@ object gears extends WithPlugin with Published {
   }
 }
 
+/** Facades of the most-used Go standard library packages (`scalago.gostd`), generated from the
+ *  packages' APIs by FacadeGen. Go types of packages outside this list are left out of them.
+ */
+object gostd extends WithPlugin with Published {
+  def artifactName = "scalago-gostd"
+  def moduleDeps = Seq(library)
+  // Generated code: unused-parameter warnings would be noise.
+  def scalacOptions = Task { Seq("-deprecation", "-feature") ++ pluginOptions() }
+
+  def goPackages = Seq(
+    "bufio", "bytes", "context", "encoding/base64", "encoding/hex", "encoding/json", "errors", "fmt", "io",
+    "math", "net/url", "os", "path", "path/filepath", "sort", "strconv", "strings", "sync", "time",
+    "unicode", "unicode/utf8"
+  )
+
+  def generatedSources = Task {
+    os.proc(
+      "java", "-cp", linker.runClasspath().map(_.path).mkString(java.io.File.pathSeparator),
+      "scalago.linker.FacadeGen", "--out", Task.dest, "--package", "scalago.gostd", goPackages
+    ).call(stdout = os.Pipe)
+    Seq(PathRef(Task.dest))
+  }
+}
+
 /** Whole-program linker: reads `.goir` files from a classpath and emits a Go module. */
 object linker extends ScalaGoModule with Published {
   def artifactName = "scalago-linker"
@@ -197,8 +221,11 @@ object linker extends ScalaGoModule with Published {
         "SCALAGO_USER_LIBRARY" -> library.compile().classes.path.toString,
         // gears: its jar (to compile and run test programs on the JVM), and its IR with the
         // scala-go override first.
-        "SCALAGO_EXTRA_CP" -> Seq(gears.compile().classes.path, gears.gearsJar().path).mkString(java.io.File.pathSeparator),
-        "SCALAGO_EXTRA_IR" -> Seq(gears.compile().classes.path, gears.gearsIR().path).mkString(java.io.File.pathSeparator),
+        // The generated standard-library facades too (their IR is in their classes directory).
+        "SCALAGO_EXTRA_CP" -> Seq(gears.compile().classes.path, gears.gearsJar().path, gostd.compile().classes.path)
+          .mkString(java.io.File.pathSeparator),
+        "SCALAGO_EXTRA_IR" -> Seq(gears.compile().classes.path, gostd.compile().classes.path, gears.gearsIR().path)
+          .mkString(java.io.File.pathSeparator),
         "SCALAGO_TEST_CASES" -> testCasesDir().path.toString
       )
     }
@@ -228,4 +255,6 @@ object example extends UserScalaGoModule {
   // gears comes as a plain Scala dependency: ScalaGoModule compiles it from TASTy.
   def mvnDeps = Seq(gears.gearsDep)
   def goLocalModules = Task.Sources(moduleDir / "go" / "textstats")
+  // Facades generated from Go packages: a standard library package, and the local module.
+  def goFacadePackages = Seq("strconv", "example.com/textstats")
 }

@@ -76,6 +76,11 @@ object slices:
 (`GoSlice.make[GoInt](n)` is an `[]int`, `GoMap.make[GoString, Long]` a `map[string]int64`). They
 also run on the JVM. Go funcs returned by facades are Scala functions.
 
+Facades can also be generated from the Go packages themselves: list them in `goFacadePackages`
+(their objects are in the Scala package `gofacades`), or depend on `scalago-gostd`, the generated
+facades of the most-used standard library packages (`scalago.gostd.strings`, `fmt`, `time`,
+`net/url`, `encoding/json`, ...).
+
 Go modules other than the standard library go in `goRequires` (`"module@version"`), or in
 `goLocalModules` for local directories with a `go.mod` (see `example/`). Facade members throw on
 the JVM. See [docs/design.md](docs/design.md#go-interop) for the conversion rules.
@@ -133,6 +138,7 @@ Methods annotated with `@throws` return a Go `error`. Other exceptions are panic
 | `javalib/`           | JDK classes in Scala (emitted as `java.*`) and Scala-library overrides  |
 | `library/`           | User-facing APIs: Go facades and exports, `GoString`, `GoSlice`, ...    |
 | `gears/`             | gears on goroutines (`scalago-gears`): an override and Go helpers       |
+| `gostd/`             | Generated facades of Go standard library packages (`scalago-gostd`)     |
 | `mill-build/src/`    | `ScalaGoModule`/`ScalaGoLibraryModule` and `TastyIR`, published as `mill-scalago` |
 | `example/`           | A program built with `ScalaGoModule`: `mill example.goRun Ada Grace`    |
 | `tests/cases/`       | End-to-end programs with their expected output                          |

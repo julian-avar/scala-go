@@ -1,0 +1,23 @@
+ababab
+GRÜßE
+4: the-quick-brown-fox
+key value true
+bAnAnA
+42!
+124
+Atoi failed: strconv.Atoi: parsing "x": invalid syntax
+"tab\there"
+true
+2147483647 true
+90.0 minutes, 1s, 2h0m0s
+example.com 8080 /a/b two
+hello, world #1 (15 bytes)
+003.1|go  |true
+a/b/c.txt
+.gz
+apple,fig,pear
+{"a":1,"b":2}
+aGk=
+5 runes, true
+true
+plain

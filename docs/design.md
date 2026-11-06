@@ -210,6 +210,28 @@ object url:
   Scala types, and the call passes values of those types, so Go infers the type arguments. A
   function needs one facade member per instantiation (`@GoName` allows several).
 
+### Generated facades
+
+`FacadeGen` (`scalago.linker.FacadeGen`; `goFacadePackages` in `ScalaGoModule`) writes facades
+from Go packages' APIs, as ScalablyTyped does from `.d.ts` files. Each package becomes one
+`@GoImport` object, and its types become classes and traits:
+
+- Parameters and results get the cheapest exact Scala types: Go numbers become Scala numbers
+  (`int` is `Long`), `string` is `String`, `error` is `GoError`, Go types are the generated
+  facades, funcs are Scala functions, and several results are tuples. A trailing `error` is
+  thrown, except where the error is the function's value (`errors.New`, `Errorf`, `ctx.Err()`).
+- Inside Go data, the canonical views apply (`GoSlice[GoString]`, `GoMap[GoString, GoInt]`), so
+  slices are shared and the right Go types are created.
+- Go typing is structural and Scala's is nominal, so a generated type extends every generated
+  interface whose methods it has (`class Buffer extends io.Writer, io.Reader, fmt.Stringer, ...`).
+- Members whose types cannot be represented are left out with a comment saying why: generics,
+  types of packages that are not generated, unnamed structs, arrays, complex numbers, and
+  constants beyond `Long`.
+
+Generated facades are checked against Go at link time like handwritten ones, but only where
+used, so unused members cost nothing. `scalago-gostd` (`gostd/` in this build) has the facades
+of 21 standard library packages, about 1,500 members. The `go-std` test case uses them.
+
 ### Go data in Scala
 
 `GoSlice[T]`, `GoMap[K, V]`, `GoChan[T]` and `GoPtr[T]` (`library/src/scalago/go/`) are opaque
@@ -378,7 +400,7 @@ Supported and covered by end-to-end tests:
 - standard-library collections (`List`, `Vector`, `Map`, ranges, `sorted`, `groupBy`, ...),
   string interpolation, `StringBuilder`, `BigInt`
 - `scalago.go.GoString`
-- Go interop: facades of standard-library packages and of a local Go module, Go interfaces
+- Go interop: handwritten and generated facades of standard-library packages and of a local Go module, Go interfaces
   implemented in Scala, errors and callbacks, Go slices, maps, channels, pointers and funcs
   shared with Go, and generic Go functions. Mismatched facades are tested as link errors.
 - gears: futures, races, cancellation, timeouts, channels, and Go channels and contexts, on
@@ -415,10 +437,10 @@ copying wherever the representations allow. Scala.js's features map to Go as fol
 | `@JSImport` native objects and classes    | `@GoImport` facades of packages and types                 | done   |
 | facades checked against the target only at run time | facades checked against Go's API at link time   | done   |
 | non-native JS classes (Scala classes JS can use) | Scala classes implementing Go interfaces           | done   |
-| `js.Array`, `js.Dictionary`, `js.Function`, `js.Promise` | `GoSlice`, `GoMap`, Go funcs, `GoChan`/gears | step 3 |
-| `@JSExportTopLevel`, `@JSExport`          | `@GoExport` functions, objects and classes                | step 4 |
-| ES module output, module splitting        | library builds: a Go package other Go code imports        | step 4 |
-| ScalablyTyped (facades generated from .d.ts) | facades generated from Go packages (`goapi`)           | step 6 |
+| `js.Array`, `js.Dictionary`, `js.Function`, `js.Promise` | `GoSlice`, `GoMap`, Go funcs, `GoChan`/gears | done   |
+| `@JSExportTopLevel`, `@JSExport`          | `@GoExport` functions, objects and classes                | done   |
+| ES module output, module splitting        | library builds: a Go package other Go code imports        | done   |
+| ScalablyTyped (facades generated from .d.ts) | facades generated from Go packages (`goapi`)           | done   |
 
 The order follows the dependencies. Each step builds on the previous ones, and nothing done
 earlier has to be redone:
@@ -451,8 +473,9 @@ earlier has to be redone:
    thread interruption, cancellable Go channel operations, and Go contexts cancelling gears
    code. This needed steps 2 and 3. It also brought Scala library dependencies in general
    (compiled from TASTy) and regex-based `String` methods on Go's `regexp`.
-6. **Facade generation** from Go packages, using `goapi` and the step 3 types. Facades for the
-   most-used standard-library packages, published as a library.
+6. **Facade generation** (done, see [Generated facades](#generated-facades)) from Go packages'
+   APIs (`goapi`), with the step 3 types. `ScalaGoModule.goFacadePackages` generates facades for
+   any Go package, and `scalago-gostd` publishes those of 21 standard library packages.
 7. **Library coverage** (`BigDecimal`, `java.util` collections, regex on Go's `regexp`, more of
    `java.lang`) and **publishing** (organization `io.github.scalago` is a placeholder). These
    can happen in parallel with the steps above.
@@ -463,8 +486,10 @@ earlier has to be redone:
   (current behavior) or runtime errors, as on the JVM, with a warning? The JVM behavior is more
   permissive, but it hides gaps.
 - **Facades on the JVM.** Facade members throw on the JVM, so programs using Go cannot be run or
-  tested there. Facades could take an optional JVM implementation, or be generated from Go
-  packages (the `goapi` helper already reads their APIs).
+  tested there. Facades could take an optional JVM implementation.
+- **Errors in generated facades.** A trailing `error` is thrown, which suits most functions but
+  not all. Generated facades could instead return `(T, GoError)` everywhere and leave the choice
+  to the caller, or be configurable per member.
 - **Shared or copied slices.** `Array[T]` ↔ `[]T` shares memory only when the representations
   match, and `GoSlice[T]` always does. Should `Array` conversions stay as a convenience (current
   behavior) or require `GoSlice`?

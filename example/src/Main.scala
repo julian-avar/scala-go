@@ -2,6 +2,8 @@ import gears.async.*
 import gears.async.default.given
 import scalago.go.*
 
+import gofacades.*
+
 sealed trait Expr
 case class Num(value: Double) extends Expr
 case class Add(left: Expr, right: Expr) extends Expr
@@ -22,10 +24,11 @@ object Main {
     val g = "Grüße".toGoString
     println(s"${g.toJavaString}: ${g.byteLength} bytes as a Go string")
 
-    // Calling Go: a standard library package, and a local Go module
+    // Calling Go through facades generated from the Go packages (goFacadePackages in build.mill):
+    // a standard library package, and a local Go module
     val words = textstats.Words("It's a truth universally acknowledged...")
     println(s"${words.length} words, the longest is ${strconv.Quote(textstats.Longest(words))}")
-    try textstats.Longest(Array.empty)
+    try textstats.Longest(GoSlice.empty[GoString])
     catch case e: GoException => println(s"Go error: ${e.getMessage}")
 
     // gears (a Scala library dependency) on goroutines

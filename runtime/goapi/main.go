@@ -14,13 +14,14 @@
 //	(package <path> <name>)
 //	(func <path> <Name> <signature>)
 //	(var <path> <Name> <type>)
-//	(const <path> <Name> <type>)
+//	(const <path> <Name> <type> <value>)        value: the exact value, as a string
 //	(type <path> <Name> <kind>)                  kind: struct, interface, or other
 //	(method <path> <Type> <Name> <signature>)   method set of *Type (of Type for interfaces)
 //	(field <path> <Type> <Name> <type>)         struct fields, including promoted ones
 //	(error <message>)
 //
-// Signatures are (sig (<param type>...) (<result type>...) <variadic: true/false>). Types:
+// Signatures are (sig (<param type>...) (<result type>...) <variadic: true/false> [generic]
+// (names <param name>...)); unnamed parameters are "_". Types:
 //
 //	(basic <name>)  (named <path> <Name>)  (ptr T)  (slice T)  (array <n> T)  (map K V)
 //	(chan T)  (func <signature>)  (interface)  (struct)  (tparam <name>)
@@ -122,7 +123,7 @@ func printPackage(out io.Writer, pkg *types.Package) {
 		case *types.Var:
 			fmt.Fprintf(out, "(var %s %s %s)\n", path, name, typ(obj.Type()))
 		case *types.Const:
-			fmt.Fprintf(out, "(const %s %s %s)\n", path, name, typ(obj.Type()))
+			fmt.Fprintf(out, "(const %s %s %s %s)\n", path, name, typ(obj.Type()), strconv.Quote(obj.Val().ExactString()))
 		case *types.TypeName:
 			printType(out, path, obj)
 		}
@@ -237,7 +238,15 @@ func signature(sig *types.Signature) string {
 	if sig.TypeParams().Len() > 0 {
 		sb.WriteString(" generic")
 	}
-	sb.WriteString(")")
+	sb.WriteString(" (names")
+	for i := 0; i < sig.Params().Len(); i++ {
+		name := sig.Params().At(i).Name()
+		if name == "" {
+			name = "_"
+		}
+		sb.WriteString(" " + name)
+	}
+	sb.WriteString("))")
 	return sb.String()
 }
 

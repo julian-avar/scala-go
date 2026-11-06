@@ -43,7 +43,9 @@ enum GoType:
 object GoType:
   val Error: GoType = Named("", "error")
 
-final case class GoSignature(params: List[GoType], results: List[GoType], variadic: Boolean, generic: Boolean):
+final case class GoSignature(params: List[GoType], results: List[GoType], variadic: Boolean, generic: Boolean,
+    /** Parameter names ("_" for unnamed ones; empty when unknown). */
+    paramNames: List[String] = Nil):
   override def toString: String =
     val ps = params.zipWithIndex.map((t, i) => if variadic && i == params.size - 1 then s"...${t.asInstanceOf[GoType.Slice].elem}" else t.toString)
     val rs = results match
@@ -65,6 +67,8 @@ final case class GoPackage(
     funcs: Map[String, GoSignature],
     vars: Map[String, GoType],
     consts: Map[String, GoType],
+    /** The exact values of the constants (Go syntax: `3`, `1e+100`, `"a"`, `true`). */
+    constValues: Map[String, String],
     types: Map[String, GoTypeDecl],
     /** `type A = B`: the aliased type. */
     aliases: Map[String, GoType]
@@ -126,11 +130,12 @@ object GoApi:
       val funcs = mutable.LinkedHashMap.empty[String, GoSignature]
       val vars = mutable.LinkedHashMap.empty[String, GoType]
       val consts = mutable.LinkedHashMap.empty[String, GoType]
+      val constValues = mutable.LinkedHashMap.empty[String, String]
       val kinds = mutable.LinkedHashMap.empty[String, GoTypeKind]
       val methods = mutable.LinkedHashMap.empty[String, mutable.LinkedHashMap[String, GoSignature]]
       val fields = mutable.LinkedHashMap.empty[String, mutable.LinkedHashMap[String, GoType]]
       val aliases = mutable.LinkedHashMap.empty[String, GoType]
-      def build = GoPackage(path, name, funcs.toMap, vars.toMap, consts.toMap,
+      def build = GoPackage(path, name, funcs.toMap, vars.toMap, consts.toMap, constValues.toMap,
         kinds.map((t, k) => t -> GoTypeDecl(k, methods.get(t).fold(Map.empty)(_.toMap), fields.get(t).fold(Map.empty)(_.toMap))).toMap,
         aliases.toMap)
 
@@ -142,7 +147,9 @@ object GoApi:
         case SList(Atom("package") :: Str(path) :: Atom(name) :: Nil) => builders(path) = Builder(path, name)
         case SList(Atom("func") :: Str(path) :: Atom(name) :: sig :: Nil) => pkg(path).funcs(name) = signature(sig)
         case SList(Atom("var") :: Str(path) :: Atom(name) :: t :: Nil) => pkg(path).vars(name) = goType(t)
-        case SList(Atom("const") :: Str(path) :: Atom(name) :: t :: Nil) => pkg(path).consts(name) = goType(t)
+        case SList(Atom("const") :: Str(path) :: Atom(name) :: t :: rest) =>
+          pkg(path).consts(name) = goType(t)
+          rest.collectFirst { case Str(v) => v }.foreach(pkg(path).constValues(name) = _)
         case SList(Atom("alias") :: Str(path) :: Atom(name) :: t :: Nil) => pkg(path).aliases(name) = goType(t)
         case SList(Atom("type") :: Str(path) :: Atom(name) :: Atom(kind) :: Nil) =>
           pkg(path).kinds(name) = kind match
@@ -160,7 +167,8 @@ object GoApi:
 
   private def signature(e: SExpr): GoSignature = e match
     case SList(Atom("sig") :: SList(params) :: SList(results) :: Atom(variadic) :: rest) =>
-      GoSignature(params.map(goType), results.map(goType), variadic == "true", rest.contains(Atom("generic")))
+      val names = rest.collectFirst { case SList(Atom("names") :: ns) => ns.collect { case Atom(n) => n } }.getOrElse(Nil)
+      GoSignature(params.map(goType), results.map(goType), variadic == "true", rest.contains(Atom("generic")), names)
     case other => throw GoApiException(s"bad signature: $other")
 
   private def goType(e: SExpr): GoType = e match
