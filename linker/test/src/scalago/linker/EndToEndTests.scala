@@ -43,8 +43,12 @@ class EndToEndTests extends munit.FunSuite:
       .map(c => Path.of(c.getProtectionDomain.getCodeSource.getLocation.toURI).toString)
       .distinct
 
+  /** `SCALAGO_TEST_ONLY=a,b` runs only the cases named `a` and `b`. */
+  private val only: Option[Set[String]] = sys.env.get("SCALAGO_TEST_ONLY").map(_.split(',').map(_.trim).toSet)
+
   private val cases: Seq[Path] =
     Using.resource(Files.list(casesDir))(_.iterator.asScala.filter(Files.isDirectory(_)).toSeq.sortBy(_.toString))
+      .filter(dir => only.forall(_.contains(dir.getFileName.toString)))
 
   private val parallelism =
     sys.env.get("SCALAGO_TEST_PARALLELISM").map(_.toInt).getOrElse(math.max(1, Runtime.getRuntime.availableProcessors / 4))
