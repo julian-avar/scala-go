@@ -147,6 +147,10 @@ The `stdlib` module produces the Scala standard library's IR (`mill stdlib.ir`).
 
 ## Development
 
+`./mill` is Mill's launcher (it downloads the Mill version the build names), so only a JDK (17+)
+and Go (1.22+) need to be installed. CI (`.github/workflows/ci.yml`) runs the runtime's unit
+tests on amd64 and arm64 (Linux, macOS; oldest and newest Go) and everything below.
+
 ```sh
 mill linker.test                 # end-to-end tests (compile, run on JVM and as Go, compare)
 cd runtime && go test ./...      # runtime unit tests
