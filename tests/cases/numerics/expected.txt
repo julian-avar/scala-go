@@ -18,3 +18,5 @@ b
 true
 true
 len 5
+dividend / by zero / by zero / by zero
+Failure(java.lang.ArithmeticException: / by zero)

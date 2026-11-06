@@ -42,3 +42,10 @@ func Or(a, b bool) bool  { return a || b }
 func NaN() float64         { return math.NaN() }
 func Inf(sign int) float64 { return math.Inf(sign) }
 func NegZero() float64     { return math.Copysign(0, -1) }
+
+// DivByZero is an integer division or remainder whose divisor is the constant 0: Go rejects it
+// at compile time, the JVM throws once the dividend (evaluated here, for its side effects) is.
+func DivByZero[T int8 | int16 | int32 | int64 | uint16](dividend T) T {
+	ThrowKind(Arithmetic, "/ by zero")
+	return dividend
+}

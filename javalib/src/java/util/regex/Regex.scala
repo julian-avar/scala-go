@@ -1,4 +1,4 @@
-package scalago.javalib.util.regex
+package java.util.regex
 
 import scala.annotation.static
 

@@ -23,9 +23,9 @@ trait Appendable:
 trait Cloneable
 
 trait Iterable[T]:
-  def iterator(): scalago.javalib.util.Iterator[T]
+  def iterator(): java.util.Iterator[T]
 
-abstract class Number extends Object with scalago.javalib.io.Serializable:
+abstract class Number extends Object with java.io.Serializable:
   def intValue(): Int
   def longValue(): scala.Long
   def floatValue(): scala.Float

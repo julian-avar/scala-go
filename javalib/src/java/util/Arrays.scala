@@ -1,4 +1,4 @@
-package scalago.javalib.util
+package java.util
 
 import scala.annotation.static
 

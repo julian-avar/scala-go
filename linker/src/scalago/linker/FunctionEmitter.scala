@@ -609,7 +609,12 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       case IntLiteral(v)  => s"$goType(${v.toLong & 0xffffffffL})"
       case LongLiteral(v) => s"$goType(${java.lang.Long.toUnsignedString(v)})"
       case _              => s"$goType($a)"
+    // Go rejects a constant integer division by zero, which the JVM throws at run time.
+    def zeroDivisor = rhs match
+      case IntLiteral(0) | LongLiteral(0L) => opType == Type.Int || opType == Type.Long
+      case _                               => false
     op match
+      case Div | Rem if zeroDivisor => s"rt.DivByZero($a)"
       case Add | Sub | Mul | Div =>
         infix(op match { case Add => "+"; case Sub => "-"; case Mul => "*"; case _ => "/" })
       case Rem =>

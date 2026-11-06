@@ -1,4 +1,4 @@
-package scalago.javalib.util.concurrent.atomic
+package java.util.concurrent.atomic
 
 import scalago.runtime.Intrinsics
 

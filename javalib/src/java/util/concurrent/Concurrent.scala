@@ -1,4 +1,4 @@
-package scalago.javalib.util.concurrent
+package java.util.concurrent
 
 import scala.collection.mutable
 

@@ -162,3 +162,4 @@ used by the Go program in its `consumer/` directory. The entry point is
 runs it on the JVM. It then links it to Go, runs `go vet` and `go build`, and runs the binary.
 Both outputs must equal `expected.txt`. The work directory of a failing case is kept under
 `/tmp/scalago-<case>-*` for inspection. Set `SCALAGO_KEEP_WORK=1` to keep passing ones too.
+Cases run concurrently; `SCALAGO_TEST_PARALLELISM` sets how many at once.

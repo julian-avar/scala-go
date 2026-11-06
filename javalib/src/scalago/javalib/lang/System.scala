@@ -2,7 +2,7 @@ package scalago.javalib.lang
 
 import scala.annotation.static
 
-import scalago.javalib.io.PrintStream
+import java.io.PrintStream
 
 /** java.lang.System: only the standard streams are defined here; the other methods are
  *  implemented natively by the linker.

@@ -6,7 +6,7 @@ final class StringBuilder private (private var chars: Array[Char], private var c
     with CharSequence
     with Appendable
     with Comparable[StringBuilder]
-    with scalago.javalib.io.Serializable:
+    with java.io.Serializable:
 
   def this() = this(new Array[Char](16), 0)
   def this(capacity: Int) = this(new Array[Char](capacity), 0)

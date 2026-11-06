@@ -1,4 +1,4 @@
-package scalago.javalib.util.concurrent.locks
+package java.util.concurrent.locks
 
 import scalago.runtime.Locks
 

@@ -39,11 +39,14 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
 4. **javalib** (`javalib/`). JDK classes written in Scala: exceptions, `StringBuilder`,
    `System.out`, `java.util.Arrays`, `MathContext`, references, and so on. It also replaces the
    few Java-written classes of the Scala library (`*Ref`, `LazyVals`, `JProcedureN`,
-   `ScalaNumber`). The Scala compiler refuses to redefine core `java.lang` classes, so the
-   sources live in `scalago.javalib.*`/`scalago.scalalib.*` and the plugin renames them in the IR.
-   The `.class` files keep those names, so the jar is harmless on a JVM classpath. When a class
-   appears more than once on the link classpath, the first occurrence wins, so javalib must come
-   before the stdlib IR.
+   `ScalaNumber`). Packages other than `java.lang` are compiled under their own names
+   (`package java.util`): a class compiled from source takes precedence over the JDK's, so
+   javalib and the JDK class files it is type-checked against agree on one symbol per class.
+   The Scala compiler refuses to redefine core `java.lang` classes, so those sources live in
+   `scalago.javalib.lang` (and the Scala library's in `scalago.scalalib`), and the plugin renames
+   them in the IR. javalib is only ever linked: its jar must not be on a compile or run
+   classpath. When a class appears more than once on the link classpath, the first occurrence
+   wins, so javalib must come before the stdlib IR.
 5. **Linker** (`linker/`):
    - **Lambdas** (`Lambdas.scala`): `Closure` nodes become synthetic classes. Their single
      abstract method calls the lifted target method, with boxing and cast adaptation. Bridges are

@@ -1,4 +1,4 @@
-package scalago.javalib.util
+package java.util
 
 class NoSuchElementException(message: String) extends RuntimeException(message):
   def this() = this(null)

@@ -1,4 +1,4 @@
-package scalago.javalib.math
+package java.math
 
 import scala.annotation.static
 

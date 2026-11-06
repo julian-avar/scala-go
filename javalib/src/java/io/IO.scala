@@ -1,4 +1,4 @@
-package scalago.javalib.io
+package java.io
 
 trait Serializable
 

@@ -22,5 +22,9 @@ object Main {
     val boxed: Any = 42
     println(boxed == 42L)
     println("len " + "héllo".length)
+    // A constant zero divisor is an ArithmeticException at run time, after the dividend.
+    def divide(f: => Int): String = try f.toString catch case e: ArithmeticException => e.getMessage
+    println(divide(1 / 0) + " " + divide(7 % 0) + " " + divide({ print("dividend "); 3 } / 0))
+    println(scala.util.Try(5L / 0L))
   }
 }
