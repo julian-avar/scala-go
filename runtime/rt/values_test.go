@@ -128,3 +128,9 @@ func TestRegexSplitAndReplace(t *testing.T) {
 		t.Errorf("replaceFirst: %q", got)
 	}
 }
+
+func BenchmarkClassOf(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		ClassOf("scala.collection.mutable.HashMap")
+	}
+}
