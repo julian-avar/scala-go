@@ -28,6 +28,11 @@ func TestToStringMatchesJava(t *testing.T) {
 		{math.NaN(), "NaN"},
 		{float32(0.1), "0.1"},
 		{float32(1e10), "1.0E10"},
+		{1e23, "1.0E23"},
+		{math.SmallestNonzeroFloat64, "4.9E-324"},
+		{2 * math.SmallestNonzeroFloat64, "9.9E-324"},
+		{float32(3 * math.SmallestNonzeroFloat32), "4.2E-45"},
+		{float32(math.SmallestNonzeroFloat32), "1.4E-45"},
 	}
 	for _, c := range cases {
 		if got := ToGoString(c.in); got != c.want {

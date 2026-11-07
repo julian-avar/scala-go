@@ -438,6 +438,111 @@ object Natives:
   instance(BI, "toString()Ljava.lang.String;")((r, _) => s"rt.BigIntegerToString($r, 10)")
   instanceFn(BI, "toString(I)Ljava.lang.String;", "rt.BigIntegerToString")
 
+  // ---- java.math.BigDecimal (rt/bigdecimal.go) ------------------------------------------------
+
+  private val BD = Hijacked.BigDecimal
+  private val BDT = "Ljava.math.BigDecimal;"
+  private val MCT = "Ljava.math.MathContext;"
+  private val RMT = "Ljava.math.RoundingMode;"
+
+  /** javalib's MathContext packs its settings for natives: `precision << 3 | roundingMode.ordinal`. */
+  private val MathContextBits = MethodName("goBits", Nil, Type.Long)
+  private val EnumOrdinal = MethodName("ordinal", Nil, Type.Int)
+
+  /** Go expression calling a javalib method of a native's argument (throwing NPE for null). */
+  private def callOn(arg: String, m: MethodName, goResult: String): String =
+    val name = Mangling.virtualMethod(m)
+    s"rt.RequireNonNull(any($arg), nil).(interface{ $name() $goResult }).$name()"
+
+  private def mcBits(mc: String) = callOn(mc, MathContextBits, "int64")
+  private def ordinal(mode: String) = callOn(mode, EnumOrdinal, "int32")
+
+  /** Registers a native whose last parameter is a MathContext (passed to Go as its packed bits). */
+  private def withMC(desc: String, gen: (Option[String], List[String]) => String, instanceMethod: Boolean): Unit =
+    def go(r: Option[String], as: List[String]) = gen(r, as.init :+ mcBits(as.last))
+    if instanceMethod then instance(BD, desc)((r, as) => go(Some(r), as)) else static(BD, desc)(as => go(None, as))
+    calls(BD, desc, MathContextBits)
+
+  private def bdInstanceMC(desc: String, goFn: String): Unit =
+    withMC(desc, (r, as) => s"$goFn(${(r.toList ++ as).mkString(", ")})", instanceMethod = true)
+
+  for (field, go) <- List("ZERO" -> "rt.BigDecimalZero", "ONE" -> "rt.BigDecimalOne", "TWO" -> "rt.BigDecimalTwo",
+      "TEN" -> "rt.BigDecimalTen", "ROUND_UP" -> "rt.RoundUp", "ROUND_DOWN" -> "rt.RoundDown",
+      "ROUND_CEILING" -> "rt.RoundCeiling", "ROUND_FLOOR" -> "rt.RoundFloor", "ROUND_HALF_UP" -> "rt.RoundHalfUp",
+      "ROUND_HALF_DOWN" -> "rt.RoundHalfDown", "ROUND_HALF_EVEN" -> "rt.RoundHalfEven",
+      "ROUND_UNNECESSARY" -> "rt.RoundUnnecessary")
+  do staticFields((BD, field)) = go
+
+  // Constructors and factories.
+  for (params, fn) <- List("Ljava.lang.String;" -> "FromString", "[C" -> "FromChars", "[CII" -> "FromCharRange",
+      "D" -> "FromDouble", BIT -> "FromBigInteger", s"${BIT}I" -> "FromUnscaled", "J" -> "FromLong")
+  do
+    staticFn(BD, s"<init>($params)V", s"rt.NewBigDecimal$fn")
+    withMC(s"<init>($params$MCT)V", (_, as) => s"rt.NewBigDecimal${fn}MC(${as.mkString(", ")})", instanceMethod = false)
+  static(BD, "<init>(I)V")(as => s"rt.NewBigDecimalFromLong(int64(${as.head}))")
+  withMC(s"<init>(I$MCT)V", (_, as) => s"rt.NewBigDecimalFromLongMC(int64(${as(0)}), ${as(1)})", instanceMethod = false)
+  staticFn(BD, s"valueOf(JI)$BDT", "rt.BigDecimalValueOf")
+  static(BD, s"valueOf(J)$BDT")(as => s"rt.BigDecimalValueOf(${as.head}, 0)")
+  staticFn(BD, s"valueOf(D)$BDT", "rt.BigDecimalValueOfDouble")
+
+  // Arithmetic.
+  for (name, fn) <- List("add" -> "Add", "subtract" -> "Subtract", "multiply" -> "Multiply", "divide" -> "Divide",
+      "divideToIntegralValue" -> "DivideToIntegralValue", "remainder" -> "Remainder", "min" -> "Min", "max" -> "Max")
+  do
+    instanceFn(BD, s"$name($BDT)$BDT", s"rt.BigDecimal$fn")
+    if name != "min" && name != "max" then bdInstanceMC(s"$name($BDT$MCT)$BDT", s"rt.BigDecimal${fn}MC")
+  instanceFn(BD, s"divideAndRemainder($BDT)[$BDT", "rt.BigDecimalDivideAndRemainder")
+  bdInstanceMC(s"divideAndRemainder($BDT$MCT)[$BDT", "rt.BigDecimalDivideAndRemainderMC")
+  instance(BD, s"divide(${BDT}I$RMT)$BDT")((r, as) => s"rt.BigDecimalDivideToScale($r, ${as(0)}, ${as(1)}, ${ordinal(as(2))})")
+  instance(BD, s"divide(${BDT}II)$BDT")((r, as) =>
+    s"rt.BigDecimalDivideToScale($r, ${as(0)}, ${as(1)}, rt.BigDecimalLegacyRoundingMode(${as(2)}))")
+  instance(BD, s"divide($BDT$RMT)$BDT")((r, as) => s"rt.BigDecimalDivideRounding($r, ${as(0)}, ${ordinal(as(1))})")
+  instance(BD, s"divide(${BDT}I)$BDT")((r, as) =>
+    s"rt.BigDecimalDivideRounding($r, ${as(0)}, rt.BigDecimalLegacyRoundingMode(${as(1)}))")
+  for desc <- List(s"divide(${BDT}I$RMT)$BDT", s"divide($BDT$RMT)$BDT") do calls(BD, desc, EnumOrdinal)
+  instanceFn(BD, s"pow(I)$BDT", "rt.BigDecimalPow")
+  bdInstanceMC(s"pow(I$MCT)$BDT", "rt.BigDecimalPowMC")
+  bdInstanceMC(s"sqrt($MCT)$BDT", "rt.BigDecimalSqrt")
+  for (name, fn) <- List("abs" -> "Abs", "negate" -> "Negate") do
+    instanceFn(BD, s"$name()$BDT", s"rt.BigDecimal$fn")
+    bdInstanceMC(s"$name($MCT)$BDT", s"rt.BigDecimal${fn}MC")
+  instance(BD, s"plus()$BDT")((r, _) => r)
+  for name <- List("plus", "round") do bdInstanceMC(s"$name($MCT)$BDT", "rt.BigDecimalRound")
+
+  // Scale and representation.
+  instance(BD, s"setScale(I$RMT)$BDT")((r, as) => s"rt.BigDecimalSetScale($r, ${as(0)}, ${ordinal(as(1))})")
+  calls(BD, s"setScale(I$RMT)$BDT", EnumOrdinal)
+  instance(BD, s"setScale(II)$BDT")((r, as) =>
+    s"rt.BigDecimalSetScale($r, ${as(0)}, rt.BigDecimalLegacyRoundingMode(${as(1)}))")
+  instance(BD, s"setScale(I)$BDT")((r, as) => s"rt.BigDecimalSetScale($r, ${as(0)}, rt.RoundUnnecessary)")
+  for (name, fn) <- List("movePointLeft" -> "MovePointLeft", "movePointRight" -> "MovePointRight",
+      "scaleByPowerOfTen" -> "ScaleByPowerOfTen")
+  do instanceFn(BD, s"$name(I)$BDT", s"rt.BigDecimal$fn")
+  for (name, fn) <- List("stripTrailingZeros" -> "StripTrailingZeros", "ulp" -> "Ulp") do
+    instanceFn(BD, s"$name()$BDT", s"rt.BigDecimal$fn")
+  for (name, fn) <- List("signum" -> "Signum", "scale" -> "Scale", "precision" -> "Precision",
+      "hashCode" -> "HashCode", "intValue" -> "IntValue", "intValueExact" -> "IntValueExact")
+  do instanceFn(BD, s"$name()I", s"rt.BigDecimal$fn")
+  instanceFn(BD, s"unscaledValue()$BIT", "rt.BigDecimalUnscaledValue")
+
+  // Comparison and conversions.
+  instanceFn(BD, s"compareTo($BDT)I", "rt.BigDecimalCompareTo")
+  instanceFn(BD, "compareTo(Ljava.lang.Object;)I", "rt.BigDecimalCompareToObject")
+  instanceFn(BD, "equals(Ljava.lang.Object;)Z", "rt.BigDecimalEquals")
+  for (name, fn) <- List("toString" -> "ToString", "toEngineeringString" -> "ToEngineeringString",
+      "toPlainString" -> "ToPlainString")
+  do instanceFn(BD, s"$name()Ljava.lang.String;", s"rt.BigDecimal$fn")
+  instanceFn(BD, s"toBigInteger()$BIT", "rt.BigDecimalToBigInteger")
+  instanceFn(BD, s"toBigIntegerExact()$BIT", "rt.BigDecimalToBigIntegerExact")
+  instanceFn(BD, "longValue()J", "rt.BigDecimalLongValue")
+  instanceFn(BD, "longValueExact()J", "rt.BigDecimalLongValueExact")
+  instanceFn(BD, "shortValueExact()S", "rt.BigDecimalShortValueExact")
+  instanceFn(BD, "byteValueExact()B", "rt.BigDecimalByteValueExact")
+  instance(BD, "byteValue()B")((r, _) => s"int8(rt.BigDecimalIntValue($r))")
+  instance(BD, "shortValue()S")((r, _) => s"int16(rt.BigDecimalIntValue($r))")
+  instanceFn(BD, "doubleValue()D", "rt.BigDecimalDoubleValue")
+  instanceFn(BD, "floatValue()F", "rt.BigDecimalFloatValue")
+
   // ---- java.util ------------------------------------------------------------------------------
 
   private val Arrays = "java.util.Arrays"

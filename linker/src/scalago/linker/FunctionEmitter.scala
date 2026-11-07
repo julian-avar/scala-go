@@ -299,7 +299,9 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
         emit("panic(\"unreachable\")")
       else emit(s"return ${adapt(expr, tpe, method.name.result)}")
     case Dest.AssignTo(v, target) =>
-      if expr.nonEmpty then emit(s"$v = ${adapt(expr, tpe, target)}")
+      // A call of a method returning Nothing has no Go value: it never returns, so v stays unset.
+      if tpe == Type.Nothing then deliver(Dest.Discard, expr, tpe)
+      else if expr.nonEmpty then emit(s"$v = ${adapt(expr, tpe, target)}")
 
   private def genAssign(lhs: Tree, rhs: Tree): Unit = lhs match
     case VarRef(name, tpe) =>

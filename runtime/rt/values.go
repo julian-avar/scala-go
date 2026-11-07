@@ -60,6 +60,8 @@ func ToGoString(x any) string {
 		return ClassToString(v).GoString()
 	case *BigInteger:
 		return v.String()
+	case *BigDecimal:
+		return v.String()
 	case scalaToString:
 		return ToGoString(v.M_toString_p_rLjava_dlang_dString_e())
 	}
@@ -100,7 +102,8 @@ func formatFloating(d float64, bits int) string {
 	s := strconv.FormatFloat(d, 'E', -1, bits) // e.g. "1.2345E+07"
 	mantissa, exponent, _ := strings.Cut(s, "E")
 	if !strings.Contains(mantissa, ".") {
-		mantissa += ".0"
+		// Java writes at least two digits, the two closest to the value: 4.9E-324, not 5.0E-324.
+		mantissa, exponent, _ = strings.Cut(strconv.FormatFloat(d, 'E', 1, bits), "E")
 	}
 	exp, _ := strconv.Atoi(exponent)
 	return mantissa + "E" + strconv.Itoa(exp)
@@ -117,6 +120,8 @@ func ObjectEquals(a, b any) bool {
 		return StringEquals(v, b)
 	case *BigInteger:
 		return BigIntegerEquals(v, b)
+	case *BigDecimal:
+		return BigDecimalEquals(v, b)
 	case scalaEquals:
 		return v.M_equals_pLjava_dlang_dObject_e_rZ(b)
 	case float32:
@@ -192,6 +197,8 @@ func HashCode(x any) int32 {
 		return StringHashCode(v)
 	case *BigInteger:
 		return BigIntegerHashCode(v)
+	case *BigDecimal:
+		return BigDecimalHashCode(v)
 	case bool:
 		if v {
 			return 1231
@@ -277,9 +284,9 @@ func ObjectDefaultEquals(x any, other any) bool { return x == other }
 
 // ---- Null ---------------------------------------------------------------------------------
 
-// Scala references with a concrete Go pointer type (strings, arrays, BigIntegers, classes) are
-// nil pointers when null. Stored in an `any`, such a nil pointer would not be a nil `any`, so
-// conversions to `any` go through AnyRef, and null tests on `any` values through IsNull.
+// Scala references with a concrete Go pointer type (strings, arrays, BigIntegers, BigDecimals,
+// classes) are nil pointers when null. Stored in an `any`, such a nil pointer would not be a nil
+// `any`, so conversions to `any` go through AnyRef, and null tests on `any` values through IsNull.
 
 type nilRef interface{ isNilRef() bool }
 

@@ -11,7 +11,7 @@ See [docs/design.md](docs/design.md) for the architecture, object model, status 
 matching, lambdas, `lazy val` and the standard collections all run, and Scala code can call Go
 packages, and Go code can call Scala libraries. Threads run on goroutines, with `synchronized`,
 `wait`/`notify`, volatiles and atomics, and gears runs on them. The generated code is safe to
-call from any goroutine. `BigDecimal`, `java.util.regex`, reflection and most of
+call from any goroutine. `BigDecimal` and `BigInt` match the JDK. Reflection and most of
 `java.util.concurrent` don't work yet.
 
 ## Using it with Mill

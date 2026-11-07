@@ -60,6 +60,8 @@ func GetClass(x any) *Class {
 		return ClassOf("java.lang.Class")
 	case *BigInteger:
 		return ClassOf("java.math.BigInteger")
+	case *BigDecimal:
+		return ClassOf("java.math.BigDecimal")
 	case *Array[bool]:
 		return ClassOf("[Z")
 	case *Array[uint16]:
