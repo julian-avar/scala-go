@@ -469,16 +469,31 @@ object Spliterators {
 
     val harmonized = maybeSetSizedCharacteristics(characteristics)
     new AbstractSpliterator[T](c.size(), harmonized) {
-      lazy val it = c.iterator()
+      // Late-binding: the iterator is created on first use.
+      private var it: Iterator[? <: T] = null
+
+      private def iter(): Iterator[? <: T] = {
+        if (it == null) it = c.iterator()
+        it
+      }
 
       def tryAdvance(action: Consumer[? >: T]): Boolean = {
         Objects.requireNonNull(action)
-        if (!it.hasNext()) false
+        val i = iter()
+        if (!i.hasNext()) false
         else {
-          action.accept(it.next())
+          action.accept(i.next())
           true
         }
       }
+
+      override def forEachRemaining(action: Consumer[? >: T]): Unit = {
+        Objects.requireNonNull(action)
+        iter().forEachRemaining(action)
+      }
+
+      override def estimateSize(): Long =
+        if (it == null) c.size() else super.estimateSize()
     }
   }
 
@@ -516,6 +531,16 @@ object Spliterators {
         action.accept(array(cursor))
         cursor += 1
         true
+      }
+    }
+
+    override def forEachRemaining(action: DoubleConsumer): Unit = {
+      Objects.requireNonNull(action)
+      var i = cursor
+      cursor = toIndex
+      while (i < toIndex) {
+        action.accept(array(i))
+        i += 1
       }
     }
 
@@ -603,6 +628,16 @@ object Spliterators {
       }
     }
 
+    override def forEachRemaining(action: IntConsumer): Unit = {
+      Objects.requireNonNull(action)
+      var i = cursor
+      cursor = toIndex
+      while (i < toIndex) {
+        action.accept(array(i))
+        i += 1
+      }
+    }
+
     def estimateSize(): Long = { toIndex - cursor }
 
     def characteristics(): Int =
@@ -650,6 +685,11 @@ object Spliterators {
           true
         }
       }
+
+      override def forEachRemaining(action: Consumer[? >: T]): Unit = {
+        Objects.requireNonNull(action)
+        iterator.forEachRemaining(action)
+      }
     }
   }
 
@@ -682,6 +722,16 @@ object Spliterators {
         action.accept(array(cursor))
         cursor += 1
         true
+      }
+    }
+
+    override def forEachRemaining(action: LongConsumer): Unit = {
+      Objects.requireNonNull(action)
+      var i = cursor
+      cursor = toIndex
+      while (i < toIndex) {
+        action.accept(array(i))
+        i += 1
       }
     }
 
@@ -750,6 +800,16 @@ object Spliterators {
         action.accept(array(cursor).asInstanceOf[T])
         cursor += 1
         true
+      }
+    }
+
+    override def forEachRemaining(action: Consumer[? >: T]): Unit = {
+      Objects.requireNonNull(action)
+      var i = cursor
+      cursor = toIndex
+      while (i < toIndex) {
+        action.accept(array(i).asInstanceOf[T])
+        i += 1
       }
     }
 
@@ -869,6 +929,11 @@ object Spliterators {
           action.accept(iterator.next())
           true
         }
+      }
+
+      override def forEachRemaining(action: Consumer[? >: T]): Unit = {
+        Objects.requireNonNull(action)
+        iterator.forEachRemaining(action)
       }
     }
   }

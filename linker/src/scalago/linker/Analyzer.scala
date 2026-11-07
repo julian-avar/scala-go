@@ -60,6 +60,7 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
   private def reachVirtual(m: MethodName): Unit =
     if calledNames.add(m) then
       for c <- instantiated.toList; impl <- program.vtable(c).get(m) do reach(impl, m)
+      for h <- Hijacked.instanceGoType.keys; impl <- program.hijackedDefault(h, m) do reach(impl, m)
 
   def reach(cls: ClassName, m: MethodName): Unit =
     program.findMethod(cls, m).filterNot(_.isAbstract).foreach { _ =>

@@ -39,7 +39,7 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
 4. **javalib** (`javalib/`). JDK classes written in Scala: exceptions, `StringBuilder`,
    `System`, `java.io`, `java.nio.file` and `java.nio.charset` (see [I/O](#io)), `java.util`
    (collections, `Arrays`, `Collections`, `Optional`, `Random`, `UUID`,
-   `java.util.function`, ...), `MathContext` and `RoundingMode`, references, and so on. It also replaces the
+   `java.util.function`, `java.util.stream`, ...), `MathContext` and `RoundingMode`, references, and so on. It also replaces the
    few Java-written classes of the Scala library (`*Ref`, `LazyVals`, `JProcedureN`,
    `ScalaNumber`), and `Enumeration`, which uses reflection (see below). Packages other than `java.lang` are compiled under their own names
    (`package java.util`): a class compiled from source takes precedence over the JDK's, so
@@ -62,6 +62,27 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
    `AbstractList`); `Random`, `SplittableRandom` and `Collections.shuffle` give the JDK's
    sequences. The operations of `Arrays` on primitive arrays are natives, generic Go functions
    standing in for Scala Native's specialization.
+
+   **java.util.stream.** The interfaces come from Scala Native, but the implementation follows
+   the JDK's design (Scala Native's pulls every element through a chain of spliterators, with a
+   closure per element and stage). A stage of a pipeline (`AbstractPipeline` and its four
+   element types) knows how to wrap the sink of the next stage in its own, and a terminal
+   operation pushes the source spliterator's elements through the chain of sinks with one
+   `forEachRemaining` call (or `tryAdvance` until cancellation, when an operation
+   short-circuits). A traversal allocates one sink per stage and nothing per element, and
+   primitive streams pass `int`s, `long`s and `double`s unboxed (`IntStream.range(0, n).sum()`
+   is a loop of interface calls). `iterator()` and `spliterator()` pull through the same sinks,
+   a source element at a time. Pipelines track the JDK's flags (sized, sorted, distinct,
+   short-circuiting, size-adjusting), so observable behavior matches: the order of side
+   effects in `peek`, `sorted` as a barrier, `count()` without traversal when the size is known
+   (also through `skip`/`limit`), `sorted()`/`distinct()` passing through already sorted or
+   distinct sources, short-circuits reaching into `flatMap`'s streams, the "already operated
+   upon or closed" errors, close handlers, compensated double sums. `Collectors` accumulate as
+   the JDK's (`groupingBy` with `computeIfAbsent` into a `HashMap`, so groups iterate in the
+   JDK's order). Parallel streams run sequentially: `parallel()` only sets the flag
+   `isParallel()` reports. Strings get `chars()` and `codePoints()` from `CharSequence`'s
+   default methods: a method of a hijacked class without a native falls back to a default
+   method of one of its interfaces (`Program.hijackedDefault`).
 5. **Linker** (`linker/`):
    - **Lambdas** (`Lambdas.scala`): `Closure` nodes become synthetic classes. Their single
      abstract method calls the lifted target method, with boxing and cast adaptation. Bridges are
@@ -371,8 +392,9 @@ variable is first set, so `Console.out` costs one atomic load while nothing is r
 
 Not like the JDK: the console streams' print methods do not take the stream's monitor, so a
 thread holding `System.out`'s lock does not keep other threads from printing; `FileTime`s have
-millisecond precision; file attributes given at creation are ignored; `Files.lines`, `list`,
-`walk` and `BufferedReader.lines` (java.util.stream), channels, buffers, watch services,
+millisecond precision; file attributes given at creation are ignored; directories list in name
+order (`Files.list`, `walk`, `newDirectoryStream`; the JDK follows the file system's order);
+`Files.walk` with `FOLLOW_LINKS` does not detect cycles; channels, buffers, watch services,
 `System.getProperties`, `Scanner` and other charsets are not implemented.
 
 ## Exports and library builds
@@ -544,6 +566,12 @@ Supported and covered by end-to-end tests:
   `StringJoiner`, `StringTokenizer`, `BitSet`, `Base64`, summary statistics, `Comparator`
   combinators, `java.util.function`, `scala.jdk.CollectionConverters` both ways, and Scala
   classes extending `AbstractList`/`AbstractMap`
+- `java.util.stream`: reference and primitive streams from collections, arrays, ranges,
+  `iterate`/`generate`/`concat`/builders, `Optional`, `BitSet`, strings (`chars`,
+  `codePoints`), readers and files (`lines`, `Files.list`/`walk`/`find`), `Random` and
+  `Pattern`; every intermediate and terminal operation, `Collectors` (grouping, partitioning,
+  maps, joining, statistics, `teeing`, ...), laziness and short-circuiting as on the JDK, close
+  handlers, and `scala.jdk.StreamConverters`
 - Go interop: handwritten and generated facades of standard-library packages and of a local Go module, Go interfaces
   implemented in Scala, errors and callbacks, Go slices, maps, channels, pointers and funcs
   shared with Go, and generic Go functions. Mismatched facades are tested as link errors.
@@ -559,7 +587,7 @@ Supported and covered by end-to-end tests:
 - I/O: java.io's streams, readers and writers (buffered, data, pushback, print, string and
   array ones), charsets (UTF-8, ISO-8859-1, US-ASCII, with the JDK's malformed-input handling),
   files through `java.io.File`, file streams, `RandomAccessFile` and `java.nio.file`
-  (`Files`, `Path`, `walkFileTree`, the JDK's exceptions and messages), standard input
+  (`Files`, `Path`, `walkFileTree`, `lines`, `walk`, the JDK's exceptions and messages), standard input
   (`StdIn`, `System.in`, end of input), `Console.withOut`, `System.setOut`, `scala.io.Source`,
   `scala.util.Using`, system properties, environment, exit statuses and shutdown hooks
 - concurrency: threads, `synchronized`, `wait`/`notify`, volatile fields, atomics, interrupts,
@@ -569,7 +597,9 @@ Known gaps:
 - Regular expressions that RE2
   cannot run (lookaround, backreferences, possessive quantifiers), `String.format` beyond the
   common conversions, `java.time`, and the parts of I/O listed in [I/O](#io).
-- `java.util`: streams (`stream()` and the `java.util.stream` package), the reversed views of
+- `java.util`: `Stream.gather` (Java 24's gatherers), the concurrent collectors
+  (`groupingByConcurrent`, `toConcurrentMap`, waiting for `java.util.concurrent`'s maps),
+  `String.lines()`, parallel execution of parallel streams, the reversed views of
   sequenced maps (`LinkedHashMap.reversed()`, `sequencedKeySet()`, ...), `Formatter`,
   `Date`/`Calendar`/`Timer`, `EnumSet`/`EnumMap`, `WeakHashMap`, `ServiceLoader`,
   `Arrays.compare`/`mismatch` and the range forms of `Arrays.equals`, `String.CASE_INSENSITIVE_ORDER`,
@@ -585,6 +615,11 @@ Known gaps:
   `Arrays.copyOf` return arrays whose `getClass` is `Object[]`.
 - Reflection: `getClass` and `Class` names work; nothing else.
 - `BigInteger` and `BigDecimal` cannot be subclassed (they are Go values).
+- Casts to the interfaces that strings and boxes implement (`Comparable`, `CharSequence`,
+  `Number`, ...) are not checked: sorting objects that are not `Comparable` fails with an
+  `AbstractMethodError` at the `compareTo` call rather than a `ClassCastException`.
+- String literals cannot contain unpaired surrogates (the IR's string table is UTF-8; they
+  become `?`). Strings built at run time can.
 - Concurrency: `java.util.concurrent` beyond what gears needs (executors, concurrent maps,
   `CompletableFuture`), thread groups. `scala.concurrent.Future` needs an
   `ExecutionContext` on `java.util.concurrent`; gears is the supported API.
@@ -651,8 +686,8 @@ earlier has to be redone:
    regular expressions on Go's `regexp` (`java.util.regex`, Scala's `Regex`), the
    `java.util.concurrent` subset gears needs, `java.util` (collections and utilities), Scala
    library dependencies compiled from TASTy, `BigDecimal`, I/O (files, streams, charsets,
-   stdin), and JVM-like stack traces. Still to do: `java.util.concurrent` beyond gears' subset,
-   `java.util.stream`, `java.time`, and publishing (organization `io.github.scalago` is a
+   stdin), JVM-like stack traces and `java.util.stream`. Still to do: `java.util.concurrent`
+   beyond gears' subset, `java.time`, and publishing (organization `io.github.scalago` is a
    placeholder).
 
 ## Open questions

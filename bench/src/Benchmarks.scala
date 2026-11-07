@@ -1,7 +1,7 @@
 /** Small CPU benchmarks covering what typical Scala code spends its time on: allocation and
  *  pattern matching, numeric loops, immutable and mutable collections, strings, virtual
- *  dispatch, closures, exceptions and monitors. Each prints its time and a checksum (which must
- *  agree between the JVM and Go).
+ *  dispatch, closures, exceptions, monitors and java.util.stream. Each prints its time and a
+ *  checksum (which must agree between the JVM and Go).
  */
 import scala.collection.mutable
 
@@ -102,6 +102,37 @@ object Main:
     for i <- 0 until 2000000 do lock.synchronized { n += 1 }
     n
 
+  val boxedInts: java.util.List[Integer] =
+    val l = new java.util.ArrayList[Integer]()
+    for i <- 0 until 200000 do l.add(i)
+    l
+
+  /** A java.util.stream pipeline over boxed elements, into a collector. */
+  def streams(): Long =
+    var acc = 0L
+    for k <- 0 until 50 do
+      val out = boxedInts.stream().map(i => i * 2 + k).filter(i => i % 3 != 0)
+        .collect(java.util.stream.Collectors.toList())
+      acc += out.size + out.get(out.size - 1)
+    acc
+
+  /** Primitive streams: nothing boxed per element. */
+  def intStreams(): Long =
+    var acc = 0L
+    for k <- 0 until 20 do
+      acc += java.util.stream.IntStream.range(0, 1000000).map(_ * 3 + k).filter(_ % 7 != 0).asLongStream().sum()
+      acc += java.util.stream.LongStream.rangeClosed(1, 1000000).map(_ ^ k).max().getAsLong
+    acc
+
+  def collectors(): Long =
+    import java.util.stream.Collectors
+    var acc = 0L
+    for k <- 0 until 20 do
+      val groups = boxedInts.stream().collect(Collectors.groupingBy((i: Integer) => i % 1000, Collectors.counting()))
+      val joined = boxedInts.stream().limit(20000).map(_.toString).collect(Collectors.joining(","))
+      acc += groups.size + groups.get(k) + joined.length
+    acc
+
   def time[A](name: String)(f: => A): Unit =
     val t0 = System.nanoTime()
     val r = f
@@ -121,3 +152,6 @@ object Main:
       time("closures")(closures())
       time("exceptions")(exceptions())
       time("synchronized")(synchronizedLoop())
+      time("streams")(streams())
+      time("intStreams")(intStreams())
+      time("collectors")(collectors())

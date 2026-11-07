@@ -1,0 +1,63 @@
+== strings
+12
+héllowörld
+[72, 201, 76, 76, 79, 44, 32, 87, 214, 82, 76, 68]
+6 5
+[61, 1f600, 62, d800, 63]
+363
+[a, b, c, d, e]
+OptionalInt[101]
+0
+3
+{p=2, s=4, i=4, m=1}
+== readers
+[one, two, three, , five]
+0
+[a, b]
+c
+closed reader: threw java.io.UncheckedIOException
+== files
+[alpha, beta, , gamma]
+ALPHA|BETA|GAMMA
+4
+malformed: threw java.io.UncheckedIOException
+missing: threw java.nio.file.NoSuchFileException
+[bad.txt, sub, text.txt]
+list file: threw java.nio.file.NotDirectoryException
+list missing: threw java.nio.file.NoSuchFileException
+[, bad.txt, sub, sub/deeper, sub/deeper/three.txt, sub/deeper/two.md, sub/one.txt, text.txt]
+[, bad.txt, sub, text.txt]
+[]
+1
+walk missing: threw java.nio.file.NoSuchFileException
+walk negative depth: threw java.lang.IllegalArgumentException
+true
+[bad.txt, sub/deeper/three.txt, sub/one.txt, text.txt]
+3
+27
+false
+== randoms
+[-1170105035, 234785527, -1360544799, 205897768, 1325939940]
+[10, 13, 18, 14, 10, 15]
+[-5, -2, 3, -1, -5, 0]
+[-1156638823, -1552468968, -1077308326, 41356089]
+[-5025562857975149833, -5843495416241995736, 5694868678511409995]
+[891, 940, 997, 398]
+[0.7275636800328681, 0.6832234717598454, 0.30871945533265976]
+[1.7275636800328682, 1.6832234717598453, 1.3087194553326598]
+[-1155869325, 431529176, 1761283695]
+1260427492 304908421
+{0=157, 1=160, 2=192, 3=152, 4=148, 5=191}
+[14, 91, 42, 50]
+[7134611160154358618, -4569129087685675272]
+[0.386768045983934, 0.7523070158382239]
+[2, 2, 3] List(2, 2, 3)
+negative size: threw java.lang.IllegalArgumentException
+bad range: threw java.lang.IllegalArgumentException
+bad double range: threw java.lang.IllegalArgumentException
+10
+== patterns
+[a, b, c, , d]
+[]
+[a, b, c]
+1

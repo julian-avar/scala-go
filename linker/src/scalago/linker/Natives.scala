@@ -235,6 +235,8 @@ object Natives:
     static(box, s"toString($code)Ljava.lang.String;")(as => s"rt.StringValueOf(${as.head})")
     static(box, s"hashCode($code)I")(as => s"rt.HashCode(${as.head})")
     staticFields((box, "TYPE")) = s"""rt.ClassOf("${primitiveName(prim)}")"""
+  staticFields(("java.lang.Boolean", "TRUE")) = "any(true)"
+  staticFields(("java.lang.Boolean", "FALSE")) = "any(false)"
 
   private def primitiveName(t: Type): String = t match
     case Type.Boolean => "boolean"
@@ -363,6 +365,7 @@ object Natives:
   static(Character, "isLowSurrogate(C)Z")(as => s"(${as.head} >= 0xdc00 && ${as.head} <= 0xdfff)")
   static(Character, "isSurrogate(C)Z")(as => s"(${as.head} >= 0xd800 && ${as.head} <= 0xdfff)")
   static(Character, "charCount(I)I")(as => s"rt.CharCount(${as.head})")
+  static(Character, "toCodePoint(CC)I")(as => s"(int32(${as(0)})<<10 + int32(${as(1)}) - 56613888)")
 
   // ---- java.lang.Math -------------------------------------------------------------------------
 
@@ -375,6 +378,8 @@ object Natives:
         "sinh" -> "math.Sinh", "cosh" -> "math.Cosh", "tanh" -> "math.Tanh", "floor" -> "math.Floor",
         "ceil" -> "math.Ceil", "rint" -> "rt.MathRint", "signum" -> "rt.MathSignum")
     do unaryD(name, goFn)
+    m("nextUp(D)D")(as => s"math.Nextafter(${as.head}, math.Inf(1))")
+    m("nextDown(D)D")(as => s"math.Nextafter(${as.head}, math.Inf(-1))")
     m("toRadians(D)D")(as => s"(${as.head} / 180 * math.Pi)")
     m("toDegrees(D)D")(as => s"(${as.head} * 180 / math.Pi)")
     m("pow(DD)D")(as => s"math.Pow(${as(0)}, ${as(1)})")

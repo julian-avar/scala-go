@@ -4,7 +4,9 @@ package java.util
 // New work for Scala Native. Based on Scala Native Optional.scala:
 //   Ported from Scala.js commit SHA1: 9c79cb9 dated: 2022-03-18
 
+// stream() method added for Scala Native
 import java.util.function._
+import java.util.{stream => jus}
 
 final class OptionalDouble private (hasValue: Boolean, value: Double) {
 
@@ -49,6 +51,11 @@ final class OptionalDouble private (hasValue: Boolean, value: Double) {
   def orElseThrow[X <: Throwable](exceptionSupplier: Supplier[? <: X]): Double =
     if (isPresent()) value
     else throw exceptionSupplier.get()
+
+  // Since: Java 9
+  def stream(): jus.DoubleStream =
+    if (isPresent()) jus.DoubleStream.of(value)
+    else jus.DoubleStream.empty()
 
   override def equals(obj: Any): Boolean = {
     obj match {

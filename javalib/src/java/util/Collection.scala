@@ -1,12 +1,13 @@
 // Adapted from Scala Native's javalib (Apache-2.0, see javalib/LICENSE-scala-native.md).
 /* Ported from Scala.js commit: f122aa5 dated: 2019-07-03
- * Additional Spliterator code implemented for Scala Native
+ * Additional Spliterator and Stream code implemented for Scala Native
  * JDK 11 toArray(IntFunction) default method implemented for Scala Native
  */
 
 package java.util
 
 import java.util.function.{IntFunction, Predicate}
+import java.util.stream.{Stream, StreamSupport}
 
 trait Collection[E] extends java.lang.Iterable[E] {
   def size(): Int
@@ -50,5 +51,10 @@ trait Collection[E] extends java.lang.Iterable[E] {
     Spliterators.spliterator[E](this, Spliterator.SIZED | Spliterator.SUBSIZED)
   }
 
-  // stream() and parallelStream() are left out: java.util.stream is not implemented.
+  def stream(): Stream[E] =
+    StreamSupport.stream(spliterator(), false)
+
+  /** Runs sequentially (see java.util.stream.AbstractPipeline). */
+  def parallelStream(): Stream[E] =
+    StreamSupport.stream(spliterator(), true)
 }

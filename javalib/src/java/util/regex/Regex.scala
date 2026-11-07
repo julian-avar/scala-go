@@ -30,6 +30,10 @@ final class Pattern private (regex: String, patternFlags: Int) extends Object wi
   def matcher(input: CharSequence): Matcher = new Matcher(this, String.valueOf(input))
   def split(input: CharSequence): Array[String] = split(input, 0)
   def split(input: CharSequence, limit: Int): Array[String] = Regexes.split(handle, String.valueOf(input), limit)
+  /** As `split(input)`, but empty for an empty input (the JDK's is lazy, with the same elements). */
+  def splitAsStream(input: CharSequence): java.util.stream.Stream[String] =
+    if input.length() == 0 then java.util.stream.Stream.empty[String]()
+    else java.util.Arrays.stream(split(input))
   override def toString(): String = regex
 
 object Pattern:

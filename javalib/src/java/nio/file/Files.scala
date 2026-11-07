@@ -368,6 +368,95 @@ object Files:
             i += 1
             paths(i - 1)
 
+  // ---- Streams of lines and paths ----
+
+  /** An IOException of a stream's close handler, unchecked. */
+  private def closeUnchecked(c: Closeable): Runnable = () =>
+    try c.close()
+    catch case e: IOException => throw new java.io.UncheckedIOException(e)
+
+  @static def lines(path: Path, cs: Charset): java.util.stream.Stream[String] =
+    val reader = newBufferedReader(path, cs)
+    try reader.lines().onClose(closeUnchecked(reader))
+    catch
+      case e: Throwable =>
+        try reader.close()
+        catch case e2: IOException => e.addSuppressed(e2)
+        throw e
+
+  @static def lines(path: Path): java.util.stream.Stream[String] = lines(path, StandardCharsets.UTF_8)
+
+  /** The entries of a directory (in name order: the JDK's follows the directory's). */
+  @static def list(dir: Path): java.util.stream.Stream[Path] =
+    val ds = newDirectoryStream(dir)
+    java.util.stream.StreamSupport
+      .stream(java.util.Spliterators.spliteratorUnknownSize(ds.iterator(), java.util.Spliterator.DISTINCT), false)
+      .onClose(closeUnchecked(ds))
+
+  @static def walk(start: Path, maxDepth: Int, options: Array[FileVisitOption]): java.util.stream.Stream[Path] =
+    treeStream(start, maxDepth, options).map(_.path)
+
+  @static def walk(start: Path, options: Array[FileVisitOption]): java.util.stream.Stream[Path] =
+    walk(start, Int.MaxValue, options)
+
+  @static def find(start: Path, maxDepth: Int, matcher: java.util.function.BiPredicate[Path, BasicFileAttributes],
+      options: Array[FileVisitOption]): java.util.stream.Stream[Path] =
+    java.util.Objects.requireNonNull(matcher)
+    treeStream(start, maxDepth, options).filter(e => matcher.test(e.path, e.attributes)).map(_.path)
+
+  private final class TreeEntry(val path: Path, val attributes: BasicFileAttributes)
+
+  /** The files under `start`, depth-first and directories first, as the JDK's FileTreeIterator:
+   *  a directory is read when the walk reaches it, and an error reading one is thrown as an
+   *  UncheckedIOException. Directories loops through links (with FOLLOW_LINKS) are not detected.
+   */
+  private def treeStream(start: Path, maxDepth: Int, options: Array[FileVisitOption]): java.util.stream.Stream[TreeEntry] =
+    if maxDepth < 0 then throw new IllegalArgumentException("'maxDepth' is negative")
+    val followLinks = options.exists(_ eq FileVisitOption.FOLLOW_LINKS)
+    val startAttrs = new Attributes(stat(start, followLinks))
+
+    final class Level(val dir: Path, val names: Array[String], val depth: Int):
+      var next = 0
+
+    val it = new java.util.Iterator[TreeEntry]:
+      private val levels = new java.util.ArrayDeque[Level]()
+      private var pending = enter(new TreeEntry(start, startAttrs), 0)
+
+      /** Returns `entry`, after opening it if it is a directory to walk into. */
+      private def enter(entry: TreeEntry, depth: Int): TreeEntry =
+        if entry.attributes.isDirectory() && depth < maxDepth then
+          val names =
+            try entries(entry.path)
+            catch case e: IOException => throw new java.io.UncheckedIOException(e)
+          levels.push(new Level(entry.path, names, depth + 1))
+        entry
+
+      def hasNext(): scala.Boolean =
+        while pending == null && !levels.isEmpty() do
+          val level = levels.peek()
+          if level.next == level.names.length then levels.pop()
+          else
+            val path = level.dir.resolve(level.names(level.next))
+            level.next += 1
+            val r = OS.stat(path.toString, followLinks)
+            val attrs =
+              if !OS.isError(r) then new Attributes(r.asInstanceOf[Array[Long]])
+              else if followLinks && !OS.isError(OS.stat(path.toString, false)) then
+                // A broken link: the JDK returns the link itself.
+                new Attributes(OS.stat(path.toString, false).asInstanceOf[Array[Long]])
+              else throw new java.io.UncheckedIOException(translate(r, path.toString, null))
+            pending = enter(new TreeEntry(path, attrs), level.depth)
+        pending != null
+
+      def next(): TreeEntry =
+        if !hasNext() then throw new java.util.NoSuchElementException()
+        val entry = pending
+        pending = null
+        entry
+
+    java.util.stream.StreamSupport
+      .stream(java.util.Spliterators.spliteratorUnknownSize(it, java.util.Spliterator.DISTINCT), false)
+
   @static def walkFileTree(start: Path, visitor: FileVisitor[? >: Path]): Path =
     walk(start, Int.MaxValue, false, visitor.asInstanceOf[FileVisitor[Path]])
     start

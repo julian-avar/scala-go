@@ -13,8 +13,7 @@ import java.util.function.*
  *  `fill`, `copyOf`, `copyOfRange`, `toString`), and copying, filling, comparing and hashing of
  *  object arrays, are implemented natively by the linker (`Natives.scala`, `rt/scalalib.go`),
  *  with Go generics where Scala Native relies on specialization. Their declarations here only
- *  give javalib code something to call. `stream` is left out: `java.util.stream` is not
- *  implemented.
+ *  give javalib code something to call.
  */
 object Arrays:
   private def native: Nothing = throw new UnsupportedOperationException("scala-go native")
@@ -234,6 +233,8 @@ object Arrays:
         val ret = a(index)
         a(index) = element
         ret
+      override def spliterator(): Spliterator[T] =
+        Spliterators.spliterator[T](a.asInstanceOf[Array[AnyRef]], Spliterator.ORDERED)
 
   def deepHashCode(a: Array[AnyRef]): Int =
     if a == null then 0
@@ -446,3 +447,28 @@ object Arrays:
   def spliterator[T](array: Array[AnyRef], startInclusive: Int, endExclusive: Int): Spliterator[T] =
     Objects.requireNonNull(array)
     Spliterators.spliterator(array, startInclusive, endExclusive, standardArraySpliteratorCharacteristics)
+
+  def stream(array: Array[Double]): java.util.stream.DoubleStream =
+    stream(array, 0, array.length)
+
+  def stream(array: Array[Double], startInclusive: Int, endExclusive: Int): java.util.stream.DoubleStream =
+    java.util.stream.StreamSupport.doubleStream(spliterator(array, startInclusive, endExclusive), false)
+
+  def stream(array: Array[Int]): java.util.stream.IntStream =
+    stream(array, 0, array.length)
+
+  def stream(array: Array[Int], startInclusive: Int, endExclusive: Int): java.util.stream.IntStream =
+    java.util.stream.StreamSupport.intStream(spliterator(array, startInclusive, endExclusive), false)
+
+  def stream(array: Array[Long]): java.util.stream.LongStream =
+    stream(array, 0, array.length)
+
+  def stream(array: Array[Long], startInclusive: Int, endExclusive: Int): java.util.stream.LongStream =
+    java.util.stream.StreamSupport.longStream(spliterator(array, startInclusive, endExclusive), false)
+
+  def stream[T <: AnyRef](array: Array[T]): java.util.stream.Stream[T] =
+    stream(array, 0, array.length)
+
+  def stream[T <: AnyRef](array: Array[T], startInclusive: Int, endExclusive: Int): java.util.stream.Stream[T] =
+    java.util.stream.StreamSupport.stream(
+      spliterator[T](array.asInstanceOf[Array[AnyRef]], startInclusive, endExclusive), false)
