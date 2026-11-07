@@ -118,16 +118,20 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
   /** A Go boolean expression testing whether `e` (any reference) is an instance of `t`. */
   def typeTest(e: String, t: Type): String = t match
     case Type.Class(ClassName.Object)           => s"($e != nil)"
+    case Type.Class(c) if Hijacked.arrayAncestors(c) => s"(rt.IsArray($e) || ${classTypeTest(e, c)})"
     case Type.Class(c) if program.isFacade(c)   => interop.typeTest(e, c)
     case Type.Class(c) if Hijacked.isHijacked(c) => s"rt.Is[${Hijacked.instanceGoType(c)}]($e)"
-    case Type.Class(c) =>
-      if Hijacked.subclassesOf(c).nonEmpty then
-        instanceTests += c
-        s"${Mangling.instanceTest(c)}($e)"
-      else if declared(c) then ifaceTest(c, e)
-      else s"rt.Never($e)"
+    case Type.Class(c)                           => classTypeTest(e, c)
     case Type.Array(elem) => s"rt.Is[*rt.Array[${goArrayElemType(elem)}]]($e)"
     case _                => "false"
+
+  /** Whether `e` is an instance of the (non-hijacked) class `c`, leaving arrays aside. */
+  private def classTypeTest(e: String, c: ClassName): String =
+    if Hijacked.subclassesOf(c).nonEmpty then
+      instanceTests += c
+      s"${Mangling.instanceTest(c)}($e)"
+    else if declared(c) then ifaceTest(c, e)
+    else s"rt.Never($e)"
 
   /** Go expression converting `e` (of IR type `from`) to IR type `to`, checking the cast. */
   def cast(e: String, from: Type, to: Type): String =
@@ -139,7 +143,13 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
       case _                                     => castTo(e, to, source, target)
 
   private def castTo(e: String, to: Type, source: String, target: String): String =
-    if target.isEmpty || target == source then e
+    if target.isEmpty then e
+    else if target == "any" && source == "any" then
+      // A downcast between types that are both Go `any`.
+      to match
+        case Type.Class(c) if needsCheckedCast(c) => checkedCast(c, e)
+        case _                                    => e
+    else if target == source then e
     else if target == "any" then
       to match
         case Type.Class(c) if program.contains(c) && !declared(c) && !Hijacked.hijackedAncestors(c) => s"rt.CastNull($e)"
@@ -150,6 +160,24 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
     else to match
       case Type.Class(c) if target == Mangling.iface(c) => ifaceCast(c, e)
       case _                                            => s"rt.Cast[$target]($e)"
+
+  // ---- Casts to types that strings and boxes implement ---------------------------------------------
+
+  /** Whether a cast to `cls` must be checked although its references are Go `any`: the types that
+   *  strings, boxes, other hijacked values and arrays implement (`Comparable`, `CharSequence`,
+   *  `Number`, `Cloneable`, ...), and those classes themselves. Otherwise a value of the wrong
+   *  class would go through and fail later, at a call, instead of with the JVM's
+   *  `ClassCastException`.
+   */
+  private def needsCheckedCast(cls: ClassName): Boolean =
+    cls != ClassName.Object && (Hijacked.isHijacked(cls) || Hijacked.hijackedAncestors(cls))
+
+  /** Classes casts to which are checked by a `CheckCast_<class>` helper in support.go. */
+  val checkedCasts = mutable.LinkedHashSet.empty[ClassName]
+
+  private def checkedCast(cls: ClassName, e: String): String =
+    checkedCasts += cls
+    s"${Mangling.checkedCast(cls)}($e)"
 
   // ---- Casts and type tests to class interfaces --------------------------------------------------
 

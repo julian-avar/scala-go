@@ -111,3 +111,13 @@ func NewMultiArrayOf(component *Class, dims *Array[int32]) any {
 	}
 	return outer
 }
+
+// IsArray reports whether x is an array (arrays are Cloneable and Serializable).
+func IsArray(x any) bool {
+	switch x.(type) {
+	case *Array[any], *Array[bool], *Array[uint16], *Array[int8], *Array[int16], *Array[int32],
+		*Array[int64], *Array[float32], *Array[float64]:
+		return x != nil && !IsNull(x)
+	}
+	return false
+}

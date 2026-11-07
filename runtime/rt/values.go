@@ -325,3 +325,8 @@ func CheckNotNull(x any) {
 		ThrowKind(NullPointer, "")
 	}
 }
+
+// ThrowClassCast throws the JVM's ClassCastException for casting x to the class named target.
+func ThrowClassCast(x any, target string) {
+	ThrowKind(ClassCast, "class "+GetClass(x).name+" cannot be cast to class "+target)
+}

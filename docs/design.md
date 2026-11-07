@@ -601,9 +601,11 @@ Known gaps:
   (`groupingByConcurrent`, `toConcurrentMap`, waiting for `java.util.concurrent`'s maps),
   `String.lines()`, parallel execution of parallel streams, the reversed views of
   sequenced maps (`LinkedHashMap.reversed()`, `sequencedKeySet()`, ...), `Formatter`,
-  `Date`/`Calendar`/`Timer`, `EnumSet`/`EnumMap`, `WeakHashMap`, `ServiceLoader`,
+  `Date`/`Calendar`/`Timer`, `EnumSet`/`EnumMap`, `ServiceLoader`,
   `Arrays.compare`/`mismatch` and the range forms of `Arrays.equals`, `String.CASE_INSENSITIVE_ORDER`,
   `String.join(delimiter, Iterable)`, and `Properties` keys continued over several lines.
+  Arrays of references do not know their element type, so `toArray(new Array[String](0))` and
+  `Arrays.copyOf` return arrays whose `getClass` is `Object[]`.
 - Scala libraries are compiled from their TASTy, so classes of a library written in Java (which
   have none) are missing; natives cover those of popular libraries that reachable code uses
   (ujson's float formatting). `WeakHashMap` holds its keys strongly (Go's weak pointers need
@@ -611,13 +613,8 @@ Known gaps:
 - Locales: there is no locale data. `java.util.Locale` carries identifiers only, and every
   locale formats and maps case as `Locale.ROOT` does (so `String.format(Locale.GERMANY, "%.1f",
   x)` uses a `.`).
-  Arrays of references do not know their element type, so `toArray(new Array[String](0))` and
-  `Arrays.copyOf` return arrays whose `getClass` is `Object[]`.
 - Reflection: `getClass` and `Class` names work; nothing else.
 - `BigInteger` and `BigDecimal` cannot be subclassed (they are Go values).
-- Casts to the interfaces that strings and boxes implement (`Comparable`, `CharSequence`,
-  `Number`, ...) are not checked: sorting objects that are not `Comparable` fails with an
-  `AbstractMethodError` at the `compareTo` call rather than a `ClassCastException`.
 - String literals cannot contain unpaired surrogates (the IR's string table is UTF-8; they
   become `?`). Strings built at run time can.
 - Concurrency: `java.util.concurrent` beyond what gears needs (executors, concurrent maps,

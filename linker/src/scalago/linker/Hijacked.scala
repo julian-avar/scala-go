@@ -83,8 +83,13 @@ object Hijacked:
       BigDecimal -> Set(number, comparable, serializable)
     )
 
-  /** Classes some hijacked value is an instance of. References of these types are Go `any`. */
-  val hijackedAncestors: Set[ClassName] = ancestors.values.flatten.toSet + ClassName.Object
+  /** The interfaces arrays implement (besides java.lang.Object). */
+  val arrayAncestors: Set[ClassName] = Set("java.lang.Cloneable", serializable)
+
+  /** Classes some hijacked value (or array) is an instance of. References of these types are Go
+   *  `any`.
+   */
+  val hijackedAncestors: Set[ClassName] = ancestors.values.flatten.toSet ++ arrayAncestors + ClassName.Object
 
   /** The hijacked classes that are subtypes of `cls`. */
   def subclassesOf(cls: ClassName): List[ClassName] =

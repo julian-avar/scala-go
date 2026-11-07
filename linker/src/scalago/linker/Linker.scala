@@ -274,6 +274,16 @@ object Linker:
       line("}")
     if ctx.ifaceCasts.nonEmpty || ctx.ifaceTests.nonEmpty then line()
 
+    // Before the type tests below: these add to them.
+    for cls <- ctx.checkedCasts.toList.sorted do
+      line(s"func ${Mangling.checkedCast(cls)}(x any) any {")
+      line(s"\tif x != nil && !${ctx.typeTest("x", Type.Class(cls))} {")
+      line(s"\t\trt.ThrowClassCast(x, ${FunctionEmitter.goStringLiteral(cls)})")
+      line("\t}")
+      line("\treturn x")
+      line("}")
+    if ctx.checkedCasts.nonEmpty then line()
+
     for m <- ctx.dispatchers.toList.sortBy(_.descriptor) do
       val params = m.params.zipWithIndex.map((t, i) => (s"a$i", ctx.goType(t)))
       val result = ctx.goType(m.result)

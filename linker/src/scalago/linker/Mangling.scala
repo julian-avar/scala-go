@@ -28,6 +28,7 @@ import scalago.ir.*
  *  SL_<n>                    interned string literal
  *  CL_<n>                    `classOf` constant (a *rt.Class)
  *  As_<class>, Is_<class>    cast and type test to C_<class>, from `any`
+ *  CheckCast_<class>         cast to a class that hijacked values implement (references are `any`)
  *  }}}
  *  Methods on structs: `M_<method>` (virtual methods, exported so the runtime can call
  *  `toString` and friends), `A_<class>` (returns the struct of an ancestor class) and
@@ -95,4 +96,5 @@ object Mangling:
   def dispatcher(m: MethodName): String = s"Disp_${method(m)}"
   def instanceTest(cls: ClassName): String = s"InstanceOf_${escape(cls)}"
   def ifaceCast(cls: ClassName): String = s"As_${escape(cls)}"
+  def checkedCast(cls: ClassName): String = s"CheckCast_${escape(cls)}"
   def ifaceTest(cls: ClassName): String = s"Is_${escape(cls)}"
