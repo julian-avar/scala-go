@@ -273,8 +273,98 @@ func StringConcat(s *String, o *String) *String {
 	return newString(append(append(chars, s.chars...), o.chars...))
 }
 
-func StringToUpperCase(s *String) *String { return Str(strings.ToUpper(s.GoString())) }
-func StringToLowerCase(s *String) *String { return Str(strings.ToLower(s.GoString())) }
+// StringToUpperCase and StringToLowerCase map case as the JDK does for Locale.ROOT: per code
+// point, with Unicode's special casing (ß is SS, final sigma is ς). They return s itself if
+// nothing changes.
+func StringToUpperCase(s *String) *String {
+	return mapCase(s, func(chars []uint16, i int, r rune) ([]uint16, bool) {
+		if special, ok := specialUpperCase[r]; ok {
+			return special, true
+		}
+		return nil, false
+	}, unicode.ToUpper)
+}
+
+func StringToLowerCase(s *String) *String {
+	return mapCase(s, func(chars []uint16, i int, r rune) ([]uint16, bool) {
+		if r == 'Σ' {
+			if isFinalSigma(chars, i) {
+				return []uint16{'ς'}, true
+			}
+			return []uint16{'σ'}, true
+		}
+		if special, ok := specialLowerCase[r]; ok {
+			return special, true
+		}
+		return nil, false
+	}, unicode.ToLower)
+}
+
+// mapCase maps each code point of s (at char index i) with special, or else with simple.
+func mapCase(s *String, special func(chars []uint16, i int, r rune) ([]uint16, bool), simple func(rune) rune) *String {
+	chars := s.chars
+	var out []uint16 // nil while nothing has changed
+	for i := 0; i < len(chars); {
+		r, n := rune(chars[i]), 1
+		if utf16.IsSurrogate(r) && i+1 < len(chars) {
+			if pair := utf16.DecodeRune(r, rune(chars[i+1])); pair != unicode.ReplacementChar {
+				r, n = pair, 2
+			}
+		}
+		mapped, ok := special(chars, i, r)
+		if !ok {
+			if m := simple(r); m != r {
+				mapped = utf16.AppendRune(nil, m)
+				ok = true
+			}
+		}
+		if ok && out == nil {
+			out = append(make([]uint16, 0, len(chars)+4), chars[:i]...)
+		}
+		if out != nil {
+			if ok {
+				out = append(out, mapped...)
+			} else {
+				out = append(out, chars[i:i+n]...)
+			}
+		}
+		i += n
+	}
+	if out == nil {
+		return s
+	}
+	return newString(out)
+}
+
+// isFinalSigma implements Unicode's Final_Sigma condition for the Σ at index i: a cased letter
+// before it and none after it, skipping case-ignorable characters.
+func isFinalSigma(chars []uint16, i int) bool {
+	cased := func(r rune) bool { return unicode.IsUpper(r) || unicode.IsLower(r) || unicode.IsTitle(r) }
+	ignorable := func(r rune) bool {
+		return unicode.In(r, unicode.Mn, unicode.Me, unicode.Cf, unicode.Lm, unicode.Sk) ||
+			r == '\'' || r == '.' || r == ':' || r == '\u00b7' || r == '\u2019'
+	}
+	before := false
+	for j := i - 1; j >= 0; j-- {
+		r := rune(chars[j])
+		if ignorable(r) {
+			continue
+		}
+		before = cased(r)
+		break
+	}
+	if !before {
+		return false
+	}
+	for j := i + 1; j < len(chars); j++ {
+		r := rune(chars[j])
+		if ignorable(r) {
+			continue
+		}
+		return !cased(r)
+	}
+	return true
+}
 
 func isJavaWhitespaceForTrim(c uint16) bool { return c <= ' ' }
 

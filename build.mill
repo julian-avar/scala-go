@@ -300,3 +300,26 @@ object example extends InBuildScalaGoModule {
  *  `mill bench.goRun [rounds]` as Go. Later rounds show warmed-up JVM performance.
  */
 object bench extends InBuildScalaGoModule
+
+/** Popular Scala 3 libraries, compiled from TASTy like any dependency (none has a scala-go
+ *  specific artifact): `mill ecosystem.check` runs the program on the JVM and as Go and checks
+ *  that both print the same.
+ */
+object ecosystem extends InBuildScalaGoModule {
+  def mvnDeps = Seq(
+    mvn"org.typelevel::cats-core:2.13.0",
+    mvn"com.lihaoyi::upickle:4.4.1",
+    mvn"com.lihaoyi::fastparse:3.1.1",
+    mvn"com.lihaoyi::pprint:0.9.4",
+    mvn"com.lihaoyi::mainargs:0.7.6"
+  )
+
+  def check() = Task.Command {
+    val javaExe = os.Path(sys.props("java.home")) / "bin" / "java"
+    val classpath = runClasspath().map(_.path).filter(os.exists(_)).mkString(java.io.File.pathSeparator)
+    val jvm = os.proc(javaExe, "-cp", classpath, finalMainClass()).call().out.text()
+    val go = os.proc(goBuild().path).call().out.text()
+    if (jvm != go) throw new Exception(s"the JVM and Go outputs differ:\n--- JVM\n$jvm--- Go\n$go")
+    println(s"JVM and Go outputs agree (${jvm.linesIterator.size} lines)")
+  }
+}

@@ -1,0 +1,1 @@
+scala.concurrent on goroutines: the ForkJoinPool, promises and callbacks must be free of data races.

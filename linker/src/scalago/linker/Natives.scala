@@ -670,7 +670,7 @@ object Natives:
   staticFn(Boxes, "isBoxedNumber(Ljava.lang.Object;)Z", "rt.IsBoxedNumber")
   staticFn(Boxes, "isBoxedNumberOrBoolean(Ljava.lang.Object;)Z", "rt.IsBoxedNumberOrBoolean")
 
-  // java.lang.Thread's native side (javalib/src/scalago/runtime/Threads.scala).
+  // java.lang.Thread's and LockSupport's native side (javalib/src/scalago/runtime/Threads.scala).
   private val Threads = "scalago.runtime.Threads$"
   /** The method a started thread runs on its goroutine (javalib's Thread). */
   val ThreadRunMethod: MethodName = MethodName("runOnGoroutine", Nil, Type.Void)
@@ -679,13 +679,21 @@ object Natives:
     s"rt.StartThread(${as(0)}, ${as(1)}, func(t any) { t.(interface{ $run() }).$run() })"
   }
   calls(Threads, "start(Ljava.lang.Object;Z)V", ThreadRunMethod)
-  staticFn(Threads, "current()Ljava.lang.Object;", "rt.CurrentThread")
-  staticFn(Threads, "attach(Ljava.lang.Object;)V", "rt.AttachThread")
-  staticFn(Threads, "isMainGoroutine()Z", "rt.IsMainGoroutine")
-  staticFn(Threads, "interrupt(Ljava.lang.Object;)V", "rt.InterruptThread")
-  staticFn(Threads, "isInterrupted(Ljava.lang.Object;Z)Z", "rt.ThreadIsInterrupted")
-  staticFn(Threads, "sleep(JI)V", "rt.Sleep")
-  staticFn(Threads, "yieldNow()V", "rt.Yield")
+  for (desc, fn) <- List(
+      "newState(Ljava.lang.Object;)Ljava.lang.Object;" -> "rt.NewThreadState",
+      "current()Ljava.lang.Object;" -> "rt.CurrentThread",
+      "attach(Ljava.lang.Object;)V" -> "rt.AttachThread",
+      "isMainGoroutine()Z" -> "rt.IsMainGoroutine",
+      "interrupt(Ljava.lang.Object;)V" -> "rt.InterruptThread",
+      "isInterrupted(Ljava.lang.Object;Z)Z" -> "rt.ThreadIsInterrupted",
+      "sleep(JI)V" -> "rt.Sleep",
+      "yieldNow()V" -> "rt.Yield",
+      "holdsLock(Ljava.lang.Object;)Z" -> "rt.MonitorHeldByCurrent",
+      "activeCount()I" -> "rt.ActiveThreadCount",
+      "park(Ljava.lang.Object;J)V" -> "rt.Park",
+      "unpark(Ljava.lang.Object;)V" -> "rt.Unpark"
+    )
+  do staticFn(Threads, desc, fn)
 
   // java.lang.System's properties and java.lang.Runtime (javalib/src/scalago/runtime/Process.scala).
   private val Process = "scalago.runtime.Process$"
@@ -724,20 +732,23 @@ object Natives:
   static("ujson.FloatToDecimalChar", "toString([CIF)I")(as => s"rt.WriteFloatingChars(${as(0)}, ${as(1)}, float64(${as(2)}), 32)")
   static("ujson.DoubleToDecimalChar", "toString([CID)I")(as => s"rt.WriteFloatingChars(${as(0)}, ${as(1)}, ${as(2)}, 64)")
 
-  // java.util.concurrent.locks' native side (javalib/src/scalago/runtime/Locks.scala).
-  private val Locks = "scalago.runtime.Locks$"
+  // Atomic operations on array elements (javalib/src/scalago/runtime/AtomicArrays.scala).
+  private val AtomicArrays = "scalago.runtime.AtomicArrays$"
+  for (t, code, go) <- List(("Int", "I", "Int32"), ("Long", "J", "Int64")) do
+    staticFn(AtomicArrays, s"get$t([${code}I)$code", s"rt.ArrayLoad$go")
+    staticFn(AtomicArrays, s"set$t([${code}I$code)V", s"rt.ArrayStore$go")
+    staticFn(AtomicArrays, s"compareAndSet$t([${code}I$code$code)Z", s"rt.ArrayCompareAndSet$go")
+    staticFn(AtomicArrays, s"getAndSet$t([${code}I$code)$code", s"rt.ArrayGetAndSet$go")
+    staticFn(AtomicArrays, s"getAndAdd$t([${code}I$code)$code", s"rt.ArrayGetAndAdd$go")
   for (desc, fn) <- List(
-      "enter(Ljava.lang.Object;)V" -> "rt.MonitorEnter",
-      "exit(Ljava.lang.Object;)V" -> "rt.MonitorExit",
-      "tryEnter(Ljava.lang.Object;)Z" -> "rt.MonitorTryEnter",
-      "heldByCurrent(Ljava.lang.Object;)Z" -> "rt.MonitorHeldByCurrent",
-      "isLocked(Ljava.lang.Object;)Z" -> "rt.MonitorIsLocked",
-      "newCondition(Ljava.lang.Object;)Ljava.lang.Object;" -> "rt.NewCondition",
-      "await(Ljava.lang.Object;J)J" -> "rt.ConditionAwait",
-      "signal(Ljava.lang.Object;)V" -> "rt.ConditionSignal",
-      "signalAll(Ljava.lang.Object;)V" -> "rt.ConditionSignalAll"
+      "newRefs(I)Ljava.lang.Object;" -> "rt.NewAtomicRefs",
+      "length(Ljava.lang.Object;)I" -> "rt.AtomicRefsLength",
+      "get(Ljava.lang.Object;I)Ljava.lang.Object;" -> "rt.AtomicRefsGet",
+      "set(Ljava.lang.Object;ILjava.lang.Object;)V" -> "rt.AtomicRefsSet",
+      "compareAndSet(Ljava.lang.Object;ILjava.lang.Object;Ljava.lang.Object;)Z" -> "rt.AtomicRefsCompareAndSet",
+      "getAndSet(Ljava.lang.Object;ILjava.lang.Object;)Ljava.lang.Object;" -> "rt.AtomicRefsGetAndSet"
     )
-  do staticFn(Locks, desc, fn)
+  do staticFn(AtomicArrays, desc, fn)
 
   // java.util.regex's native side (javalib/src/scalago/runtime/Regexes.scala).
   private val Regexes = "scalago.runtime.Regexes$"

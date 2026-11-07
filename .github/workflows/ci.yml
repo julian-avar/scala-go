@@ -35,6 +35,12 @@ jobs:
       - name: test
         working-directory: runtime
         run: go test -race ./...
+      - name: cross-compile
+        working-directory: runtime
+        run: |
+          for target in linux/amd64 linux/arm64 darwin/arm64 windows/amd64 linux/riscv64; do
+            GOOS=${target%/*} GOARCH=${target#*/} go vet ./... || exit 1
+          done
 
   # Compiles everything, runs the end-to-end tests (each program on the JVM and as Go, including
   # go vet and race-detector builds) and the example through ScalaGoModule.
@@ -68,3 +74,5 @@ jobs:
         run: ./mill --ticker false linker.test
       - name: example
         run: ./mill --ticker false example.goRun Ada Grace
+      - name: popular libraries (compiled from TASTy), JVM and Go output compared
+        run: ./mill --ticker false ecosystem.check

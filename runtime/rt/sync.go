@@ -79,75 +79,6 @@ func (l *InitLock) run(init func()) {
 	ok = true
 }
 
-// ---- Volatile fields ----------------------------------------------------------------------
-
-// Volatile is a @volatile field. Each store allocates; volatile fields are for flags and lazy
-// val states, not for bulk data.
-type Volatile[T any] struct {
-	p atomic.Pointer[T]
-}
-
-func (v *Volatile[T]) Load() T {
-	if p := v.p.Load(); p != nil {
-		return *p
-	}
-	var zero T
-	return zero
-}
-
-func (v *Volatile[T]) Store(x T) { v.p.Store(&x) }
-
-// CompareAndSet replaces the value with update if it is expected (reference identity for
-// objects, value equality for primitives).
-func (v *Volatile[T]) CompareAndSet(expected, update T) bool {
-	for {
-		old := v.p.Load()
-		var current T
-		if old != nil {
-			current = *old
-		}
-		if !sameValue(current, expected) {
-			return false
-		}
-		if v.p.CompareAndSwap(old, &update) {
-			return true
-		}
-	}
-}
-
-// GetAndSet stores x and returns the previous value.
-func (v *Volatile[T]) GetAndSet(x T) T {
-	old := v.p.Swap(&x)
-	if old == nil {
-		var zero T
-		return zero
-	}
-	return *old
-}
-
-func sameValue[T any](a, b T) bool {
-	x, y := any(a), any(b)
-	if x == nil || y == nil {
-		return x == y
-	}
-	if t := reflect.TypeOf(x); t != reflect.TypeOf(y) {
-		return false
-	} else if !t.Comparable() {
-		return sameRef(x, y)
-	}
-	return x == y
-}
-
-// sameRef is identity for Go values that == cannot compare (slices, maps, funcs).
-func sameRef(x, y any) bool {
-	vx, vy := reflect.ValueOf(x), reflect.ValueOf(y)
-	switch vx.Kind() {
-	case reflect.Slice, reflect.Map, reflect.Func, reflect.Pointer, reflect.Chan, reflect.UnsafePointer:
-		return vx.Pointer() == vy.Pointer()
-	}
-	return false
-}
-
 // ---- Monitors -----------------------------------------------------------------------------
 
 // ObjectHeader is embedded in every Scala object: it holds the object's monitor, created on first
@@ -320,86 +251,11 @@ func ObjectNotifyAll(x any) {
 	m.mu.Unlock()
 }
 
-// ---- java.util.concurrent.locks ----------------------------------------------------------
-
-// ReentrantLock and its Conditions use a monitor (of a private object of the lock).
-
-// MonitorTryEnter acquires x's monitor if that does not block.
-func MonitorTryEnter(x any) bool {
-	m := MonitorOf(x)
-	g := GoID()
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.owner != 0 && m.owner != g {
-		return false
-	}
-	m.owner = g
-	m.count++
-	return true
-}
-
+// MonitorHeldByCurrent reports whether the current goroutine holds x's monitor (Thread.holdsLock).
 func MonitorHeldByCurrent(x any) bool {
 	m := MonitorOf(x)
 	g := GoID()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.owner == g
-}
-
-func MonitorIsLocked(x any) bool {
-	m := MonitorOf(x)
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.owner != 0
-}
-
-// Condition is a wait set of a monitor, separate from the monitor's own (Lock.newCondition).
-type Condition struct {
-	m       *Monitor
-	waiters []chan struct{}
-}
-
-func NewCondition(lock any) any { return &Condition{m: MonitorOf(lock)} }
-
-// ConditionAwait waits until signaled or interrupted (which throws), or until nanos have elapsed
-// if nanos >= 0. It returns an estimate of the remaining nanoseconds (<= 0 on timeout).
-func ConditionAwait(c any, nanos int64) int64 {
-	cond := Cast[*Condition](c)
-	if nanos == 0 {
-		return 0
-	}
-	start := time.Now()
-	timeout := time.Duration(nanos)
-	if nanos < 0 {
-		timeout = 0
-	}
-	if cond.m.wait(&cond.waiters, timeout) {
-		if nanos < 0 {
-			return 1
-		}
-		return max(nanos-int64(time.Since(start)), 1)
-	}
-	return nanos - int64(time.Since(start))
-}
-
-func ConditionSignal(c any) {
-	cond := Cast[*Condition](c)
-	cond.m.mu.Lock()
-	cond.m.checkOwner(GoID())
-	if len(cond.waiters) > 0 {
-		close(cond.waiters[0])
-		cond.waiters = cond.waiters[1:]
-	}
-	cond.m.mu.Unlock()
-}
-
-func ConditionSignalAll(c any) {
-	cond := Cast[*Condition](c)
-	cond.m.mu.Lock()
-	cond.m.checkOwner(GoID())
-	for _, w := range cond.waiters {
-		close(w)
-	}
-	cond.waiters = nil
-	cond.m.mu.Unlock()
 }

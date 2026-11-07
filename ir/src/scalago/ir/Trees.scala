@@ -196,6 +196,18 @@ object Tree:
   final case class CompareAndSet(field: Tree, expected: Tree, update: Tree)(val pos: Position) extends Tree:
     def tpe: Type = Type.Boolean
 
+  /** Atomically sets a volatile field to `value`, returning the previous value
+   *  (`scalago.runtime.Intrinsics.getAndSet`).
+   */
+  final case class GetAndSet(field: Tree, value: Tree)(val pos: Position) extends Tree:
+    def tpe: Type = field.tpe
+
+  /** Atomically adds `delta` to a volatile `Int` or `Long` field, returning the previous value
+   *  (`scalago.runtime.Intrinsics.getAndAdd`).
+   */
+  final case class GetAndAdd(field: Tree, delta: Tree)(val pos: Position) extends Tree:
+    def tpe: Type = field.tpe
+
   // ---- Calls ---------------------------------------------------------------------------------
 
   /** Allocates an instance of `cls` and runs constructor `ctor` on it. */
@@ -320,6 +332,8 @@ object Traversal:
     case Assign(l, r)                           => List(l, r)
     case Select(q, _, _, _)                     => List(q)
     case CompareAndSet(f, e, u)                 => List(f, e, u)
+    case GetAndSet(f, v)                        => List(f, v)
+    case GetAndAdd(f, d)                        => List(f, d)
     case New(_, _, args)                        => args
     case Apply(r, _, _, args, _)                => r :: args
     case ApplyStatically(r, _, _, args, _)      => r :: args
@@ -367,6 +381,8 @@ object Traversal:
       case Assign(l, r)                       => Assign(t(l), t(r))(p)
       case Select(q, c, fl, tp)               => Select(t(q), c, fl, tp)(p)
       case CompareAndSet(f, e, u)             => CompareAndSet(t(f), t(e), t(u))(p)
+      case GetAndSet(f, v)                    => GetAndSet(t(f), t(v))(p)
+      case GetAndAdd(f, d)                    => GetAndAdd(t(f), t(d))(p)
       case New(c, m, args)                    => New(c, m, ts(args))(p)
       case Apply(r, c, m, args, tp)           => Apply(t(r), c, m, ts(args), tp)(p)
       case ApplyStatically(r, c, m, args, tp) => ApplyStatically(t(r), c, m, ts(args), tp)(p)

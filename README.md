@@ -5,16 +5,20 @@ intermediate representation (`.goir`) next to the `.class` files. A whole-progra
 the program's IR into a Go module that `go build` compiles, together with IR for the Scala
 standard library (recompiled from its TASTy) and a Java standard library written in Scala.
 
-See [docs/design.md](docs/design.md) for the architecture, object model, status and roadmap.
+See [docs/guide.md](docs/guide.md) for using it (setup, dependencies, JVM differences, link
+errors, performance, shipping binaries) and [docs/design.md](docs/design.md) for the
+architecture, object model, status and roadmap.
 
 **Status:** early, but real programs work. Classes, traits, objects, exceptions, pattern
 matching, lambdas, `lazy val`, the standard collections and `java.util` (collections, `Arrays`,
 `Collections`, `Optional`, `Random`, streams, ...) all run, and Scala code can call Go
 packages, and Go code can call Scala libraries. Threads run on goroutines, with `synchronized`,
-`wait`/`notify`, volatiles and atomics, and gears runs on them. The generated code is safe to
+`wait`/`notify`, volatiles and atomics; `java.util.concurrent` (executors, `ForkJoinPool`,
+`CompletableFuture`, locks, concurrent collections), `scala.concurrent.Future` and gears run on
+them. The generated code is safe to
 call from any goroutine. `BigDecimal` and `BigInt` match the JDK. Programs read and write files
 (`java.io`, `java.nio.file`, `scala.io.Source`) and standard input. `java.time` works, with time
-zones from Go's tz database. Reflection and most of `java.util.concurrent` don't work yet.
+zones from Go's tz database. Reflection doesn't work yet.
 
 ## Using it with Mill
 
@@ -29,6 +33,10 @@ object app extends ScalaGoModule   // Scala 3.9.0
 mill app.goRun arg1 arg2    # compile, link, go build, run
 mill app.goLink             # just the Go module (out/app/goLink.dest/go)
 ```
+
+The output is a plain Go module (generated code and runtime are pure Go): `goBuildEnv` and
+`goBuildFlags` cross-compile (`Map("GOOS" -> "windows", "GOARCH" -> "amd64")`) or strip release
+binaries (`Seq("-trimpath", "-ldflags=-s -w")`).
 
 Nothing is published yet: `mill __.publishLocal` publishes everything to the local Ivy
 repository. Requires a JDK and Go ≥ 1.22 on the `PATH`.
@@ -143,6 +151,7 @@ Methods annotated with `@throws` return a Go `error`. Other exceptions are panic
 | `gostd/`             | Generated facades of Go standard library packages (`scalago-gostd`)     |
 | `mill-build/src/`    | `ScalaGoModule`/`ScalaGoLibraryModule` and `TastyIR`, published as `mill-scalago` |
 | `example/`           | A program built with `ScalaGoModule`: `mill example.goRun Ada Grace`    |
+| `ecosystem/`         | Popular Scala libraries compiled from TASTy (`mill ecosystem.check`: JVM and Go agree) |
 | `bench/`             | CPU benchmarks, run on the JVM (`mill bench.run`) and as Go (`mill bench.goRun`) |
 | `tests/cases/`       | End-to-end programs with their expected output                          |
 

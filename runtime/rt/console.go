@@ -139,7 +139,8 @@ const (
 	hookShutdownStarted = 2
 )
 
-// AddShutdownHook registers a Thread (not started) to run at exit.
+// AddShutdownHook registers a Thread (not started; given by its state, NewThreadState) to run at
+// exit.
 func AddShutdownHook(thread any, run func(thread any)) int32 {
 	hooksMu.Lock()
 	defer hooksMu.Unlock()

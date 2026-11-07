@@ -569,14 +569,19 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
       case Select(handle, name) if name.toString == "compareAndSet" && isLazyValHandle(handle.symbol) =>
         genLazyValCompareAndSet(tree, handle.symbol)
 
-      case _ if isCompareAndSetIntrinsic(sym) =>
-        val List(field, expected, update) = args: @unchecked
+      case _ if isAtomicIntrinsic(sym) =>
+        val name = sym.name.toString
         def stripCasts(t: G): G = t match
           case G.AsInstanceOf(inner, _) => stripCasts(inner)
           case other                    => other
-        stripCasts(genExpr(field)) match
-          case f @ (_: G.Select | _: G.SelectStatic) => G.CompareAndSet(f, genExpr(expected), genExpr(update))(pos)
-          case _ => unsupported(field, "compareAndSet on something other than a field")
+        stripCasts(genAtomicField(args.head)) match
+          case f @ (_: G.Select | _: G.SelectStatic) =>
+            val operands = args.tail.map(genExpr)
+            name match
+              case "compareAndSet" => G.CompareAndSet(f, operands(0), operands(1))(pos)
+              case "getAndSet"     => G.GetAndSet(f, operands(0))(pos)
+              case _               => G.GetAndAdd(f, operands(0))(pos)
+          case _ => unsupported(args.head, s"$name on something other than a field")
 
       case Select(Super(_, _), _) =>
         G.ApplyStatically(G.This(toIRType(currentClass.typeRef))(pos), className(staticOwner(sym)), methodName(sym),
@@ -633,10 +638,33 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
     val field = handle.name.toString.stripSuffix(LazyHandleSuffix)
     G.CompareAndSet(G.Select(obj, owner, field, ir.Type.Object)(pos), expected, update)(pos)
 
-  /** `scalago.runtime.Intrinsics.compareAndSet(field, expected, update)`, used by javalib's atomics. */
-  private def isCompareAndSetIntrinsic(sym: Symbol): Boolean =
-    sym.name.toString == "compareAndSet" && sym.owner.is(ModuleClass) &&
+  /** The field operand of an atomic intrinsic. A field that is not private is read through its
+   *  getter (`this.result` is `this.result()`): the intrinsic applies to the field itself.
+   */
+  private def genAtomicField(tree: Tree): G =
+    def strip(t: Tree): Tree = t match
+      case Typed(inner, _)                                 => strip(inner)
+      case TypeApply(fun, _) if fun.symbol == defn.Any_asInstanceOf => strip(receiverOf(fun))
+      case Apply(fun, Nil) if fun.symbol.is(Accessor)      => fun
+      case other                                           => other
+    strip(tree) match
+      case getter @ (_: Select | _: Ident) if getter.symbol.is(Accessor) && !getter.symbol.isSetter =>
+        val field = getter.symbol.field
+        if !field.exists then genExpr(tree)
+        else
+          val pos = position(tree)
+          if isStaticMember(field) then G.SelectStatic(className(staticOwner(field)), fieldName(field), toIRType(field.info))(pos)
+          else G.Select(genExpr(receiverOf(getter)), className(staticOwner(field)), fieldName(field), toIRType(field.info))(pos)
+      case _ => genExpr(tree)
+
+  /** `scalago.runtime.Intrinsics.compareAndSet(field, expected, update)`, `getAndSet(field, value)`
+   *  and `getAndAdd(field, delta)`, used by javalib's atomics.
+   */
+  private def isAtomicIntrinsic(sym: Symbol): Boolean =
+    AtomicIntrinsics(sym.name.toString) && sym.owner.is(ModuleClass) &&
       sym.owner.fullName.toString == "scalago.runtime.Intrinsics$"
+
+  private val AtomicIntrinsics = Set("compareAndSet", "getAndSet", "getAndAdd")
 
   /** The receiver of a method selection, recovering implicit prefixes of bare identifiers. */
   private def receiverOf(fun: Tree): Tree = fun match

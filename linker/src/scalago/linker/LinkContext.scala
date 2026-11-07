@@ -80,13 +80,18 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
     case Type.Array(elem)         => s"*rt.Array[${goArrayElemType(elem)}]"
     case prim                     => Hijacked.primitiveGoType(prim)
 
-  /** Whether field `cls.field` is volatile: it then has Go type `rt.Volatile[T]`. */
+  /** Whether field `cls.field` is volatile: it then has an atomic Go type (see `fieldGoType`). */
   def isVolatile(cls: ClassName, field: String): Boolean =
     program.get(cls).exists(_.fields.exists(f => f.name == field && f.isVolatile))
 
-  /** The Go type of a field's storage. */
+  /** The Go type of a field's storage. Volatile fields of primitive types are `sync/atomic`
+   *  values (`rt.VolatileInt32`, ...), of reference types `rt.Volatile[T]` (an atomic pointer to
+   *  the value). All have `Load`, `Store`, `CompareAndSet` and `GetAndSet`, integers `GetAndAdd`.
+   */
   def fieldGoType(f: FieldDef): String =
-    if f.isVolatile then s"rt.Volatile[${goType(f.tpe)}]" else goType(f.tpe)
+    if !f.isVolatile then goType(f.tpe)
+    else if f.tpe.isPrimitive then s"rt.Volatile${goType(f.tpe).capitalize}"
+    else s"rt.Volatile[${goType(f.tpe)}]"
 
   /** Arrays of references all share one Go type, so that array covariance works. */
   def goArrayElemType(elem: Type): String =

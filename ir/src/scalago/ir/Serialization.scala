@@ -10,7 +10,7 @@ import scala.collection.mutable
  */
 object Serialization:
   val Magic: Int = 0x53474f49 // "SGOI"
-  val FormatVersion: Int = 6
+  val FormatVersion: Int = 7
   val FileExtension: String = ".goir"
 
   final class IRFormatException(msg: String) extends IOException(msg)
@@ -104,6 +104,8 @@ object Serialization:
     final val Select = 23
     final val SelectStatic = 24
     final val CompareAndSet = 25
+    final val GetAndSet = 26
+    final val GetAndAdd = 27
     final val New = 30
     final val Apply = 31
     final val ApplyStatically = 32
@@ -210,6 +212,8 @@ object Serialization:
         case Select(q, cls, f, ty)            => { tag(Tags.Select); tree(q); str(cls); str(f); tpe(ty) }
         case SelectStatic(cls, f, ty)         => { tag(Tags.SelectStatic); str(cls); str(f); tpe(ty) }
         case CompareAndSet(f, e, u)           => { tag(Tags.CompareAndSet); tree(f); tree(e); tree(u) }
+        case GetAndSet(f, v)                  => { tag(Tags.GetAndSet); tree(f); tree(v) }
+        case GetAndAdd(f, d)                  => { tag(Tags.GetAndAdd); tree(f); tree(d) }
         case New(cls, ctor, args)             => { tag(Tags.New); str(cls); method(ctor); trees(args) }
         case Apply(r, rc, m, args, ty) =>
           tag(Tags.Apply); tree(r); str(rc); method(m); trees(args); tpe(ty)
@@ -315,6 +319,8 @@ object Serialization:
         case Tags.Select          => Select(tree(), str(), str(), tpe())(p)
         case Tags.SelectStatic    => SelectStatic(str(), str(), tpe())(p)
         case Tags.CompareAndSet   => CompareAndSet(tree(), tree(), tree())(p)
+        case Tags.GetAndSet       => GetAndSet(tree(), tree())(p)
+        case Tags.GetAndAdd       => GetAndAdd(tree(), tree())(p)
         case Tags.New             => New(str(), method(), trees())(p)
         case Tags.Apply           => Apply(tree(), str(), method(), trees(), tpe())(p)
         case Tags.ApplyStatically => ApplyStatically(tree(), str(), method(), trees(), tpe())(p)
