@@ -65,6 +65,9 @@ func ToGoString(x any) string {
 	case scalaToString:
 		return ToGoString(v.M_toString_p_rLjava_dlang_dString_e())
 	}
+	if r, ok := x.(nilRef); ok && r.isNilRef() { // a null array or class
+		return "null"
+	}
 	if s, ok := foreignToString(x); ok {
 		return s
 	}

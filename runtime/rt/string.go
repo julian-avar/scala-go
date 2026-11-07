@@ -542,8 +542,8 @@ func StringGetChars(s *String, srcBegin, srcEnd int32, dst *Array[uint16], dstBe
 
 // ---- Charsets ------------------------------------------------------------------------------------
 //
-// A java.nio.charset.Charset is represented by its name (a *String). UTF-8, ISO-8859-1 and
-// US-ASCII are supported.
+// Charsets are given by name: a *String, or a java.nio.charset.Charset (javalib's), whose
+// toString is its name. UTF-8, ISO-8859-1 and US-ASCII are supported.
 
 func charsetOf(charset any) string {
 	name := strings.ToUpper(strings.ReplaceAll(ToGoString(charset), "_", "-"))
@@ -561,10 +561,24 @@ func charsetOf(charset any) string {
 
 // NewStringFromBytes implements new String(bytes, charset).
 func NewStringFromBytes(a *Array[int8], charset any) *String {
-	bytes := Reinterpret[int8, byte](a.Data)
+	return newStringFromBytes(Reinterpret[int8, byte](a.Data), charset)
+}
+
+// NewStringFromByteRange implements new String(bytes, offset, length, charset).
+func NewStringFromByteRange(a *Array[int8], offset, length int32, charset any) *String {
+	if offset < 0 || length < 0 || int(offset)+int(length) > len(a.Data) {
+		ThrowKind(StringIndexOutOfBounds, "offset "+itoa(offset)+", count "+itoa(length)+", length "+itoa(int32(len(a.Data))))
+	}
+	return newStringFromBytes(Reinterpret[int8, byte](a.Data[offset:offset+length]), charset)
+}
+
+func newStringFromBytes(bytes []byte, charset any) *String {
 	switch charsetOf(charset) {
 	case "UTF-8":
-		return Str(string(bytes))
+		if utf8.Valid(bytes) {
+			return Str(string(bytes))
+		}
+		return newString(decodeMalformedUTF8(bytes))
 	default:
 		chars := make([]uint16, len(bytes))
 		for i, b := range bytes {
@@ -577,30 +591,78 @@ func NewStringFromBytes(a *Array[int8], charset any) *String {
 	}
 }
 
-// NewStringFromByteRange implements new String(bytes, offset, length, charset).
-func NewStringFromByteRange(a *Array[int8], offset, length int32, charset any) *String {
-	if offset < 0 || length < 0 || int(offset)+int(length) > len(a.Data) {
-		ThrowKind(StringIndexOutOfBounds, "offset "+itoa(offset)+", count "+itoa(length)+", length "+itoa(int32(len(a.Data))))
+// decodeMalformedUTF8 decodes UTF-8 as the JDK does: each maximal prefix of a valid sequence
+// (rather than each byte, as Go does) becomes one U+FFFD.
+func decodeMalformedUTF8(bytes []byte) []uint16 {
+	chars := make([]uint16, 0, len(bytes))
+	for i := 0; i < len(bytes); {
+		b := bytes[i]
+		if b < utf8.RuneSelf {
+			chars = append(chars, uint16(b))
+			i++
+			continue
+		}
+		// The sequence's length, and the range of its second byte (the others are 80..BF).
+		n, lo, hi := 1, byte(0x80), byte(0xbf)
+		switch {
+		case b >= 0xc2 && b <= 0xdf:
+			n = 2
+		case b >= 0xe0 && b <= 0xef:
+			n = 3
+		case b >= 0xf0 && b <= 0xf4:
+			n = 4
+		}
+		switch b {
+		case 0xe0:
+			lo = 0xa0
+		case 0xed:
+			hi = 0x9f
+		case 0xf0:
+			lo = 0x90
+		case 0xf4:
+			hi = 0x8f
+		}
+		valid := 1
+		for valid < n && i+valid < len(bytes) {
+			c := bytes[i+valid]
+			if valid == 1 && (c < lo || c > hi) || valid > 1 && (c < 0x80 || c > 0xbf) {
+				break
+			}
+			valid++
+		}
+		if valid == n && n > 1 {
+			r, _ := utf8.DecodeRune(bytes[i : i+n])
+			chars = utf16.AppendRune(chars, r)
+		} else {
+			chars = append(chars, 0xfffd)
+		}
+		i += valid
 	}
-	return NewStringFromBytes(&Array[int8]{Data: a.Data[offset : offset+length]}, charset)
+	return chars
 }
 
 // StringGetBytes implements String.getBytes(charset).
 func StringGetBytes(s *String, charset any) *Array[int8] {
 	switch charsetOf(charset) {
 	case "UTF-8":
-		return ArrayOfSlice(Reinterpret[byte, int8]([]byte(s.GoString())))
+		return ArrayOfSlice(Reinterpret[byte, int8](appendUTF16(make([]byte, 0, len(s.chars)), s.chars)))
 	default:
 		limit := uint16(0xff)
 		if charsetOf(charset) == "US-ASCII" {
 			limit = 0x7f
 		}
-		out := make([]int8, len(s.chars))
-		for i, c := range s.chars {
+		// Unmappable chars become '?', a surrogate pair a single one.
+		out := make([]int8, 0, len(s.chars))
+		for i := 0; i < len(s.chars); i++ {
+			c := s.chars[i]
 			if c > limit {
+				if utf16.IsSurrogate(rune(c)) && c < 0xdc00 && i+1 < len(s.chars) &&
+					s.chars[i+1] >= 0xdc00 && s.chars[i+1] <= 0xdfff {
+					i++
+				}
 				c = '?'
 			}
-			out[i] = int8(c)
+			out = append(out, int8(c))
 		}
 		return ArrayOfSlice(out)
 	}

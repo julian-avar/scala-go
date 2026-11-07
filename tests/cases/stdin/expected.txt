@@ -1,0 +1,10 @@
+name? hello, Ada
+sum of 3 numbers: 60
+[windows line] 12
+[Grüße ☃] 7
+[] 0
+[no newline at end] 17
+after EOF: null
+java.io.EOFException: Console has reached end of input
+System.in.read: -1
+exitingshutdown hook

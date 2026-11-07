@@ -214,11 +214,15 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     case TryFinally(block, finalizer, tpe) =>
       withValueDest(dest, tpe) { bodyDest =>
         val (exc, jumps) = runInTryClosure(block, bodyDest, dispatch = false)
+        // A finalizer that throws or returns replaces the block's outcome.
+        val abrupt = endsAbruptly(finalizer)
+        if abrupt then emit(s"_ = $exc")
         genTree(finalizer, Dest.Discard)
-        emit(s"if $exc != nil {")
-        emit(s"\tpanic(rt.Exc($exc))")
-        emit("}")
-        dispatchJumps(jumps)
+        if !abrupt then
+          emit(s"if $exc != nil {")
+          emit(s"\tpanic(rt.Exc($exc))")
+          emit("}")
+          dispatchJumps(jumps)
       }
 
     case _ =>
