@@ -353,7 +353,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       emit(store(s"${fieldAccess(qual, q, cls)}.${Mangling.field(field)}", cls, field, r))
     case SelectStatic(cls, field, tpe) =>
       val r = adapt(genExpr(rhs), rhs.tpe, tpe)
-      initStatics(cls)
+      initStaticFields(cls)
       emit(store(Mangling.staticField(cls, field), cls, field, r))
     case ArraySelect(array, index, _) =>
       val List(a, i, r) = genExprs(List(array, index, rhs)): @unchecked
@@ -372,7 +372,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     case Select(qual, cls, f, _) if ctx.isVolatile(cls, f) =>
       Some(s"${fieldAccess(qual, genExpr(qual), cls)}.${Mangling.field(f)}")
     case SelectStatic(cls, f, _) if ctx.isVolatile(cls, f) =>
-      initStatics(cls)
+      initStaticFields(cls)
       Some(Mangling.staticField(cls, f))
     case _ =>
       error(tree, "compareAndSet needs a @volatile field")
@@ -389,14 +389,17 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
         s"${ctx.ifaceCast(cls, q)}.${Mangling.accessor(cls)}()"
       case _ => s"$q.${Mangling.accessor(cls)}()"
 
-  /** Triggers the static initializer of `cls` (unless we are in `cls` itself). The static fields
-   *  of an object (Scala 3's enum cases) are set by its constructor, which the JVM runs as the
-   *  static initializer: those need the object.
-   */
+  /** Triggers the static initializer of `cls` (unless we are in `cls` itself). */
   private def initStatics(cls: ClassName): Unit =
-    if cls != owner.name then
-      if ctx.analyzer.staticInit.contains(cls) then emit(s"${Mangling.clinit(cls)}()")
-      if program.isModuleClass(cls) then emit(s"${Mangling.module(cls)}()")
+    if cls != owner.name && ctx.analyzer.staticInit.contains(cls) then emit(s"${Mangling.clinit(cls)}()")
+
+  /** Before an access to a static field of `cls`: the static fields of an object (Scala 3's enum
+   *  cases) are set by its constructor, which the JVM runs as the static initializer, so those
+   *  need the object.
+   */
+  private def initStaticFields(cls: ClassName): Unit =
+    initStatics(cls)
+    if cls != owner.name && program.isModuleClass(cls) then emit(s"${Mangling.module(cls)}()")
 
   // ---------------------------------------------------------------------------------------------
   // Expressions
@@ -454,7 +457,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
           program.staticFieldViaCompanion(sel) match
             case Some(read) => genExpr(read)
             case None =>
-              initStatics(cls)
+              initStaticFields(cls)
               load(Mangling.staticField(cls, field), cls, field)
 
     case CompareAndSet(field, expected, update) =>
@@ -805,7 +808,14 @@ object FunctionEmitter:
     case If(_, thenp, elsep, _) => endsAbruptly(thenp) && endsAbruptly(elsep)
     case While(cond, _)         => isInfinite(cond)
     case Match(_, cases, d, _)  => cases.forall((_, body) => endsAbruptly(body)) && endsAbruptly(d)
+    // A jump to the block's own label completes it normally.
+    case Labeled(label, _, body) => endsAbruptly(body) && !jumpsTo(label, body)
     case _                      => false
+
+  /** Whether `tree` may jump to `label` (a jump whose value throws or returns does not). */
+  private def jumpsTo(label: String, tree: Tree): Boolean = tree match
+    case Return(Some(`label`), expr) => !endsAbruptly(expr) || jumpsTo(label, expr)
+    case _                           => Traversal.children(tree).exists(jumpsTo(label, _))
 
   /** Whether emitting `tree` against `Dest.Return` ends in a Go terminating statement.
    *
