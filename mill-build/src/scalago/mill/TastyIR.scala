@@ -22,6 +22,28 @@ object TastyIR {
     } finally zip.close()
   }
 
+  /** Compile-only dependencies of a published library, as `group:artifact:version`: the
+   *  `provided`-scope dependencies its POM (next to the jar in the Coursier cache) lists. They are
+   *  not on the run classpath (annotation libraries, for example), but compiling the library's
+   *  TASTy needs them. Empty if the jar has no POM next to it.
+   */
+  def providedDependencies(jar: os.Path): Seq[String] = {
+    val pom = jar / os.up / (jar.baseName + ".pom")
+    if (!os.isFile(pom)) Seq.empty
+    else {
+      val dependency = "(?s)<dependency>(.*?)</dependency>".r
+      def field(xml: String, name: String) = s"(?s)<$name>\\s*(.*?)\\s*</$name>".r.findFirstMatchIn(xml).map(_.group(1))
+      dependency.findAllMatchIn(os.read(pom)).map(_.group(1)).toSeq.flatMap { d =>
+        if (!field(d, "scope").contains("provided")) None
+        else for {
+          group <- field(d, "groupId")
+          artifact <- field(d, "artifactId")
+          version <- field(d, "version") if !version.contains("${")
+        } yield s"$group:$artifact:$version"
+      }
+    }
+  }
+
   /** Compiles the TASTy files of `jar` (except those `skip` rejects) into `.goir` files in `out`.
    *
    *  @param classpath the jar's dependencies

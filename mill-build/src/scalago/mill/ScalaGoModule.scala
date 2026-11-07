@@ -63,7 +63,12 @@ trait ScalaGoModule extends ScalaModule {
     val jars = classpath.filter(p => os.isFile(p) && p.ext == "jar" && !isStdlib(p) && TastyIR.needsIR(p))
     jars.map { jar =>
       val out = Task.dest / "ir" / jar.baseName
-      TastyIR.compile(jar, classpath, out, Task.dest / "work" / jar.baseName,
+      // Compile-only dependencies are not on the run classpath, but compiling the TASTy needs them.
+      val provided = TastyIR.providedDependencies(jar)
+      val providedJars =
+        if (provided.isEmpty) Seq.empty[os.Path]
+        else defaultResolver().classpath(provided.map(d => Dep.parse(d))).map(_.path)
+      TastyIR.compile(jar, classpath ++ providedJars, out, Task.dest / "work" / jar.baseName,
         scalaGoCompilerClasspath().map(_.path), scalaGoPlugin().path)
       PathRef(out)
     }
