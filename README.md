@@ -175,7 +175,8 @@ Both outputs must equal `expected.txt`. The work directory of a failing case is 
 `/tmp/scalago-<case>-*` for inspection. Set `SCALAGO_KEEP_WORK=1` to keep passing ones too.
 Cases run concurrently; `SCALAGO_TEST_PARALLELISM` sets how many at once, and
 `SCALAGO_TEST_ONLY=regex,traits` runs only the named cases. A `missing-apis.txt` case is linked
-with `--missing-apis throw`.
+with `--missing-apis throw`. The tests use their own Go build cache
+(`~/.cache/scalago-tests/go-build`), pruned of entries unused for a day when they start.
 
 The generated Go code carries line directives, so Go reports Scala positions, also in
 compiler errors. `SCALAGO_LINE_DIRECTIVES=false` (the linker's `--line-directives false`)
