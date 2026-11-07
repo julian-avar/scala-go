@@ -83,6 +83,8 @@ object Main:
     show(IntStream.range(0, 5).boxed().toList, IntStream.rangeClosed(-2, 2).boxed().toList)
     show(IntStream.range(5, 5).count(), IntStream.rangeClosed(Int.MaxValue - 1, Int.MaxValue).count())
     show(LongStream.rangeClosed(1, 5).sum(), LongStream.range(Long.MinValue, Long.MinValue + 3).count())
+    show(LongStream.rangeClosed(Long.MinValue, Long.MaxValue).limit(2).boxed().toList,
+      LongStream.range(Long.MinValue + 5, Long.MaxValue).skip(2).findFirst())
     show(IntStream.of(4, 2, 4).boxed().toList, IntStream.of(9).sum())
     println(IntStream.iterate(1, i => i * 2).limit(5).boxed().toList)
     println(IntStream.iterate(0, i => i < 10, i => i + 3).boxed().toList)

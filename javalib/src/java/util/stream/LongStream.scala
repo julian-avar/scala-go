@@ -154,12 +154,22 @@ object LongStream {
 
   def of(t: Long): LongStream = Arrays.stream(Array(t))
 
+  /* A range with more than Long.MaxValue elements is the concatenation of two halves, as on the
+   * JDK, so that its size fits.
+   */
+
   def range(startInclusive: Long, endExclusive: Long): LongStream =
     if (startInclusive >= endExclusive) empty()
-    else StreamSupport.longStream(new Streams.LongRange(startInclusive, endExclusive, closed = false), false)
+    else if (endExclusive - startInclusive < 0) {
+      val m = startInclusive + ((endExclusive - startInclusive) >>> 1) + 1
+      concat(range(startInclusive, m), range(m, endExclusive))
+    } else StreamSupport.longStream(new Streams.LongRange(startInclusive, endExclusive, closed = false), false)
 
   def rangeClosed(startInclusive: Long, endInclusive: Long): LongStream =
     if (startInclusive > endInclusive) empty()
-    else StreamSupport.longStream(new Streams.LongRange(startInclusive, endInclusive, closed = true), false)
+    else if (endInclusive - startInclusive + 1 <= 0) {
+      val m = startInclusive + ((endInclusive - startInclusive) >>> 1) + 1
+      concat(range(startInclusive, m), rangeClosed(m, endInclusive))
+    } else StreamSupport.longStream(new Streams.LongRange(startInclusive, endInclusive, closed = true), false)
 
 }
