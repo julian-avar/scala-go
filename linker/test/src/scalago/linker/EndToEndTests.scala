@@ -107,11 +107,10 @@ class EndToEndTests extends munit.FunSuite:
       Files.writeString(consumer.resolve("go.mod"),
         s"\nrequire $LibraryModule v0.0.0\n\nreplace $LibraryModule => ${goDir.toAbsolutePath}\n",
         java.nio.file.StandardOpenOption.APPEND)
-      runGo(consumer, expected, race = Files.exists(dir.resolve("race.txt")))
+      runGo(consumer, expected, raceCheck(dir))
       deleteRecursively(work)
     else
-      // `race.txt`: the Go build also runs under the race detector.
-      linkAndRun(classpath, goDir, config, expected, race = Files.exists(dir.resolve("race.txt")))
+      linkAndRun(classpath, goDir, config, expected, raceCheck(dir))
       deleteRecursively(work) // kept on failure, for inspection
 
   /** Module path of libraries linked by the tests (their consumers import it). */
@@ -125,18 +124,37 @@ class EndToEndTests extends munit.FunSuite:
     }
     to
 
-  private def linkAndRun(classpath: Seq[Path], goDir: Path, config: Linker.Config, expected: String, race: Boolean): Unit =
+  private def linkAndRun(classpath: Seq[Path], goDir: Path, config: Linker.Config, expected: String, race: Option[RaceCheck]): Unit =
     Linker.link(classpath, goDir, config)
     runGo(goDir, expected, race)
 
+  /** A case with a `race.txt` also runs under Go's race detector, which must report no data race,
+   *  except in the generated Go functions that its `allow-race: <function>` lines name (races in
+   *  third-party libraries, with the reason in the file).
+   */
+  private final case class RaceCheck(allowedIn: Seq[String])
+
+  private def raceCheck(dir: Path): Option[RaceCheck] =
+    val file = dir.resolve("race.txt")
+    Option.when(Files.exists(file))(RaceCheck(
+      Files.readAllLines(file, UTF_8).asScala.toSeq.collect { case s"allow-race: $function" => function.trim }))
+
+  private val raceReport = raw"(?s)==================\nWARNING: DATA RACE\n.*?==================\n".r
+
   /** Vets, builds and runs the Go main package in `goDir`, checking its output. */
-  private def runGo(goDir: Path, expected: String, race: Boolean): Unit =
+  private def runGo(goDir: Path, expected: String, race: Option[RaceCheck]): Unit =
     assertEquals(run(Seq("go", "vet", "./..."), goDir), "", "go vet output")
     assertEquals(run(Seq("go", "build", "-o", "app", "."), goDir), "", "go build output")
     assertNoDiff(run(Seq(goDir.resolve("app").toString), goDir), expected, "Go output")
-    if race then
+    for check <- race do
       assertEquals(run(Seq("go", "build", "-race", "-o", "app-race", "."), goDir), "", "go build -race output")
-      assertNoDiff(run(Seq(goDir.resolve("app-race").toString), goDir), expected, "Go output under the race detector")
+      // Reports are checked here rather than through the exit status, so that allowed ones can be
+      // told apart and dropped from the output.
+      val output = run(Seq(goDir.resolve("app-race").toString), goDir, Map("GORACE" -> "exitcode=0"))
+      for report <- raceReport.findAllIn(output) do
+        assert(check.allowedIn.exists(f => report.contains(s"internal/scala.$f(")), s"data race:\n$report")
+      val programOutput = raceReport.replaceAllIn(output, "").replaceAll(raw"Found \d+ data race\(s\)\n", "")
+      assertNoDiff(programOutput, expected, "Go output under the race detector")
 
   private def goModulePath(goMod: Path): String =
     Files.readAllLines(goMod, UTF_8).asScala.collectFirst { case s"module $path" => path.trim }
@@ -160,8 +178,10 @@ class EndToEndTests extends munit.FunSuite:
   private def javaBinary: String = Path.of(sys.props("java.home"), "bin", "java").toString
 
   /** Runs a process to completion, failing the test on a non-zero exit. Returns stdout+stderr. */
-  private def run(command: Seq[String], cwd: Path): String =
-    val process = ProcessBuilder(command.asJava).directory(cwd.toFile).redirectErrorStream(true).start()
+  private def run(command: Seq[String], cwd: Path, env: Map[String, String] = Map.empty): String =
+    val builder = ProcessBuilder(command.asJava).directory(cwd.toFile).redirectErrorStream(true)
+    builder.environment.putAll(env.asJava)
+    val process = builder.start()
     process.getOutputStream.close()
     val output = String(process.getInputStream.readAllBytes(), UTF_8)
     val exit = process.waitFor()

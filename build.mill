@@ -200,7 +200,7 @@ object linker extends ScalaGoModule with Published {
     val dest = Task.dest / "scalago" / "rt"
     os.makeDir.all(dest)
     val files = os.list(goRuntimeDir().path)
-      .filter(p => p.ext == "go" && !p.last.endsWith("_test.go"))
+      .filter(p => (p.ext == "go" || p.ext == "s") && !p.last.endsWith("_test.go"))
       .sortBy(_.last)
     files.foreach(f => os.copy.into(f, dest))
     os.write(dest / "files.txt", files.map(_.last).mkString("", "\n", "\n"))
