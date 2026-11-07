@@ -174,7 +174,8 @@ runs it on the JVM. It then links it to Go, runs `go vet` and `go build`, and ru
 Both outputs must equal `expected.txt`. The work directory of a failing case is kept under
 `/tmp/scalago-<case>-*` for inspection. Set `SCALAGO_KEEP_WORK=1` to keep passing ones too.
 Cases run concurrently; `SCALAGO_TEST_PARALLELISM` sets how many at once, and
-`SCALAGO_TEST_ONLY=regex,traits` runs only the named cases.
+`SCALAGO_TEST_ONLY=regex,traits` runs only the named cases. A `missing-apis.txt` case is linked
+with `--missing-apis throw`.
 
 The generated Go code carries line directives, so Go reports Scala positions, also in
 compiler errors. `SCALAGO_LINE_DIRECTIVES=false` (the linker's `--line-directives false`)

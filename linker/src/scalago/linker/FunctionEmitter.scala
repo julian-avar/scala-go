@@ -105,7 +105,19 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   // Statements: trees whose value goes to a destination
   // ---------------------------------------------------------------------------------------------
 
-  private def genTree(tree: Tree, dest: Dest): Unit = atPos(tree.pos)(genTreeHere(tree, dest))
+  private def genTree(tree: Tree, dest: Dest): Unit = atPos(tree.pos) {
+    ctx.analyzer.missingUse(tree) match
+      case Some(use) =>
+        throwMissing(use)
+        if dest != Dest.Discard then deliver(dest, zeroValue(tree.tpe), tree.tpe)
+      case None => genTreeHere(tree, dest)
+  }
+
+  /** A use of an API without an implementation, linked with `--missing-apis throw`: throws the
+   *  JVM's linkage error. (A call, not a `panic`, so that the code after it stays reachable for Go.)
+   */
+  private def throwMissing(use: Analyzer.MissingUse): Unit =
+    emit(s"rt.ThrowKind(rt.${use.kind.goKind}, ${goStringLiteral(s"scala-go: ${use.message}")})")
 
   private def genTreeHere(tree: Tree, dest: Dest): Unit = tree match
     case VarDef(name, tpe, mutable, rhs) =>
@@ -346,6 +358,9 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     if isSimple(expr) then emitPlain(line(expr)) else emit(line(expr))
 
   private def genAssign(lhs: Tree, rhs: Tree): Unit = lhs match
+    case _ if ctx.analyzer.missingUse(lhs).isDefined =>
+      genTree(rhs, Dest.Discard)
+      genTree(lhs, Dest.Discard)
     case VarRef(name, tpe) =>
       emit(s"${Mangling.local(name)} = ${adapt(genExpr(rhs), rhs.tpe, tpe)}")
     case Select(qual, cls, field, tpe) =>
@@ -398,7 +413,13 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   // ---------------------------------------------------------------------------------------------
 
   /** Go expression for `tree`, emitting any statements it needs first. Empty for void trees. */
-  private def genExpr(tree: Tree): String = atPos(tree.pos)(genExprHere(tree))
+  private def genExpr(tree: Tree): String = atPos(tree.pos) {
+    ctx.analyzer.missingUse(tree) match
+      case Some(use) =>
+        throwMissing(use)
+        zeroValue(tree.tpe)
+      case None => genExprHere(tree)
+  }
 
   private def genExprHere(tree: Tree): String = tree match
     case Block(stats, expr) =>

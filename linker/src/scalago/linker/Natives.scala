@@ -283,6 +283,8 @@ object Natives:
   static(Integer, "remainderUnsigned(II)I")(as => s"int32(uint32(${as(0)}) % uint32(${as(1)}))")
   static(Integer, "compareUnsigned(II)I")(as => s"rt.LongCompare(int64(uint32(${as(0)})), int64(uint32(${as(1)})))")
   static(Integer, "toUnsignedLong(I)J")(as => s"int64(uint32(${as.head}))")
+  staticFn(Integer, "toUnsignedString(I)Ljava.lang.String;", "rt.IntToUnsignedDecimal")
+  staticFn(Long, "toUnsignedString(J)Ljava.lang.String;", "rt.LongToUnsignedDecimal")
   static(Long, "divideUnsigned(JJ)J")(as => s"int64(uint64(${as(0)}) / uint64(${as(1)}))")
   static(Long, "remainderUnsigned(JJ)J")(as => s"int64(uint64(${as(0)}) % uint64(${as(1)}))")
   static(Integer, "max(II)I")(as => s"max(${as(0)}, ${as(1)})")
@@ -338,6 +340,16 @@ object Natives:
       "isDigit" -> "rt.CharIsDigit", "isLetter" -> "rt.CharIsLetter", "isLetterOrDigit" -> "rt.CharIsLetterOrDigit",
       "isWhitespace" -> "rt.CharIsWhitespace", "isSpaceChar" -> "rt.CharIsSpaceChar",
       "isUpperCase" -> "rt.CharIsUpperCase", "isLowerCase" -> "rt.CharIsLowerCase", "isAlphabetic" -> "rt.CharIsLetter"
+    )
+  do
+    static(Character, s"$name(C)Z")(as => s"$fn(int32(${as.head}))")
+    staticFn(Character, s"$name(I)Z", fn)
+  for (name, fn) <- List(
+      "isUnicodeIdentifierStart" -> "rt.CharIsUnicodeIdentifierStart",
+      "isUnicodeIdentifierPart" -> "rt.CharIsUnicodeIdentifierPart",
+      "isJavaIdentifierStart" -> "rt.CharIsJavaIdentifierStart",
+      "isJavaIdentifierPart" -> "rt.CharIsJavaIdentifierPart",
+      "isIdentifierIgnorable" -> "rt.CharIsIdentifierIgnorable"
     )
   do
     static(Character, s"$name(C)Z")(as => s"$fn(int32(${as.head}))")
@@ -693,6 +705,12 @@ object Natives:
   staticFn(StackTraces, "methodName(Ljava.lang.Object;I)Ljava.lang.String;", "rt.StackTraceMethodName")
   staticFn(StackTraces, "fileName(Ljava.lang.Object;I)Ljava.lang.String;", "rt.StackTraceFileName")
   staticFn(StackTraces, "lineNumber(Ljava.lang.Object;I)I", "rt.StackTraceLineNumber")
+
+  // Java classes of popular Scala libraries: they have no TASTy to compile, so their methods are
+  // implemented here (only those that reachable Scala code of the library uses).
+  // ujson (upickle): FloatToDecimalChar/DoubleToDecimalChar port the JDK's Float/Double.toString.
+  static("ujson.FloatToDecimalChar", "toString([CIF)I")(as => s"rt.WriteFloatingChars(${as(0)}, ${as(1)}, float64(${as(2)}), 32)")
+  static("ujson.DoubleToDecimalChar", "toString([CID)I")(as => s"rt.WriteFloatingChars(${as(0)}, ${as(1)}, ${as(2)}, 64)")
 
   // java.util.concurrent.locks' native side (javalib/src/scalago/runtime/Locks.scala).
   private val Locks = "scalago.runtime.Locks$"

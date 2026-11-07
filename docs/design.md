@@ -604,6 +604,10 @@ Known gaps:
   `Date`/`Calendar`/`Timer`, `EnumSet`/`EnumMap`, `WeakHashMap`, `ServiceLoader`,
   `Arrays.compare`/`mismatch` and the range forms of `Arrays.equals`, `String.CASE_INSENSITIVE_ORDER`,
   `String.join(delimiter, Iterable)`, and `Properties` keys continued over several lines.
+- Scala libraries are compiled from their TASTy, so classes of a library written in Java (which
+  have none) are missing; natives cover those of popular libraries that reachable code uses
+  (ujson's float formatting). `WeakHashMap` holds its keys strongly (Go's weak pointers need
+  Go 1.24); `java.nio.CharBuffer` only wraps text for use as a `CharSequence`.
 - Locales: there is no locale data. `java.util.Locale` carries identifiers only, and every
   locale formats and maps case as `Locale.ROOT` does (so `String.format(Locale.GERMANY, "%.1f",
   x)` uses a `.`).
@@ -621,7 +625,12 @@ Known gaps:
   `ExecutionContext` on `java.util.concurrent`; gears is the supported API.
 
 When reachable code uses something missing, linking fails with a "called from" chain naming
-the API.
+the API. Reachability over-approximates what runs (virtual calls are resolved by name), so a
+program can fail to link because of code it never runs. With `--missing-apis throw` (Mill:
+`goMissingApis`), such uses are warnings instead, and each throws the JVM's linkage error
+(`NoClassDefFoundError`, `NoSuchMethodError`, `NoSuchFieldError`; `UnsupportedOperationException`
+for code the plugin could not translate) where it is used, if it runs. These are `LinkageError`s,
+so `NonFatal` does not catch them, as on the JVM.
 
 ## Roadmap
 
@@ -683,9 +692,9 @@ earlier has to be redone:
 
 ## Open questions
 
-- **Missing members.** Should unresolvable but statically reachable members become link errors
-  (current behavior) or runtime errors, as on the JVM, with a warning? The JVM behavior is more
-  permissive, but it hides gaps.
+- **Missing members.** Unresolvable but statically reachable members are link errors by default,
+  and runtime linkage errors with `--missing-apis throw`. Should `throw` become the default once
+  javalib is broad enough that missing APIs are rare in practice?
 - **Facades on the JVM.** Facade members throw on the JVM, so programs using Go cannot be run or
   tested there. Facades could take an optional JVM implementation.
 - **Errors in generated facades.** A trailing `error` is thrown, which suits most functions but

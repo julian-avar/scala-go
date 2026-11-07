@@ -28,11 +28,11 @@ func TestDemangle(t *testing.T) {
 		class, method string
 	}
 	for name, w := range map[string]want{
-		"Impl_Main_S__deep_pI_rI":                   {implFrame, "Main$", "deep"},
-		"Impl_Widget___init_pI_rV":                  {implFrame, "Widget", "<init>"},
-		"Impl_Foo_SBar__Show_p_rV":                  {implFrame, "Foo$Bar", "Show"},
-		"Impl_p_dQ__x_u1_pT_rV": {implFrame, "p.Q", "x_1"},
-		"Fwd_Main__main_pAT_rV": {forwarderFrame, "Main", "main"},
+		"Impl_Main_S__deep_pI_rI":  {implFrame, "Main$", "deep"},
+		"Impl_Widget___init_pI_rV": {implFrame, "Widget", "<init>"},
+		"Impl_Foo_SBar__Show_p_rV": {implFrame, "Foo$Bar", "Show"},
+		"Impl_p_dQ__x_u1_pT_rV":    {implFrame, "p.Q", "x_1"},
+		"Fwd_Main__main_pAT_rV":    {forwarderFrame, "Main", "main"},
 	} {
 		fn := demangle(name)
 		if fn.kind != w.kind || fn.class.GoString() != w.class || fn.method.GoString() != w.method {
