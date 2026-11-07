@@ -17,6 +17,10 @@ object Natives:
     case Instance(gen: (String, List[String]) => String)
     /** Static method, or method of a module whose receiver need not be evaluated. */
     case Static(gen: List[String] => String)
+    /** A method that always returns null (after evaluating its receiver, which must not be null,
+     *  and arguments).
+     */
+    case NullResult
 
   import Native.*
 
@@ -144,6 +148,8 @@ object Natives:
   instanceFn(S, "concat(Ljava.lang.String;)Ljava.lang.String;", "rt.StringConcat")
   instanceFn(S, "toUpperCase()Ljava.lang.String;", "rt.StringToUpperCase")
   instanceFn(S, "toLowerCase()Ljava.lang.String;", "rt.StringToLowerCase")
+  instanceFn(S, "toUpperCase(Ljava.util.Locale;)Ljava.lang.String;", "rt.StringToUpperCaseLocale")
+  instanceFn(S, "toLowerCase(Ljava.util.Locale;)Ljava.lang.String;", "rt.StringToLowerCaseLocale")
   instanceFn(S, "trim()Ljava.lang.String;", "rt.StringTrim")
   instanceFn(S, "strip()Ljava.lang.String;", "rt.StringStrip")
   instanceFn(S, "isBlank()Z", "rt.StringIsBlank")
@@ -165,6 +171,8 @@ object Natives:
   staticFn(S, "copyValueOf([C)Ljava.lang.String;", "rt.NewStringFromChars")
   for t <- List("Z", "I", "J", "F", "D") do staticFn(S, s"valueOf($t)Ljava.lang.String;", "rt.StringValueOf")
   staticFn(S, "format(Ljava.lang.String;[Ljava.lang.Object;)Ljava.lang.String;", "rt.StringFormat")
+  staticFn(S, "format(Ljava.util.Locale;Ljava.lang.String;[Ljava.lang.Object;)Ljava.lang.String;", "rt.StringFormatLocale")
+  staticFn(S, "join(Ljava.lang.CharSequence;[Ljava.lang.CharSequence;)Ljava.lang.String;", "rt.StringJoin")
   instanceFn(S, "getChars(II[CI)V", "rt.StringGetChars")
   // Charsets are represented by their names (see rt.NewStringFromBytes).
   private val utf8 = "rt.Str(\"UTF-8\")"
@@ -184,6 +192,8 @@ object Natives:
   instanceFn(C, "getName()Ljava.lang.String;", "rt.ClassGetName")
   instanceFn(C, "getTypeName()Ljava.lang.String;", "rt.ClassGetName")
   instanceFn(C, "getSimpleName()Ljava.lang.String;", "rt.ClassGetSimpleName")
+  // A Go binary carries no class path resources.
+  methods((C, parseMethod("getResourceAsStream(Ljava.lang.String;)Ljava.io.InputStream;"))) = NullResult
   instanceFn(C, "isArray()Z", "rt.ClassIsArray")
   instanceFn(C, "isPrimitive()Z", "rt.ClassIsPrimitive")
   instanceFn(C, "getComponentType()Ljava.lang.Class;", "rt.ClassGetComponentType")

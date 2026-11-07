@@ -277,6 +277,7 @@ object Linker:
         val call = native match
           case Natives.Native.Instance(gen) => gen("v", args)
           case Natives.Native.Static(gen)   => gen(args)
+          case Natives.Native.NullResult    => "nil"
         line(s"\tcase $goType:")
         line(s"\t\t$ret$call")
         if result.isEmpty then line("\t\treturn")

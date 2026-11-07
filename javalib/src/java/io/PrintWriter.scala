@@ -120,8 +120,8 @@ class PrintWriter(protected[io] var out: Writer, autoFlush: Boolean)
   def printf(fmt: String, args: Array[Object]): PrintWriter =
     format(fmt, args)
 
-  // Not implemented:
-  // def printf(l: java.util.Locale, fmt: String, args: Array[Object]): PrintWriter = ???
+  def printf(l: java.util.Locale, fmt: String, args: Array[Object]): PrintWriter =
+    format(l, fmt, args)
 
   // scala-go: String.format instead of java.util.Formatter.
   def format(fmt: String, args: Array[Object]): PrintWriter = {
@@ -131,8 +131,9 @@ class PrintWriter(protected[io] var out: Writer, autoFlush: Boolean)
     this
   }
 
-  // Not implemented:
-  // def format(l: java.util.Locale, fmt: String, args: Array[Object]): PrintWriter = ???
+  // scala-go has no locale data: every locale formats as Locale.ROOT.
+  def format(l: java.util.Locale, fmt: String, args: Array[Object]): PrintWriter =
+    format(fmt, args)
 
   override def append(csq: CharSequence): PrintWriter = {
     super.append(csq)

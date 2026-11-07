@@ -667,3 +667,41 @@ func StringGetBytes(s *String, charset any) *Array[int8] {
 		return ArrayOfSlice(out)
 	}
 }
+
+// StringJoin implements String.join(delimiter, elements...): null elements are "null", a null
+// delimiter or array throws NullPointerException.
+func StringJoin(delimiter any, elements *Array[any]) *String {
+	if IsNull(delimiter) || elements == nil {
+		ThrowKind(NullPointer, "")
+	}
+	sep := ToString(delimiter).chars
+	var chars []uint16
+	for i, e := range elements.Data {
+		if i > 0 {
+			chars = append(chars, sep...)
+		}
+		chars = append(chars, ToString(e).chars...)
+	}
+	return newString(chars)
+}
+
+// Locale-taking variants. scala-go has no locale data: every locale behaves as Locale.ROOT
+// (docs/design.md), but a null locale throws as in the JDK.
+
+func StringToLowerCaseLocale(s *String, locale any) *String {
+	if IsNull(locale) {
+		ThrowKind(NullPointer, "")
+	}
+	return StringToLowerCase(s)
+}
+
+func StringToUpperCaseLocale(s *String, locale any) *String {
+	if IsNull(locale) {
+		ThrowKind(NullPointer, "")
+	}
+	return StringToUpperCase(s)
+}
+
+// StringFormatLocale implements String.format(locale, format, args); a null locale means no
+// localization, which is what every locale gets.
+func StringFormatLocale(_ any, format *String, args *Array[any]) *String { return StringFormat(format, args) }

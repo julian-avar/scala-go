@@ -187,8 +187,8 @@ class PrintStream(
   def printf(fmt: String, args: Array[Object]): PrintStream =
     format(fmt, args)
 
-  // Not implemented:
-  // def printf(l: java.util.Locale, fmt: String, args: Array[Object]): PrintStream = ???
+  def printf(l: java.util.Locale, fmt: String, args: Array[Object]): PrintStream =
+    format(l, fmt, args)
 
   // scala-go: String.format instead of java.util.Formatter.
   def format(fmt: String, args: Array[Object]): PrintStream = synchronized {
@@ -196,8 +196,9 @@ class PrintStream(
     this
   }
 
-  // Not implemented:
-  // def format(l: java.util.Locale, fmt: String, args: Array[Object]): PrintStream = ???
+  // scala-go has no locale data: every locale formats as Locale.ROOT.
+  def format(l: java.util.Locale, fmt: String, args: Array[Object]): PrintStream =
+    format(fmt, args)
 
   def append(csq: CharSequence): PrintStream = {
     print(if (csq == null) "null" else csq.toString)

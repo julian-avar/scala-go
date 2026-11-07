@@ -178,12 +178,14 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
           else error(tree, s"static method $cls.$m is not available")
         scanAll(args)
 
-      case SelectStatic(cls, field, _) =>
+      case sel @ SelectStatic(cls, field, _) =>
         if Natives.staticField(cls, field).isEmpty then
           if program.get(cls).exists(_.fields.exists(f => f.isStatic && f.name == field)) then
             usedStaticFields += ((cls, field))
             initializeStatics(cls)
-          else error(tree, s"static field $cls.$field is not available")
+          else program.staticFieldViaCompanion(sel) match
+            case Some(read) => scan(read)
+            case None       => error(tree, s"static field $cls.$field is not available")
 
       case Unsupported(msg, _) =>
         error(tree, msg)

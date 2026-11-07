@@ -1,0 +1,13 @@
+1 two words continued é default
+from defaults 0
+[|und||] [en_US|en-US|en|US] [en|en|en|] [en_GB|en-GB|en|GB] [fr_CA|fr-CA|fr|CA] [_DE|und-DE||DE]
+true
+mixed MIXED
+7-x-1.01
+a, b, null, d|x|
+java.lang.IllegalStateException: outer
+true
+	at Main$.main(Main.scala) 	at Main.main(Main.scala)
+true
+true
+true

@@ -125,6 +125,20 @@ final class Program(irClasses: Seq[ClassDef]):
   def findMethod(cls: ClassName, m: MethodName): Option[MethodDef] =
     get(cls).flatMap(_.methods.find(_.name == m))
 
+  /** A read of static field `cls.field` (of type `tpe`) that `cls` does not have, as a call of the
+   *  getter of the same name on its companion object, if that object has one. javalib's classes
+   *  are Scala, where Java's static constants are usually members of the companion object
+   *  (`Collections.EMPTY_LIST`), while code compiled against the JDK reads static fields.
+   */
+  def staticFieldViaCompanion(sel: Tree.SelectStatic): Option[Tree] =
+    val Tree.SelectStatic(cls, field, tpe) = sel
+    val module = cls + "$"
+    val getter = MethodName(field, Nil, tpe)
+    val hasStatic = get(cls).exists(_.fields.exists(f => f.isStatic && f.name == field))
+    Option.when(!hasStatic && get(module).exists(_.kind == ClassKind.ModuleClass) && findMethod(module, getter).exists(!_.isStatic)) {
+      Tree.Apply(Tree.LoadModule(module)(sel.pos), module, getter, Nil, tpe)(sel.pos)
+    }
+
   /** The static initializer of `cls`, if it has one. */
   def clinit(cls: ClassName): Option[MethodDef] =
     get(cls).flatMap(_.methods.find(m => m.isStatic && m.name.simple == "<clinit>"))

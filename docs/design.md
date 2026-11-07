@@ -74,6 +74,10 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
      They also implement the `scalago.runtime` objects through which javalib reaches the Go
      runtime (`Threads`, `Locks`, `Regexes`, `Console`, `OS`, `Process`): Scala objects whose
      methods throw on the JVM and become Go calls when linked.
+   - **Static constants of javalib objects.** Java's static fields (`Collections.EMPTY_LIST`,
+     `Attributes.Name.MAIN_CLASS`) are usually members of the companion object in javalib's
+     Scala. A read of a static field that a class does not have becomes a call of the companion
+     object's getter of the same name and type (`Program.staticFieldViaCompanion`).
    - **Go interop** (`GoInterop.scala`, `GoApi.scala`): uses of Go facades become Go code (see
      [Go interop](#go-interop)).
 6. **Runtime** (`runtime/rt`). Go support code, bundled into the linker jar and copied into
@@ -365,8 +369,7 @@ Not like the JDK: the console streams' print methods do not take the stream's mo
 thread holding `System.out`'s lock does not keep other threads from printing; `FileTime`s have
 millisecond precision; file attributes given at creation are ignored; `Files.lines`, `list`,
 `walk` and `BufferedReader.lines` (java.util.stream), channels, buffers, watch services,
-`System.getProperties` (`Properties`), `Scanner`, `Locale`-taking `printf`s and other charsets are
-not implemented.
+`System.getProperties`, `Scanner` and other charsets are not implemented.
 
 ## Exports and library builds
 
@@ -563,9 +566,13 @@ Known gaps:
   cannot run (lookaround, backreferences, possessive quantifiers), `String.format` beyond the
   common conversions, `java.time`, and the parts of I/O listed in [I/O](#io).
 - `java.util`: streams (`stream()` and the `java.util.stream` package), the reversed views of
-  sequenced maps (`LinkedHashMap.reversed()`, `sequencedKeySet()`, ...), `Formatter`, `Locale`,
-  `Properties`, `Date`/`Calendar`/`Timer`, `EnumSet`/`EnumMap`, `WeakHashMap`, `ServiceLoader`,
-  `Arrays.compare`/`mismatch` and the range forms of `Arrays.equals`, `String.CASE_INSENSITIVE_ORDER`.
+  sequenced maps (`LinkedHashMap.reversed()`, `sequencedKeySet()`, ...), `Formatter`,
+  `Date`/`Calendar`/`Timer`, `EnumSet`/`EnumMap`, `WeakHashMap`, `ServiceLoader`,
+  `Arrays.compare`/`mismatch` and the range forms of `Arrays.equals`, `String.CASE_INSENSITIVE_ORDER`,
+  `String.join(delimiter, Iterable)`, and `Properties` keys continued over several lines.
+- Locales: there is no locale data. `java.util.Locale` carries identifiers only, and every
+  locale formats and maps case as `Locale.ROOT` does (so `String.format(Locale.GERMANY, "%.1f",
+  x)` uses a `.`).
   Arrays of references do not know their element type, so `toArray(new Array[String](0))` and
   `Arrays.copyOf` return arrays whose `getClass` is `Object[]`.
 - Reflection: `getClass` and `Class` names work; nothing else.

@@ -317,3 +317,11 @@ func IsNull(x any) bool {
 	}
 	return false
 }
+
+// CheckNotNull throws NullPointerException if x is null (the receiver of a native method that
+// does not otherwise use it).
+func CheckNotNull(x any) {
+	if IsNull(x) {
+		ThrowKind(NullPointer, "")
+	}
+}

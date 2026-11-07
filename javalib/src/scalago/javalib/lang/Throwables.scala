@@ -93,7 +93,14 @@ class Throwable protected (
    *  causes, in the JVM's format: frames in common with the enclosing trace are elided
    *  (`... n more`), and a cycle is printed as `[CIRCULAR REFERENCE: ...]`.
    */
-  def printStackTrace(s: java.io.PrintStream): Unit =
+  def printStackTrace(s: java.io.PrintStream): Unit = s.print(stackTraceText())
+
+  def printStackTrace(s: java.io.PrintWriter): Unit = s.print(stackTraceText())
+
+  /** What printStackTrace prints, built first so that it is written in one call (and not
+   *  interleaved with other output).
+   */
+  private def stackTraceText(): String =
     val sb = new java.lang.StringBuilder()
     val seen = new Throwable.IdentitySet
     seen.add(this)
@@ -104,8 +111,7 @@ class Throwable protected (
       sb.append("\tat ").append(trace(i)).append('\n')
       i += 1
     printEnclosed(sb, trace, seen, "")
-    // One write, so that the trace is not interleaved with other output.
-    s.print(sb.toString())
+    sb.toString()
 
   /** Appends the suppressed exceptions and the cause of a Throwable whose trace is `trace`. */
   private def printEnclosed(sb: java.lang.StringBuilder, trace: Array[StackTraceElement], seen: Throwable.IdentitySet,

@@ -442,12 +442,15 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     case Select(qual, cls, field, _) =>
       load(s"${fieldAccess(qual, genExpr(qual), cls)}.${Mangling.field(field)}", cls, field)
 
-    case SelectStatic(cls, field, _) =>
+    case sel @ SelectStatic(cls, field, _) =>
       Natives.staticField(cls, field) match
         case Some(native) => native
         case None =>
-          initStatics(cls)
-          load(Mangling.staticField(cls, field), cls, field)
+          program.staticFieldViaCompanion(sel) match
+            case Some(read) => genExpr(read)
+            case None =>
+              initStatics(cls)
+              load(Mangling.staticField(cls, field), cls, field)
 
     case CompareAndSet(field, expected, update) =>
       volatileRef(tree, field) match
@@ -464,7 +467,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
 
     case New(cls, ctor, args) =>
       Natives.lookup(cls, ctor) match
-        case Some(native) => genNative(native, None, args, ctor.params)
+        case Some(native) => genNative(native, None, args, ctor)
         case None         => s"${Mangling.newInstance(cls, ctor)}(${genExprs(args, ctor.params).mkString(", ")})"
 
     case tree: Apply           => genApply(tree)
@@ -472,7 +475,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
 
     case ApplyStatic(cls, m, args, _) =>
       Natives.lookup(cls, m) match
-        case Some(native) => genNative(native, None, args, m.params)
+        case Some(native) => genNative(native, None, args, m)
         case None =>
           val as = genExprs(args, m.params)
           initStatics(cls)
@@ -585,12 +588,17 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   // Calls
   // ---------------------------------------------------------------------------------------------
 
-  private def genNative(native: Natives.Native, receiver: Option[Tree], args: List[Tree], params: List[Type]): String =
+  private def genNative(native: Natives.Native, receiver: Option[Tree], args: List[Tree], m: MethodName): String =
     native match
-      case Natives.Native.Static(gen) => gen(genExprs(args, params))
+      case Natives.Native.Static(gen) => gen(genExprs(args, m.params))
       case Natives.Native.Instance(gen) =>
-        val r :: as = genExprs(receiver.toList ++ args, receiver.map(_.tpe).toList ++ params): @unchecked
+        val r :: as = genExprs(receiver.toList ++ args, receiver.map(_.tpe).toList ++ m.params): @unchecked
         gen(r, as)
+      case Natives.Native.NullResult =>
+        val values = genExprs(receiver.toList ++ args, receiver.map(_.tpe).toList ++ m.params)
+        receiver.foreach(_ => emit(s"rt.CheckNotNull(${values.head})"))
+        values.drop(receiver.size).filterNot(isSimple).foreach(v => emit(s"_ = $v"))
+        zeroValue(m.result)
 
   private def genApply(tree: Apply): String =
     val Apply(receiver, declaringClass, m, args, _) = tree
@@ -605,13 +613,13 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       case Some((facade, member)) => return genFacadeUse(tree, facade, member)
       case None                   => ()
     Natives.lookup(declaringClass, m) match
-      case Some(native) => genNative(native, Some(receiver), args, m.params)
+      case Some(native) => genNative(native, Some(receiver), args, m)
       case None if isVirtual =>
         val r :: as = genExprs(receiver :: args, receiver.tpe :: m.params): @unchecked
         s"$r.${Mangling.virtualMethod(m)}(${as.mkString(", ")})"
       case None =>
         Natives.objectMethod(m).orElse(hijackedNative) match
-          case Some(native) => genNative(native, Some(receiver), args, m.params)
+          case Some(native) => genNative(native, Some(receiver), args, m)
           case None =>
             val r :: as = genExprs(receiver :: args, receiver.tpe :: m.params): @unchecked
             s"${ctx.dispatcher(m)}(${(r :: as).mkString(", ")})"
@@ -639,7 +647,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     val ApplyStatically(receiver, cls, m, args, _) = tree
     if Natives.isNoOpConstructor(cls, m) || program.isFacade(cls) then ""
     else Natives.lookup(cls, m) match
-      case Some(native) => genNative(native, Some(receiver), args, m.params)
+      case Some(native) => genNative(native, Some(receiver), args, m)
       case None =>
         program.resolveImplementation(cls, m) match
           case Some(implClass) =>
