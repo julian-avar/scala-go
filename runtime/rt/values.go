@@ -21,7 +21,7 @@ func ToString(x any) *String {
 	case uint16:
 		return StringValueOfChar(v)
 	case scalaToString:
-		return ToString(v.M_toString_p_rLjava_dlang_dString_e())
+		return ToString(v.M_toString_p_rT())
 	}
 	return Str(ToGoString(x))
 }
@@ -63,7 +63,7 @@ func ToGoString(x any) string {
 	case *BigDecimal:
 		return v.String()
 	case scalaToString:
-		return ToGoString(v.M_toString_p_rLjava_dlang_dString_e())
+		return ToGoString(v.M_toString_p_rT())
 	}
 	if r, ok := x.(nilRef); ok && r.isNilRef() { // a null array or class
 		return "null"
@@ -127,7 +127,7 @@ func ObjectEquals(a, b any) bool {
 	case *BigDecimal:
 		return BigDecimalEquals(v, b)
 	case scalaEquals:
-		return v.M_equals_pLjava_dlang_dObject_e_rZ(b)
+		return v.M_equals_pO_rZ(b)
 	case float32:
 		w, ok := b.(float32)
 		return ok && math.Float32bits(v) == math.Float32bits(w)

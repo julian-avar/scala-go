@@ -16,10 +16,10 @@ package rt
 // linker's name mangling (scalago.linker.Mangling).
 type (
 	scalaToString interface {
-		M_toString_p_rLjava_dlang_dString_e() *String
+		M_toString_p_rT() *String
 	}
 	scalaEquals interface {
-		M_equals_pLjava_dlang_dObject_e_rZ(that any) bool
+		M_equals_pO_rZ(that any) bool
 	}
 	scalaHashCode interface {
 		M_hashCode_p_rI() int32

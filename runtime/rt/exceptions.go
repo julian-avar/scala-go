@@ -59,7 +59,7 @@ type fallbackException struct {
 
 func (e *fallbackException) ScalaClassName() string { return kindNames[e.kind] }
 
-func (e *fallbackException) M_toString_p_rLjava_dlang_dString_e() *String {
+func (e *fallbackException) M_toString_p_rT() *String {
 	if e.message == "" {
 		return Str(kindNames[e.kind])
 	}
