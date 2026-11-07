@@ -37,7 +37,8 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
    plugin and `-P:scala-go:rename` emits replacements under the library's own names, and its IR
    comes first on the link classpath (`scalago-gears` does this for one gears class).
 4. **javalib** (`javalib/`). JDK classes written in Scala: exceptions, `StringBuilder`,
-   `System.out`, `java.util` (collections, `Arrays`, `Collections`, `Optional`, `Random`, `UUID`,
+   `System`, `java.io`, `java.nio.file` and `java.nio.charset` (see [I/O](#io)), `java.util`
+   (collections, `Arrays`, `Collections`, `Optional`, `Random`, `UUID`,
    `java.util.function`, ...), `MathContext` and `RoundingMode`, references, and so on. It also replaces the
    few Java-written classes of the Scala library (`*Ref`, `LazyVals`, `JProcedureN`,
    `ScalaNumber`), and `Enumeration`, which uses reflection (see below). Packages other than `java.lang` are compiled under their own names
@@ -52,7 +53,7 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
    must not be on a compile or run classpath. When a class appears more than once on the link
    classpath, the first occurrence wins, so javalib must come before the stdlib IR.
 
-   Much of `java.util` is adapted from Scala Native's javalib (Apache-2.0,
+   Much of `java.util` and of `java.io` is adapted from Scala Native's javalib (Apache-2.0,
    `javalib/LICENSE-scala-native.md`; each such file says so), changed where programs can
    observe a difference from the JDK: `HashMap` lays out its table as the JDK does (capacities,
    growth, order within buckets), so iteration orders match (except in buckets of more than 8
@@ -70,6 +71,9 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
      reachable classes and methods are emitted. Errors carry a "called from" chain.
    - **Natives** (`Natives.scala`): Go implementations of JDK methods (`String`, boxes, `Math`,
      `System`, `Character`, `BigInteger`, `BigDecimal`, `Arrays`, ...). They take precedence over IR.
+     They also implement the `scalago.runtime` objects through which javalib reaches the Go
+     runtime (`Threads`, `Locks`, `Regexes`, `Console`, `OS`, `Process`): Scala objects whose
+     methods throw on the JVM and become Go calls when linked.
    - **Go interop** (`GoInterop.scala`, `GoApi.scala`): uses of Go facades become Go code (see
      [Go interop](#go-interop)).
 6. **Runtime** (`runtime/rt`). Go support code, bundled into the linker jar and copied into
@@ -283,6 +287,48 @@ interface types, variadic callbacks, Go funcs with more than 3 parameters return
 Scala implementations of Go methods with several non-error results. Go code may call Scala code from any
 goroutine (see [Concurrency](#concurrency-and-the-memory-model)).
 
+## I/O
+
+java.io, java.nio.file and java.nio.charset are Scala code in javalib over a small native layer
+on Go's `os` package (`scalago.runtime.OS`, `rt/files.go`). The Java semantics (which exception,
+which message) are in Scala; the layer is byte-oriented and knows nothing of Java's classes:
+
+- **Handles**: `open(path, mode)` (read, write, append, create, create-new, truncate) gives an
+  `*os.File` held as an `Object`; `read`, `write`, `seek`, `size`, `available`, `truncate`, `sync`
+  and `close` work on it. Read and write errors throw `IOException` with the C library's message.
+- **Paths**: `stat`, `access`, `mkdir`, `remove`, `rename`, `readDir`, `createTemp`, `chmod`,
+  `setModified`, `symlink`, `readLink`, `realPath`. They return their result or a Go error;
+  `errorKind` classifies it (no such file, exists, not empty, access denied, not a directory, is
+  a directory, loop) and `errorReason` gives the C library's text ("No such file or directory").
+  javalib builds the JDK's exceptions from them: `FileNotFoundException("<path> (<reason>)")` in
+  java.io, `NoSuchFileException`, `FileAlreadyExistsException`, `DirectoryNotEmptyException`,
+  `AccessDeniedException` or `FileSystemException` in java.nio.file.
+
+The stream, reader and writer classes are adapted from Scala Native's javalib. Charsets are
+UTF-8 (the default), ISO-8859-1 and US-ASCII. Without java.nio buffers, `CharsetDecoder` and
+`CharsetEncoder` have the JDK's configuration (error actions, replacement) but code on arrays,
+through package-private methods that `InputStreamReader`, `OutputStreamWriter` and `Files` use;
+malformed UTF-8 is replaced or reported in the JDK's units (each maximal prefix of a valid
+sequence), also by `new String(bytes, ...)`. Paths are Unix paths (`/`), normalized as by the JDK.
+
+**Standard streams.** `System.out` and `System.err` are `PrintStream`s whose print methods hand
+the value to the runtime (`Console.write`), which transcodes it straight into a 32 KB stdout
+buffer (stderr is unbuffered): one call and one lock per `print` or `println`, so lines from
+different threads never interleave. Standard output is flushed at exit, before writing to
+stderr, before reading stdin, and around calls into Go code; unlike the JDK's autoflushing
+`System.out`, not after each line. `System.in` is a `BufferedInputStream` over `os.Stdin`.
+`System.setOut/setErr/setIn` replace the streams. `Predef.println` goes through the Scala
+library's `Console`, so `Console.withOut` works: it needs `InheritableThreadLocal`, and javalib
+replaces `scala.util.DynamicVariable` with a version that skips the thread-local lookup until a
+variable is first set, so `Console.out` costs one atomic load while nothing is redirected.
+
+Not like the JDK: the console streams' print methods do not take the stream's monitor, so a
+thread holding `System.out`'s lock does not keep other threads from printing; `FileTime`s have
+millisecond precision; file attributes given at creation are ignored; `Files.lines`, `list`,
+`walk` and `BufferedReader.lines` (java.util.stream), channels, buffers, watch services,
+`System.getProperties` (`Properties`), `Scanner`, `Locale`-taking `printf`s and other charsets are
+not implemented.
+
 ## Exports and library builds
 
 Go code calls Scala code through **exports**, in the style of Scala.js's `@JSExportTopLevel`:
@@ -464,13 +510,19 @@ Supported and covered by end-to-end tests:
 - `java.math.BigDecimal` (the whole API, with `MathContext` and `RoundingMode`) and
   `scala.math.BigDecimal`, with its rounding modes and ranges
 - `scala.Enumeration`: names, `values`, `withName`, `ValueSet`s, ordering, `Val` subclasses
+- I/O: java.io's streams, readers and writers (buffered, data, pushback, print, string and
+  array ones), charsets (UTF-8, ISO-8859-1, US-ASCII, with the JDK's malformed-input handling),
+  files through `java.io.File`, file streams, `RandomAccessFile` and `java.nio.file`
+  (`Files`, `Path`, `walkFileTree`, the JDK's exceptions and messages), standard input
+  (`StdIn`, `System.in`, end of input), `Console.withOut`, `System.setOut`, `scala.io.Source`,
+  `scala.util.Using`, system properties, environment, exit statuses and shutdown hooks
 - concurrency: threads, `synchronized`, `wait`/`notify`, volatile fields, atomics, interrupts,
   and concurrent first use of modules and lazy vals (also under Go's race detector)
 
 Known gaps:
 - Regular expressions that RE2
   cannot run (lookaround, backreferences, possessive quantifiers), `String.format` beyond the
-  common conversions, `java.time`, and I/O beyond stdout/stderr.
+  common conversions, `java.time`, and the parts of I/O listed in [I/O](#io).
 - `java.util`: streams (`stream()` and the `java.util.stream` package), the reversed views of
   sequenced maps (`LinkedHashMap.reversed()`, `sequencedKeySet()`, ...), `Formatter`, `Locale`,
   `Properties`, `Date`/`Calendar`/`Timer`, `EnumSet`/`EnumMap`, `WeakHashMap`, `ServiceLoader`,
@@ -480,7 +532,7 @@ Known gaps:
 - Reflection: `getClass` and `Class` names work; nothing else.
 - `BigInteger` and `BigDecimal` cannot be subclassed (they are Go values).
 - Concurrency: `java.util.concurrent` beyond what gears needs (executors, concurrent maps,
-  `CompletableFuture`), `ThreadLocal`, thread groups. `scala.concurrent.Future` needs an
+  `CompletableFuture`), thread groups. `scala.concurrent.Future` needs an
   `ExecutionContext` on `java.util.concurrent`; gears is the supported API.
 - Stack traces: exceptions carry none. `SCALAGO_TRACE=1` prints the Go stack where a Go runtime
   error (a nil dereference, ...) becomes a Java exception.
@@ -541,9 +593,8 @@ earlier has to be redone:
 7. **Library coverage** and **publishing**, in parallel with the steps above. Done so far:
    regular expressions on Go's `regexp` (`java.util.regex`, Scala's `Regex`), the
    `java.util.concurrent` subset gears needs, `java.util` (collections and utilities), Scala
-   library dependencies compiled from TASTy, and `BigDecimal`. Still to do: `java.util.stream`,
-   `java.time`, I/O, stack traces,
-   and publishing (organization `io.github.scalago` is a placeholder).
+   library dependencies compiled from TASTy, `BigDecimal`, and I/O (files, streams, charsets,
+   stdin). Still to do: `java.util.stream`, `java.time`, stack traces, and publishing (organization `io.github.scalago` is a placeholder).
 
 ## Open questions
 
