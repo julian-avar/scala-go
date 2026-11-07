@@ -160,7 +160,7 @@ final class StringBuilder private (private var chars: Array[Char], private var c
   def lastIndexOf(str: String): Int = toString().lastIndexOf(str)
   def lastIndexOf(str: String, fromIndex: Int): Int = toString().lastIndexOf(str, fromIndex)
 
-  def getChars(srcBegin: Int, srcEnd: Int, dst: Array[Char], dstBegin: Int): Unit =
+  override def getChars(srcBegin: Int, srcEnd: Int, dst: Array[Char], dstBegin: Int): Unit =
     if srcBegin < 0 || srcEnd > count || srcBegin > srcEnd then
       throw new java.lang.StringIndexOutOfBoundsException("start " + srcBegin + ", end " + srcEnd + ", length " + count)
     java.lang.System.arraycopy(chars, srcBegin, dst, dstBegin, srcEnd - srcBegin)
@@ -168,16 +168,43 @@ final class StringBuilder private (private var chars: Array[Char], private var c
   def compareTo(another: StringBuilder): Int = toString().compareTo(another.toString())
 
 /** StringBuffer is StringBuilder without the (here meaningless) synchronization. */
-final class StringBuffer(private val builder: StringBuilder) extends Object with CharSequence with java.io.Serializable:
+final class StringBuffer(private val builder: StringBuilder)
+    extends Object
+    with CharSequence
+    with Appendable
+    with java.io.Serializable:
   def this() = this(new StringBuilder())
+  def this(capacity: Int) = this(new StringBuilder(capacity))
   def this(str: String) = this(new StringBuilder(str))
+  def this(seq: CharSequence) = this(new StringBuilder(seq))
   def length(): Int = builder.length()
+  def capacity(): Int = builder.capacity()
   def charAt(index: Int): Char = builder.charAt(index)
+  def setCharAt(index: Int, ch: Char): Unit = builder.setCharAt(index, ch)
+  def setLength(newLength: Int): Unit = builder.setLength(newLength)
   def subSequence(start: Int, end: Int): CharSequence = builder.subSequence(start, end)
+  def substring(start: Int): String = builder.substring(start)
+  def substring(start: Int, end: Int): String = builder.substring(start, end)
+  def indexOf(str: String): Int = builder.indexOf(str)
+  def lastIndexOf(str: String): Int = builder.lastIndexOf(str)
   def append(s: String): StringBuffer = { builder.append(s); this }
   def append(s: CharSequence): StringBuffer = { builder.append(s); this }
   def append(s: CharSequence, start: Int, end: Int): StringBuffer = { builder.append(s, start, end); this }
+  def append(str: Array[Char]): StringBuffer = { builder.append(str); this }
+  def append(str: Array[Char], offset: Int, len: Int): StringBuffer = { builder.append(str, offset, len); this }
   def append(obj: Object): StringBuffer = { builder.append(obj); this }
+  def append(sb: StringBuffer): StringBuffer = { builder.append(sb); this }
+  def append(b: scala.Boolean): StringBuffer = { builder.append(b); this }
   def append(c: Char): StringBuffer = { builder.append(c); this }
   def append(i: Int): StringBuffer = { builder.append(i); this }
+  def append(l: scala.Long): StringBuffer = { builder.append(l); this }
+  def append(f: scala.Float): StringBuffer = { builder.append(f); this }
+  def append(d: scala.Double): StringBuffer = { builder.append(d); this }
+  def insert(offset: Int, str: String): StringBuffer = { builder.insert(offset, str); this }
+  def delete(start: Int, end: Int): StringBuffer = { builder.delete(start, end); this }
+  def deleteCharAt(index: Int): StringBuffer = { builder.deleteCharAt(index); this }
+  def replace(start: Int, end: Int, str: String): StringBuffer = { builder.replace(start, end, str); this }
+  def reverse(): StringBuffer = { builder.reverse(); this }
+  override def getChars(srcBegin: Int, srcEnd: Int, dst: Array[Char], dstBegin: Int): Unit =
+    builder.getChars(srcBegin, srcEnd, dst, dstBegin)
   override def toString(): String = builder.toString()

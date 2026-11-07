@@ -76,6 +76,9 @@ object javalib extends WithPlugin with Published {
     Seq("-feature", "-P:scala-go:rename:scalago.javalib:java", "-P:scala-go:rename:scalago.scalalib:scala") ++
       pluginOptions()
   }
+  // A javalib class takes precedence over the JDK's only when compiled in the same run: compiled
+  // alone, a source would see the JDK's class instead of javalib's (and miss javalib-only members).
+  def zincIncrementalCompilation = false
 
   /** scala.runtime.function.JProcedure0..22: Java interfaces in the Scala library. */
   def generatedSources = Task {

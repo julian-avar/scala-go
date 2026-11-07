@@ -207,11 +207,15 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     case TryFinally(block, finalizer, tpe) =>
       withValueDest(dest, tpe) { bodyDest =>
         val (exc, jumps) = runInTryClosure(block, bodyDest, dispatch = false)
+        // A finalizer that throws or returns replaces the block's outcome.
+        val abrupt = endsAbruptly(finalizer)
+        if abrupt then emit(s"_ = $exc")
         genTree(finalizer, Dest.Discard)
-        emit(s"if $exc != nil {")
-        emit(s"\tpanic(rt.Exc($exc))")
-        emit("}")
-        dispatchJumps(jumps)
+        if !abrupt then
+          emit(s"if $exc != nil {")
+          emit(s"\tpanic(rt.Exc($exc))")
+          emit("}")
+          dispatchJumps(jumps)
       }
 
     case _ =>
@@ -299,7 +303,9 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
         emit("panic(\"unreachable\")")
       else emit(s"return ${adapt(expr, tpe, method.name.result)}")
     case Dest.AssignTo(v, target) =>
-      if expr.nonEmpty then emit(s"$v = ${adapt(expr, tpe, target)}")
+      // A call of a method returning Nothing has no Go value: it never completes.
+      if expr.nonEmpty then
+        if isVoidLike(tpe) then emit(expr) else emit(s"$v = ${adapt(expr, tpe, target)}")
 
   private def genAssign(lhs: Tree, rhs: Tree): Unit = lhs match
     case VarRef(name, tpe) =>
