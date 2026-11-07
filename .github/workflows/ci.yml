@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The Go runtime on each supported architecture: amd64 and arm64 use the fast goroutine-id path
+  # (assembly), which its unit tests check, also under the race detector. Go 1.22 is the oldest
+  # version generated modules support.
+  runtime:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+        go: ['1.22', stable]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache-dependency-path: runtime/go.mod
+      - name: gofmt
+        working-directory: runtime
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - name: vet
+        working-directory: runtime
+        run: go vet ./...
+      - name: test
+        working-directory: runtime
+        run: go test -race ./...
+
+  # Compiles everything, runs the end-to-end tests (each program on the JVM and as Go, including
+  # go vet and race-detector builds) and the example through ScalaGoModule.
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache-dependency-path: runtime/go.mod
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/coursier
+            ~/Library/Caches/Coursier
+            ~/.cache/mill
+          key: ${{ runner.os }}-jvm-${{ hashFiles('build.mill', 'mill-build/**') }}
+          restore-keys: ${{ runner.os }}-jvm-
+      - name: compile
+        run: ./mill --ticker false __.compile
+      - name: end-to-end tests
+        run: ./mill --ticker false linker.test
+      - name: example
+        run: ./mill --ticker false example.goRun Ada Grace

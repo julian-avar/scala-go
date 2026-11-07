@@ -11,20 +11,16 @@ type Class struct {
 	name string
 }
 
-var (
-	classesMu sync.Mutex
-	classes   = map[string]*Class{}
-)
+// classes interns Class objects by name. Lookups are frequent (getClass, classOf in library
+// code) and nearly always hits, which sync.Map serves without locking.
+var classes sync.Map // string -> *Class
 
 func ClassOf(name string) *Class {
-	classesMu.Lock()
-	defer classesMu.Unlock()
-	c, ok := classes[name]
-	if !ok {
-		c = &Class{name: name}
-		classes[name] = c
+	if c, ok := classes.Load(name); ok {
+		return c.(*Class)
 	}
-	return c
+	c, _ := classes.LoadOrStore(name, &Class{name: name})
+	return c.(*Class)
 }
 
 var primitiveDescriptors = map[string]string{

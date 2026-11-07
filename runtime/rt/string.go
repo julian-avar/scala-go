@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"unicode"
 	"unicode/utf16"
+	"unicode/utf8"
+	"unsafe"
 )
 
 // String is java.lang.String: an immutable sequence of UTF-16 code units. A nil *String is null.
@@ -17,9 +19,24 @@ type String struct {
 	hash  atomic.Int32 // cached hashCode; 0 means not computed yet (as in the JDK)
 }
 
-// Str converts a Go (UTF-8) string, such as a literal in generated code.
-func Str(s string) *String {
-	return &String{chars: utf16.Encode([]rune(s))}
+// Str converts a Go (UTF-8) string, such as a literal in generated code. Invalid UTF-8 bytes
+// become U+FFFD.
+func Str(s string) *String { return &String{chars: encodeUTF16(s)} }
+
+// encodeUTF16 transcodes UTF-8 to UTF-16, with a fast path for the ASCII prefix. len(s) bounds
+// the result's length: each UTF-8 sequence is at least as long as its UTF-16 encoding.
+func encodeUTF16(s string) []uint16 {
+	chars := make([]uint16, 0, len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] >= utf8.RuneSelf {
+			for _, r := range s[i:] {
+				chars = utf16.AppendRune(chars, r)
+			}
+			return chars
+		}
+		chars = append(chars, uint16(s[i]))
+	}
+	return chars
 }
 
 // StrUTF16 builds a string from UTF-16 code units (used for literals Go cannot express, such as
@@ -31,7 +48,24 @@ func StrUTF16(chars ...uint16) *String {
 func newString(chars []uint16) *String { return &String{chars: chars} }
 
 // GoString converts to a Go string. Unpaired surrogates become U+FFFD.
-func (s *String) GoString() string { return string(utf16.Decode(s.chars)) }
+func (s *String) GoString() string { return decodeUTF16(s.chars) }
+
+// decodeUTF16 transcodes UTF-16 to UTF-8, with a fast path for the ASCII prefix.
+func decodeUTF16(chars []uint16) string {
+	buf := make([]byte, 0, len(chars))
+	for i := 0; i < len(chars); i++ {
+		c := chars[i]
+		if c >= utf8.RuneSelf {
+			for _, r := range utf16.Decode(chars[i:]) {
+				buf = utf8.AppendRune(buf, r)
+			}
+			break
+		}
+		buf = append(buf, byte(c))
+	}
+	// buf is not used after this, so the string can share its memory.
+	return unsafe.String(unsafe.SliceData(buf), len(buf))
+}
 
 // String implements fmt.Stringer.
 func (s *String) String() string { return s.GoString() }
@@ -312,7 +346,61 @@ func StringSplit(s *String, regex *String) *Array[any] { return StringSplitLimit
 // start yields no leading empty string, limit > 0 caps the number of parts, and limit == 0
 // drops trailing empty strings.
 func StringSplitLimit(s *String, regex *String, limit int32) *Array[any] {
+	if c, ok := literalSplitChar(regex.chars); ok {
+		return splitOnChar(s, c, limit)
+	}
 	return splitWith(compileRegex(regex.GoString()), s, limit)
+}
+
+// literalSplitChar reports whether regex matches exactly one char and nothing else, as the JDK's
+// fast path does: one char that is not a metacharacter, or a backslash and an ASCII char that
+// is neither a letter nor a digit.
+func literalSplitChar(regex []uint16) (uint16, bool) {
+	isASCIIAlnum := func(c uint16) bool { return c < 0x80 && (unicode.IsLetter(rune(c)) || unicode.IsDigit(rune(c))) }
+	switch {
+	case len(regex) == 1 && !strings.ContainsRune(".$|()[{^?*+\\", rune(regex[0])) && !utf16.IsSurrogate(rune(regex[0])):
+		return regex[0], true
+	case len(regex) == 2 && regex[0] == '\\' && regex[1] < 0x80 && !isASCIIAlnum(regex[1]):
+		return regex[1], true
+	}
+	return 0, false
+}
+
+// splitOnChar is split with a regex matching only c, on the UTF-16 chars (no transcoding). The
+// parts share the string's chars, and their headers are allocated together.
+func splitOnChar(s *String, c uint16, limit int32) *Array[any] {
+	chars := s.chars
+	n := 0 // number of parts
+	if len(chars) > 0 {
+		n = 1
+		for _, x := range chars {
+			if x == c && (limit <= 0 || int32(n) < limit) {
+				n++
+			}
+		}
+	}
+	if n <= 1 {
+		return &Array[any]{Data: []any{s}} // no match: the string itself, as in the JDK
+	}
+	strs := make([]String, n)
+	parts := make([]any, n)
+	start, k := 0, 0
+	for i, x := range chars {
+		if x == c && k < n-1 {
+			strs[k].chars = chars[start:i:i]
+			parts[k] = &strs[k]
+			start, k = i+1, k+1
+		}
+	}
+	strs[k].chars = chars[start:len(chars):len(chars)]
+	parts[k] = &strs[k]
+	if limit == 0 {
+		for n > 0 && len(strs[n-1].chars) == 0 {
+			n--
+		}
+		parts = parts[:n]
+	}
+	return &Array[any]{Data: parts}
 }
 
 func splitWith(re *regexp.Regexp, s *String, limit int32) *Array[any] {

@@ -335,9 +335,15 @@ generated code are goroutine-safe, with the JVM's guarantees where Scala code re
   work as on the JVM (with timeouts and interrupts). The plugin lowers `synchronized` to
   enter/exit around `try`/`finally`, so `return` and exceptions release the monitor. Scala
   objects carry their monitor in an `rt.ObjectHeader`, created on first use. Strings, boxes and
-  Go values use a global table, whose entries are never removed. Reentrancy needs the current
-  goroutine's id, which Go does not expose: the runtime parses it from `runtime.Stack`, which
-  costs about a microsecond per monitor operation.
+  Go values use a global table, whose entries are never removed. An uncontended
+  enter/exit pair costs about 55 ns.
+- **Goroutine ids.** Monitors, `Thread.currentThread` and interruptible channel operations need
+  the current goroutine's id, which Go does not expose. On amd64 and arm64 the runtime reads it
+  from the goroutine's runtime structure (`rt/goid.go`: a two-instruction assembly `getg`, and
+  the field's offset, found at startup by matching the ids that `runtime.Stack` reports for
+  several goroutines), which costs about 4 ns. If the offset is not found (a future Go version
+  laying the structure out differently, or another architecture), it falls back to parsing
+  `runtime.Stack` (about 3.5 µs); a runtime unit test fails in that case on amd64 and arm64.
 - **Volatile fields** (`@volatile`, and the state field of each `lazy val`) are `rt.Volatile[T]`:
   sequentially consistent, which is what the JMM requires of volatiles. javalib's
   `java.util.concurrent.atomic` classes (`AtomicInteger`, `AtomicLong`, `AtomicBoolean`,
