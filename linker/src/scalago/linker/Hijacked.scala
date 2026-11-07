@@ -3,7 +3,8 @@ package scalago.linker
 import scalago.ir.*
 
 /** JVM classes whose instances are represented by Go values rather than generated structs
- *  ("hijacked", as Scala.js calls them): strings, boxed primitives, BoxedUnit and Class.
+ *  ("hijacked", as Scala.js calls them): strings, boxed primitives, BoxedUnit, Class, BigInteger
+ *  and BigDecimal.
  *  Their methods are implemented natively (see [[Natives]]).
  */
 object Hijacked:
@@ -11,6 +12,7 @@ object Hijacked:
   val ClassClass = "java.lang.Class"
   val BoxedUnit = "scala.runtime.BoxedUnit"
   val BigInteger = "java.math.BigInteger"
+  val BigDecimal = "java.math.BigDecimal"
 
   /** Box class for each primitive type. */
   val boxClasses: Map[Type, ClassName] = Map(
@@ -45,7 +47,8 @@ object Hijacked:
       String     -> "*rt.String",
       ClassClass -> "*rt.Class",
       BoxedUnit  -> "*rt.BoxedUnit",
-      BigInteger -> "*rt.BigInteger"
+      BigInteger -> "*rt.BigInteger",
+      BigDecimal -> "*rt.BigDecimal"
     )
 
   /** Go type of references whose static type is a hijacked class with a single Go representation
@@ -54,7 +57,8 @@ object Hijacked:
   val staticGoType: Map[ClassName, String] = Map(
     String     -> "*rt.String",
     ClassClass -> "*rt.Class",
-    BigInteger -> "*rt.BigInteger"
+    BigInteger -> "*rt.BigInteger",
+    BigDecimal -> "*rt.BigDecimal"
   )
 
   def isHijacked(cls: ClassName): Boolean = instanceGoType.contains(cls)
@@ -75,7 +79,8 @@ object Hijacked:
       String     -> Set("java.lang.CharSequence", comparable, serializable, constable, constantDesc),
       ClassClass -> Set(serializable, "java.lang.reflect.Type", "java.lang.reflect.GenericDeclaration"),
       BoxedUnit  -> Set(serializable),
-      BigInteger -> Set(number, comparable, serializable)
+      BigInteger -> Set(number, comparable, serializable),
+      BigDecimal -> Set(number, comparable, serializable)
     )
 
   /** Classes some hijacked value is an instance of. References of these types are Go `any`. */

@@ -8,10 +8,11 @@ standard library (recompiled from its TASTy) and a Java standard library written
 See [docs/design.md](docs/design.md) for the architecture, object model, status and roadmap.
 
 **Status:** early, but real programs work. Classes, traits, objects, exceptions, pattern
-matching, lambdas, `lazy val` and the standard collections all run, and Scala code can call Go
+matching, lambdas, `lazy val`, the standard collections and `java.util` (collections, `Arrays`,
+`Collections`, `Optional`, `Random`, ...) all run, and Scala code can call Go
 packages, and Go code can call Scala libraries. Threads run on goroutines, with `synchronized`,
 `wait`/`notify`, volatiles and atomics, and gears runs on them. The generated code is safe to
-call from any goroutine. `BigDecimal`, `java.util.regex`, reflection and most of
+call from any goroutine. `BigDecimal` and `BigInt` match the JDK. `java.util.stream`, reflection and most of
 `java.util.concurrent` don't work yet.
 
 ## Using it with Mill
@@ -141,6 +142,7 @@ Methods annotated with `@throws` return a Go `error`. Other exceptions are panic
 | `gostd/`             | Generated facades of Go standard library packages (`scalago-gostd`)     |
 | `mill-build/src/`    | `ScalaGoModule`/`ScalaGoLibraryModule` and `TastyIR`, published as `mill-scalago` |
 | `example/`           | A program built with `ScalaGoModule`: `mill example.goRun Ada Grace`    |
+| `bench/`             | CPU benchmarks, run on the JVM (`mill bench.run`) and as Go (`mill bench.goRun`) |
 | `tests/cases/`       | End-to-end programs with their expected output                          |
 
 The `stdlib` module produces the Scala standard library's IR (`mill stdlib.ir`).
@@ -155,6 +157,7 @@ tests on amd64 and arm64 (Linux, macOS; oldest and newest Go) and everything bel
 mill linker.test                 # end-to-end tests (compile, run on JVM and as Go, compare)
 cd runtime && go test ./...      # runtime unit tests
 mill example.goRun               # the example, through ScalaGoModule
+mill bench.run 3; mill bench.goRun 3   # CPU benchmarks on the JVM and as Go
 ```
 
 Each directory in `tests/cases/` holds a program and an `expected.txt`. Cases with a

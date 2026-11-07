@@ -284,8 +284,10 @@ func BigIntegerToString(a *BigInteger, radix int32) *String {
 }
 
 // BigIntegerHashCode matches java.math.BigInteger.hashCode.
-func BigIntegerHashCode(a *BigInteger) int32 {
-	mag := new(big.Int).Abs(&a.v).Bytes()
+func BigIntegerHashCode(a *BigInteger) int32 { return bigIntHashCode(&a.v) }
+
+func bigIntHashCode(x *big.Int) int32 {
+	mag := new(big.Int).Abs(x).Bytes()
 	for len(mag)%4 != 0 {
 		mag = append([]byte{0}, mag...)
 	}
@@ -294,5 +296,5 @@ func BigIntegerHashCode(a *BigInteger) int32 {
 		word := uint32(mag[i])<<24 | uint32(mag[i+1])<<16 | uint32(mag[i+2])<<8 | uint32(mag[i+3])
 		h = 31*h + int32(word)
 	}
-	return h * int32(a.v.Sign())
+	return h * int32(x.Sign())
 }

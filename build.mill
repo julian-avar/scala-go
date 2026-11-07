@@ -71,13 +71,14 @@ object javalib extends WithPlugin with Published {
   // Packages other than java.lang are compiled under their own names (java.util, ...). The Scala
   // compiler does not allow redefining core java.lang classes, so those live in scalago.javalib.lang
   // (and the Scala library's overrides in scalago.scalalib); the plugin emits them as java.lang /
-  // scala.* in the IR.
+  // scala.* in the IR. Static methods of JDK classes are methods of Scala objects, called through
+  // static forwarders.
   def scalacOptions = Task {
-    Seq("-feature", "-P:scala-go:rename:scalago.javalib:java", "-P:scala-go:rename:scalago.scalalib:scala") ++
-      pluginOptions()
+    Seq("-feature", "-P:scala-go:rename:scalago.javalib:java", "-P:scala-go:rename:scalago.scalalib:scala",
+      "-P:scala-go:static-forwarders") ++ pluginOptions()
   }
-  // A javalib class takes precedence over the JDK's only when compiled in the same run: compiled
-  // alone, a source would see the JDK's class instead of javalib's (and miss javalib-only members).
+  // Always compile all sources together: when compiling only some, the others' classes from the
+  // previous run lose against the JDK's classes of the same names.
   def zincIncrementalCompilation = false
 
   /** scala.runtime.function.JProcedure0..22: Java interfaces in the Scala library. */
@@ -247,18 +248,26 @@ object millplugin extends ScalaModule with Published {
   def compileMvnDeps = Seq(mvn"com.lihaoyi::mill-libs:${Versions.mill}")
 }
 
-/** An example program built with ScalaGoModule, using this build's modules instead of published
- *  artifacts: `mill example.goRun [names...]`.
- */
-object example extends UserScalaGoModule {
+/** A ScalaGoModule that uses this build's modules instead of published artifacts. */
+trait InBuildScalaGoModule extends UserScalaGoModule {
   def scalaGoPlugin = plugin.jar()
   def scalaGoLinkerClasspath = linker.runClasspath()
   def scalaGoLibraryIR = Task { Seq(javalib.compile().classes, stdlib.ir()) }
   def scalaGoLibraryDeps = Task { Seq.empty[Dep] }
-  def moduleDeps = Seq(library, gears)
+  def moduleDeps: Seq[JavaModule] = Seq(library)
+}
+
+/** An example program built with ScalaGoModule: `mill example.goRun [names...]`. */
+object example extends InBuildScalaGoModule {
+  override def moduleDeps = Seq(library, gears)
   // gears comes as a plain Scala dependency: ScalaGoModule compiles it from TASTy.
   def mvnDeps = Seq(gears.gearsDep)
   def goLocalModules = Task.Sources(moduleDir / "go" / "textstats")
   // Facades generated from Go packages: a standard library package, and the local module.
   def goFacadePackages = Seq("strconv", "example.com/textstats")
 }
+
+/** CPU benchmarks of generated code against the JVM: `mill bench.run [rounds]` on the JVM,
+ *  `mill bench.goRun [rounds]` as Go. Later rounds show warmed-up JVM performance.
+ */
+object bench extends InBuildScalaGoModule

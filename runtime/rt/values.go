@@ -60,6 +60,8 @@ func ToGoString(x any) string {
 		return ClassToString(v).GoString()
 	case *BigInteger:
 		return v.String()
+	case *BigDecimal:
+		return v.String()
 	case scalaToString:
 		return ToGoString(v.M_toString_p_rLjava_dlang_dString_e())
 	}
@@ -103,7 +105,9 @@ func formatFloating(d float64, bits int) string {
 	s := strconv.FormatFloat(d, 'E', -1, bits) // e.g. "1.2345E+07"
 	mantissa, exponent, _ := strings.Cut(s, "E")
 	if !strings.Contains(mantissa, ".") {
-		mantissa += ".0"
+		// The shortest form has one digit: Java picks the closest decimal of one or two digits
+		// (4.9E-324 for Double.MIN_VALUE, where the shortest is 5E-324).
+		mantissa, exponent, _ = strings.Cut(strconv.FormatFloat(d, 'E', 1, bits), "E")
 	}
 	exp, _ := strconv.Atoi(exponent)
 	return mantissa + "E" + strconv.Itoa(exp)
@@ -120,6 +124,8 @@ func ObjectEquals(a, b any) bool {
 		return StringEquals(v, b)
 	case *BigInteger:
 		return BigIntegerEquals(v, b)
+	case *BigDecimal:
+		return BigDecimalEquals(v, b)
 	case scalaEquals:
 		return v.M_equals_pLjava_dlang_dObject_e_rZ(b)
 	case float32:
@@ -195,6 +201,8 @@ func HashCode(x any) int32 {
 		return StringHashCode(v)
 	case *BigInteger:
 		return BigIntegerHashCode(v)
+	case *BigDecimal:
+		return BigDecimalHashCode(v)
 	case bool:
 		if v {
 			return 1231
@@ -211,9 +219,9 @@ func HashCode(x any) int32 {
 	case int64:
 		return int32(v ^ int64(uint64(v)>>32))
 	case float32:
-		return int32(math.Float32bits(v))
+		return FloatToIntBits(v) // NaNs hash alike, as on the JVM
 	case float64:
-		b := math.Float64bits(v)
+		b := uint64(DoubleToLongBits(v))
 		return int32(b ^ (b >> 32))
 	case scalaHashCode:
 		return v.M_hashCode_p_rI()
@@ -280,9 +288,9 @@ func ObjectDefaultEquals(x any, other any) bool { return x == other }
 
 // ---- Null ---------------------------------------------------------------------------------
 
-// Scala references with a concrete Go pointer type (strings, arrays, BigIntegers, classes) are
-// nil pointers when null. Stored in an `any`, such a nil pointer would not be a nil `any`, so
-// conversions to `any` go through AnyRef, and null tests on `any` values through IsNull.
+// Scala references with a concrete Go pointer type (strings, arrays, BigIntegers, BigDecimals,
+// classes) are nil pointers when null. Stored in an `any`, such a nil pointer would not be a nil
+// `any`, so conversions to `any` go through AnyRef, and null tests on `any` values through IsNull.
 
 type nilRef interface{ isNilRef() bool }
 

@@ -378,6 +378,8 @@ object Natives:
     m("multiplyExact(II)I")(as => s"rt.IntMultiplyExact(${as(0)}, ${as(1)})")
     m("addExact(JJ)J")(as => s"rt.LongAddExact(${as(0)}, ${as(1)})")
     m("multiplyExact(JJ)J")(as => s"rt.LongMultiplyExact(${as(0)}, ${as(1)})")
+    m("clamp(JII)I")(as => s"rt.MathClamp(${as(0)}, ${as(1)}, ${as(2)})")
+    m("clamp(JJJ)J")(as => s"rt.MathClamp(${as(0)}, ${as(1)}, ${as(2)})")
 
   // ---- java.lang.System and reflection --------------------------------------------------------
 
@@ -435,34 +437,163 @@ object Natives:
   instance(BI, "toString()Ljava.lang.String;")((r, _) => s"rt.BigIntegerToString($r, 10)")
   instanceFn(BI, "toString(I)Ljava.lang.String;", "rt.BigIntegerToString")
 
+  // ---- java.math.BigDecimal (rt/bigdecimal.go) ------------------------------------------------
+
+  private val BD = Hijacked.BigDecimal
+  private val BDT = "Ljava.math.BigDecimal;"
+  private val MCT = "Ljava.math.MathContext;"
+  private val RMT = "Ljava.math.RoundingMode;"
+
+  /** javalib's MathContext packs its settings for natives: `precision << 3 | roundingMode.ordinal`. */
+  private val MathContextBits = MethodName("goBits", Nil, Type.Long)
+  private val EnumOrdinal = MethodName("ordinal", Nil, Type.Int)
+
+  /** Go expression calling a javalib method of a native's argument (throwing NPE for null). */
+  private def callOn(arg: String, m: MethodName, goResult: String): String =
+    val name = Mangling.virtualMethod(m)
+    s"rt.RequireNonNull(any($arg), nil).(interface{ $name() $goResult }).$name()"
+
+  private def mcBits(mc: String) = callOn(mc, MathContextBits, "int64")
+  private def ordinal(mode: String) = callOn(mode, EnumOrdinal, "int32")
+
+  /** Registers a native whose last parameter is a MathContext (passed to Go as its packed bits). */
+  private def withMC(desc: String, gen: (Option[String], List[String]) => String, instanceMethod: Boolean): Unit =
+    def go(r: Option[String], as: List[String]) = gen(r, as.init :+ mcBits(as.last))
+    if instanceMethod then instance(BD, desc)((r, as) => go(Some(r), as)) else static(BD, desc)(as => go(None, as))
+    calls(BD, desc, MathContextBits)
+
+  private def bdInstanceMC(desc: String, goFn: String): Unit =
+    withMC(desc, (r, as) => s"$goFn(${(r.toList ++ as).mkString(", ")})", instanceMethod = true)
+
+  for (field, go) <- List("ZERO" -> "rt.BigDecimalZero", "ONE" -> "rt.BigDecimalOne", "TWO" -> "rt.BigDecimalTwo",
+      "TEN" -> "rt.BigDecimalTen", "ROUND_UP" -> "rt.RoundUp", "ROUND_DOWN" -> "rt.RoundDown",
+      "ROUND_CEILING" -> "rt.RoundCeiling", "ROUND_FLOOR" -> "rt.RoundFloor", "ROUND_HALF_UP" -> "rt.RoundHalfUp",
+      "ROUND_HALF_DOWN" -> "rt.RoundHalfDown", "ROUND_HALF_EVEN" -> "rt.RoundHalfEven",
+      "ROUND_UNNECESSARY" -> "rt.RoundUnnecessary")
+  do staticFields((BD, field)) = go
+
+  // Constructors and factories.
+  for (params, fn) <- List("Ljava.lang.String;" -> "FromString", "[C" -> "FromChars", "[CII" -> "FromCharRange",
+      "D" -> "FromDouble", BIT -> "FromBigInteger", s"${BIT}I" -> "FromUnscaled", "J" -> "FromLong")
+  do
+    staticFn(BD, s"<init>($params)V", s"rt.NewBigDecimal$fn")
+    withMC(s"<init>($params$MCT)V", (_, as) => s"rt.NewBigDecimal${fn}MC(${as.mkString(", ")})", instanceMethod = false)
+  static(BD, "<init>(I)V")(as => s"rt.NewBigDecimalFromLong(int64(${as.head}))")
+  withMC(s"<init>(I$MCT)V", (_, as) => s"rt.NewBigDecimalFromLongMC(int64(${as(0)}), ${as(1)})", instanceMethod = false)
+  staticFn(BD, s"valueOf(JI)$BDT", "rt.BigDecimalValueOf")
+  static(BD, s"valueOf(J)$BDT")(as => s"rt.BigDecimalValueOf(${as.head}, 0)")
+  staticFn(BD, s"valueOf(D)$BDT", "rt.BigDecimalValueOfDouble")
+
+  // Arithmetic.
+  for (name, fn) <- List("add" -> "Add", "subtract" -> "Subtract", "multiply" -> "Multiply", "divide" -> "Divide",
+      "divideToIntegralValue" -> "DivideToIntegralValue", "remainder" -> "Remainder", "min" -> "Min", "max" -> "Max")
+  do
+    instanceFn(BD, s"$name($BDT)$BDT", s"rt.BigDecimal$fn")
+    if name != "min" && name != "max" then bdInstanceMC(s"$name($BDT$MCT)$BDT", s"rt.BigDecimal${fn}MC")
+  instanceFn(BD, s"divideAndRemainder($BDT)[$BDT", "rt.BigDecimalDivideAndRemainder")
+  bdInstanceMC(s"divideAndRemainder($BDT$MCT)[$BDT", "rt.BigDecimalDivideAndRemainderMC")
+  instance(BD, s"divide(${BDT}I$RMT)$BDT")((r, as) => s"rt.BigDecimalDivideToScale($r, ${as(0)}, ${as(1)}, ${ordinal(as(2))})")
+  instance(BD, s"divide(${BDT}II)$BDT")((r, as) =>
+    s"rt.BigDecimalDivideToScale($r, ${as(0)}, ${as(1)}, rt.BigDecimalLegacyRoundingMode(${as(2)}))")
+  instance(BD, s"divide($BDT$RMT)$BDT")((r, as) => s"rt.BigDecimalDivideRounding($r, ${as(0)}, ${ordinal(as(1))})")
+  instance(BD, s"divide(${BDT}I)$BDT")((r, as) =>
+    s"rt.BigDecimalDivideRounding($r, ${as(0)}, rt.BigDecimalLegacyRoundingMode(${as(1)}))")
+  for desc <- List(s"divide(${BDT}I$RMT)$BDT", s"divide($BDT$RMT)$BDT") do calls(BD, desc, EnumOrdinal)
+  instanceFn(BD, s"pow(I)$BDT", "rt.BigDecimalPow")
+  bdInstanceMC(s"pow(I$MCT)$BDT", "rt.BigDecimalPowMC")
+  bdInstanceMC(s"sqrt($MCT)$BDT", "rt.BigDecimalSqrt")
+  for (name, fn) <- List("abs" -> "Abs", "negate" -> "Negate") do
+    instanceFn(BD, s"$name()$BDT", s"rt.BigDecimal$fn")
+    bdInstanceMC(s"$name($MCT)$BDT", s"rt.BigDecimal${fn}MC")
+  instance(BD, s"plus()$BDT")((r, _) => r)
+  for name <- List("plus", "round") do bdInstanceMC(s"$name($MCT)$BDT", "rt.BigDecimalRound")
+
+  // Scale and representation.
+  instance(BD, s"setScale(I$RMT)$BDT")((r, as) => s"rt.BigDecimalSetScale($r, ${as(0)}, ${ordinal(as(1))})")
+  calls(BD, s"setScale(I$RMT)$BDT", EnumOrdinal)
+  instance(BD, s"setScale(II)$BDT")((r, as) =>
+    s"rt.BigDecimalSetScale($r, ${as(0)}, rt.BigDecimalLegacyRoundingMode(${as(1)}))")
+  instance(BD, s"setScale(I)$BDT")((r, as) => s"rt.BigDecimalSetScale($r, ${as(0)}, rt.RoundUnnecessary)")
+  for (name, fn) <- List("movePointLeft" -> "MovePointLeft", "movePointRight" -> "MovePointRight",
+      "scaleByPowerOfTen" -> "ScaleByPowerOfTen")
+  do instanceFn(BD, s"$name(I)$BDT", s"rt.BigDecimal$fn")
+  for (name, fn) <- List("stripTrailingZeros" -> "StripTrailingZeros", "ulp" -> "Ulp") do
+    instanceFn(BD, s"$name()$BDT", s"rt.BigDecimal$fn")
+  for (name, fn) <- List("signum" -> "Signum", "scale" -> "Scale", "precision" -> "Precision",
+      "hashCode" -> "HashCode", "intValue" -> "IntValue", "intValueExact" -> "IntValueExact")
+  do instanceFn(BD, s"$name()I", s"rt.BigDecimal$fn")
+  instanceFn(BD, s"unscaledValue()$BIT", "rt.BigDecimalUnscaledValue")
+
+  // Comparison and conversions.
+  instanceFn(BD, s"compareTo($BDT)I", "rt.BigDecimalCompareTo")
+  instanceFn(BD, "compareTo(Ljava.lang.Object;)I", "rt.BigDecimalCompareToObject")
+  instanceFn(BD, "equals(Ljava.lang.Object;)Z", "rt.BigDecimalEquals")
+  for (name, fn) <- List("toString" -> "ToString", "toEngineeringString" -> "ToEngineeringString",
+      "toPlainString" -> "ToPlainString")
+  do instanceFn(BD, s"$name()Ljava.lang.String;", s"rt.BigDecimal$fn")
+  instanceFn(BD, s"toBigInteger()$BIT", "rt.BigDecimalToBigInteger")
+  instanceFn(BD, s"toBigIntegerExact()$BIT", "rt.BigDecimalToBigIntegerExact")
+  instanceFn(BD, "longValue()J", "rt.BigDecimalLongValue")
+  instanceFn(BD, "longValueExact()J", "rt.BigDecimalLongValueExact")
+  instanceFn(BD, "shortValueExact()S", "rt.BigDecimalShortValueExact")
+  instanceFn(BD, "byteValueExact()B", "rt.BigDecimalByteValueExact")
+  instance(BD, "byteValue()B")((r, _) => s"int8(rt.BigDecimalIntValue($r))")
+  instance(BD, "shortValue()S")((r, _) => s"int16(rt.BigDecimalIntValue($r))")
+  instanceFn(BD, "doubleValue()D", "rt.BigDecimalDoubleValue")
+  instanceFn(BD, "floatValue()F", "rt.BigDecimalFloatValue")
+
   // ---- java.util ------------------------------------------------------------------------------
 
+  // javalib implements these classes as Scala objects (javalib/src/java/util): the natives replace
+  // both the static methods that programs call and the module's methods that javalib calls.
+  private def utilStatic(cls: ClassName, desc: String)(gen: List[String] => String): Unit =
+    static(cls, desc)(gen)
+    static(cls + "$", desc)(gen)
+
+  private def utilStaticFn(cls: ClassName, desc: String, goFn: String): Unit =
+    utilStatic(cls, desc)(as => s"$goFn(${as.mkString(", ")})")
+
+  // Generic Go functions over the primitive arrays (and copying, filling, comparing and hashing of
+  // object arrays); javalib's Arrays has the rest.
   private val Arrays = "java.util.Arrays"
   for elem <- List("Z", "C", "B", "S", "I", "J", "F", "D", "Ljava.lang.Object;") do
     val arr = s"[$elem"
-    staticFn(Arrays, s"copyOf($arr" + "I)" + arr, "rt.ArraysCopyOf")
-    if elem.startsWith("L") then
-      static(Arrays, s"copyOf(${arr}ILjava.lang.Class;)$arr")(as => s"rt.ArraysCopyOf(${as(0)}, ${as(1)})")
-    staticFn(Arrays, s"copyOfRange($arr" + "II)" + arr, "rt.ArraysCopyOfRange")
+    val isObject = elem.startsWith("L")
+    utilStaticFn(Arrays, s"copyOf($arr" + "I)" + arr, "rt.ArraysCopyOf")
+    utilStaticFn(Arrays, s"copyOfRange($arr" + "II)" + arr, "rt.ArraysCopyOfRange")
+    if isObject then
+      utilStatic(Arrays, s"copyOf(${arr}ILjava.lang.Class;)$arr")(as => s"rt.ArraysCopyOf(${as(0)}, ${as(1)})")
+      utilStatic(Arrays, s"copyOfRange(${arr}IILjava.lang.Class;)$arr")(as =>
+        s"rt.ArraysCopyOfRange(${as(0)}, ${as(1)}, ${as(2)})")
     // Object arrays: pass the value as `any`, or Go infers the element type from it.
-    val value = (v: String) => if elem.startsWith("L") then s"any($v)" else v
-    static(Arrays, s"fill($arr$elem)V")(as => s"rt.ArraysFill(${as(0)}, ${value(as(1))})")
-    static(Arrays, s"fill(${arr}II$elem)V")(as => s"rt.ArraysFillRange(${as(0)}, ${as(1)}, ${as(2)}, ${value(as(3))})")
-    staticFn(Arrays, s"hashCode($arr)I", "rt.ArraysHashCode")
-    staticFn(Arrays, s"equals($arr$arr)Z", if elem.startsWith("L") then "rt.ArraysEqualsObjects" else "rt.ArraysEquals")
-    if elem != "Z" && !elem.startsWith("L") then
-      static(Arrays, s"sort($arr)V")(as => s"rt.ArraysSort(${as.head}, 0, int32(len(${as.head}.Data)))")
-      staticFn(Arrays, s"sort(${arr}II)V", "rt.ArraysSort")
+    val value = (v: String) => if isObject then s"any($v)" else v
+    utilStatic(Arrays, s"fill($arr$elem)V")(as => s"rt.ArraysFill(${as(0)}, ${value(as(1))})")
+    utilStatic(Arrays, s"fill(${arr}II$elem)V")(as =>
+      s"rt.ArraysFillRange(${as(0)}, ${as(1)}, ${as(2)}, ${value(as(3))})")
+    utilStaticFn(Arrays, s"hashCode($arr)I", "rt.ArraysHashCode")
+    utilStaticFn(Arrays, s"equals($arr$arr)Z", if isObject then "rt.ArraysEqualsObjects" else "rt.ArraysEquals")
+    if !isObject then utilStaticFn(Arrays, s"toString($arr)Ljava.lang.String;", "rt.ArraysToString")
+    if elem != "Z" && !isObject then
+      utilStatic(Arrays, s"sort($arr)V")(as => s"rt.ArraysSort(${as.head}, 0, int32(len(${as.head}.Data)))")
+      utilStaticFn(Arrays, s"sort(${arr}II)V", "rt.ArraysSort")
+      utilStatic(Arrays, s"binarySearch($arr$elem)I")(as =>
+        s"rt.ArraysBinarySearch(${as(0)}, 0, int32(len(${as(0)}.Data)), ${as(1)})")
+      utilStaticFn(Arrays, s"binarySearch(${arr}II$elem)I", "rt.ArraysBinarySearch")
 
   private val Objects = "java.util.Objects"
-  staticFn(Objects, "equals(Ljava.lang.Object;Ljava.lang.Object;)Z", "rt.ObjectsEquals")
-  staticFn(Objects, "hashCode(Ljava.lang.Object;)I", "rt.ObjectsHashCode")
-  staticFn(Objects, "hash([Ljava.lang.Object;)I", "rt.ArraysHashCode")
-  staticFn(Objects, "toString(Ljava.lang.Object;)Ljava.lang.String;", "rt.ToString")
-  static(Objects, "isNull(Ljava.lang.Object;)Z")(as => s"(${as.head} == nil)")
-  static(Objects, "nonNull(Ljava.lang.Object;)Z")(as => s"(${as.head} != nil)")
-  static(Objects, "requireNonNull(Ljava.lang.Object;)Ljava.lang.Object;")(as => s"rt.RequireNonNull(${as.head}, nil)")
-  staticFn(Objects, "requireNonNull(Ljava.lang.Object;Ljava.lang.String;)Ljava.lang.Object;", "rt.RequireNonNull")
+  utilStaticFn(Objects, "equals(Ljava.lang.Object;Ljava.lang.Object;)Z", "rt.ObjectsEquals")
+  utilStaticFn(Objects, "hashCode(Ljava.lang.Object;)I", "rt.ObjectsHashCode")
+  utilStaticFn(Objects, "hash([Ljava.lang.Object;)I", "rt.ArraysHashCode")
+  utilStaticFn(Objects, "toString(Ljava.lang.Object;)Ljava.lang.String;", "rt.ToString")
+  utilStaticFn(Objects, "isNull(Ljava.lang.Object;)Z", "rt.IsNull")
+  utilStatic(Objects, "nonNull(Ljava.lang.Object;)Z")(as => s"!rt.IsNull(${as.head})")
+  utilStatic(Objects, "requireNonNull(Ljava.lang.Object;)Ljava.lang.Object;")(as => s"rt.RequireNonNull(${as.head}, nil)")
+  utilStaticFn(Objects, "requireNonNull(Ljava.lang.Object;Ljava.lang.String;)Ljava.lang.Object;", "rt.RequireNonNull")
+
+  // java.util.UUID's native side (javalib/src/scalago/runtime/Crypto.scala).
+  private val Crypto = "scalago.runtime.Crypto$"
+  staticFn(Crypto, "secureRandomBytes(I)[B", "rt.SecureRandomBytes")
+  staticFn(Crypto, "md5([B)[B", "rt.MD5")
 
   // ---- Scala library --------------------------------------------------------------------------
 

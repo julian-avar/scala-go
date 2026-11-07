@@ -1,0 +1,348 @@
+-- parsing
+0 -> 0 (unscaled 0, scale 0, precision 1)
+-0 -> 0 (unscaled 0, scale 0, precision 1)
++0.00 -> 0.00 (unscaled 0, scale 2, precision 1)
+123.4500 -> 123.4500 (unscaled 1234500, scale 4, precision 7)
+-1.5e3 -> -1.5E+3 (unscaled -15, scale -2, precision 2)
+1E+400 -> 1E+400 (unscaled 1, scale -400, precision 1)
+0.0000001 -> 1E-7 (unscaled 1, scale 7, precision 1)
+-.5 -> -0.5 (unscaled -5, scale 1, precision 1)
+5. -> 5 (unscaled 5, scale 0, precision 1)
+1e-2147483647 -> 1E-2147483647 (unscaled 1, scale 2147483647, precision 1)
+12345678901234567890.123456789 -> 12345678901234567890.123456789 (unscaled 12345678901234567890123456789, scale 9, precision 29)
+-9223372036854775808 -> -9223372036854775808 (unscaled -9223372036854775808, scale 0, precision 19)
+9223372036854775808 -> 9223372036854775808 (unscaled 9223372036854775808, scale 0, precision 19)
+0E-10 -> 0E-10 (unscaled 0, scale 10, precision 1)
+0e+3 -> 0E+3 (unscaled 0, scale -3, precision 1)
+١٢٣.٤ -> 123.4 (unscaled 1234, scale 1, precision 4)
+1E2147483648 -> 1E+2147483648 (unscaled 1, scale -2147483648, precision 1)
+parse []: java.lang.NumberFormatException: null
+parse [abc]: java.lang.NumberFormatException: Character a is neither a decimal digit number, decimal point, nor "e" notation exponential mark.
+parse [1e]: java.lang.NumberFormatException: null
+parse [1e+]: java.lang.NumberFormatException: null
+parse [+]: java.lang.NumberFormatException: No digits found.
+parse [-]: java.lang.NumberFormatException: No digits found.
+parse [.]: java.lang.NumberFormatException: No digits found.
+parse [1.2.3]: java.lang.NumberFormatException: Character array contains more than one decimal point.
+parse [1e2147483649]: java.lang.NumberFormatException: Exponent overflow.
+parse [0.1e-2147483647]: java.lang.NumberFormatException: Exponent overflow.
+parse [1_0]: java.lang.NumberFormatException: Character _ is neither a decimal digit number, decimal point, nor "e" notation exponential mark.
+parse [ 1]: java.lang.NumberFormatException: Character   is neither a decimal digit number, decimal point, nor "e" notation exponential mark.
+parse [--1]: java.lang.NumberFormatException: Character - is neither a decimal digit number, decimal point, nor "e" notation exponential mark.
+parse [1e+-2]: java.lang.NumberFormatException: Not a digit.
+parse [e5]: java.lang.NumberFormatException: No digits found.
+parse [1e999999999999]: java.lang.NumberFormatException: Too many nonzero exponent digits.
+parse [123456789012345678x]: java.lang.NumberFormatException: Character array is missing "e" notation exponential mark.
+parse [NaN]: java.lang.NumberFormatException: Character N is neither a decimal digit number, decimal point, nor "e" notation exponential mark.
+chars: 123.5
+chars mc: 1.2E+2
+chars bad range: java.lang.NumberFormatException: Bad offset or len arguments for char[] input.
+string mc: 123.4
+string mc overflow: java.lang.NumberFormatException: Exponent overflow.
+0.1000000000000000055511151231257827021181583404541015625
+-2.5
+100000000000000000000
+751
+0.1000000000000000
+0.1
+1.0E+20
+0.0
+12345.6789
+-5E+3
+42 -7 9.223372E+18
+12345678901234567890.1234567890
+-9.9E+7
+NaN: java.lang.NumberFormatException: Infinite or NaN
+0 1 2 10
+-- toString, toEngineeringString, toPlainString
+0: 0 | 0 | 0
+0.00: 0.00 | 0.00 | 0.00
+0E+3: 0E+3 | 0E+3 | 0
+0E-7: 0E-7 | 0.0E-6 | 0.0000000
+0E-8: 0E-8 | 0.00E-6 | 0.00000000
+0E+1: 0E+1 | 0.00E+3 | 0
+0E+2: 0E+2 | 0.0E+3 | 0
+1: 1 | 1 | 1
+-1.5: -1.5 | -1.5 | -1.5
+123.456: 123.456 | 123.456 | 123.456
+0.000001: 0.000001 | 0.000001 | 0.000001
+0.0000001: 1E-7 | 100E-9 | 0.0000001
+-0.00000012: -1.2E-7 | -120E-9 | -0.00000012
+1E+3: 1E+3 | 1E+3 | 1000
+12E+3: 1.2E+4 | 12E+3 | 12000
+123E+3: 1.23E+5 | 123E+3 | 123000
+1234E+3: 1.234E+6 | 1.234E+6 | 1234000
+1.2E-9: 1.2E-9 | 1.2E-9 | 0.0000000012
+12E-10: 1.2E-9 | 1.2E-9 | 0.0000000012
+1E+4: 1E+4 | 10E+3 | 10000
+-5E-7: -5E-7 | -500E-9 | -0.0000005
+1E+2147483647: 1E+2147483647 | 10E+2147483646 | (long)
+1E-2147483647: 1E-2147483647 | 100E-2147483649 | (long)
+4.2E+2147483648: 4.2E+2147483648 | 420E+2147483646 | (long)
+-123456789.987654321E-30: -1.23456789987654321E-22 | -123.456789987654321E-24 | -0.000000000000000000000123456789987654321
+-- setScale with every rounding mode
+UP: 6 3 2 2 1 -1 -2 -2 -3 -6 1 -1 3 3
+DOWN: 5 2 1 1 1 -1 -1 -1 -2 -5 0 0 2 2
+CEILING: 6 3 2 2 1 -1 -1 -1 -2 -5 1 0 3 3
+FLOOR: 5 2 1 1 1 -1 -2 -2 -3 -6 0 -1 2 2
+HALF_UP: 6 3 2 1 1 -1 -1 -2 -3 -6 0 0 3 3
+HALF_DOWN: 5 2 2 1 1 -1 -1 -2 -2 -5 0 0 2 3
+HALF_EVEN: 6 2 2 1 1 -1 -1 -2 -2 -6 0 0 2 3
+UNNECESSARY: !Rounding necessary !Rounding necessary !Rounding necessary !Rounding necessary 1 -1 !Rounding necessary !Rounding necessary !Rounding necessary !Rounding necessary !Rounding necessary !Rounding necessary !Rounding necessary !Rounding necessary
+123.45600
+1.2E+2
+123.4
+100.00
+0.00
+setScale unnecessary: java.lang.ArithmeticException: Rounding necessary
+setScale invalid mode: java.lang.IllegalArgumentException: Invalid rounding mode
+-- round
+1: 1E+1 -1E+2
+2: 10 -1.2E+2
+3: 10.0 -123
+4: 9.995 -123.4
+5: 9.9951 -123.45
+1.00E+3
+123
+round unnecessary: java.lang.ArithmeticException: Rounding necessary
+1.2
+-- add, subtract, multiply
+1.10, 2.205: 3.305 -1.105 2.42550
+-0.1, 0.1: 0.0 -0.2 -0.01
+1E+3, 1E-3: 1000.001 999.999 1
+9223372036854775807, 1: 9223372036854775808 9223372036854775806 9223372036854775807
+-9223372036854775808, -1: -9223372036854775809 -9223372036854775807 9223372036854775808
+123456789012345678901234567890, 0.000000001: 123456789012345678901234567890.000000001 123456789012345678901234567889.999999999 123456789012345678901.234567890
+0E+5, 0.00: 0.00 0.00 0E+3
+5, -5.000: 0.000 10.000 -25.000
+1.10, 2.205 (mc 5): 3.305 -1.105 2.4255
+-0.1, 0.1 (mc 5): 0.0 -0.2 -0.01
+1E+3, 1E-3 (mc 5): 1000.0 1000.0 1
+9223372036854775807, 1 (mc 5): 9.2234E+18 9.2234E+18 9.2234E+18
+-9223372036854775808, -1 (mc 5): -9.2234E+18 -9.2234E+18 9.2234E+18
+123456789012345678901234567890, 0.000000001 (mc 5): 1.2346E+29 1.2346E+29 1.2346E+20
+0E+5, 0.00 (mc 5): 0.00 0.00 0E+3
+5, -5.000 (mc 5): 0.000 10.000 -25.000
+1.00E+10
+1.00
+1.23E+4
+999.9
+1000
+scale overflow: java.lang.ArithmeticException: Underflow
+scale underflow: java.lang.ArithmeticException: Overflow
+2147483647
+-- negate, abs, plus, signum, ulp, unscaledValue, movePoint, scaleByPowerOfTen, strip
+0: 0 0 0 0 1 0 0.00 0 0 0E+3 0
+-1.50: 1.50 1.50 -1.50 -1 0.01 -150 -0.0150 -150 -1.50 -1.50E+3 -1.5
+1.50: -1.50 1.50 1.50 1 0.01 150 0.0150 150 1.50 1.50E+3 1.5
+-9223372036854775808: 9223372036854775808 9223372036854775808 -9223372036854775808 -1 1 -9223372036854775808 -92233720368547758.08 -922337203685477580800 -9223372036854775808 -9.223372036854775808E+21 -9223372036854775808
+1E+3: -1E+3 1E+3 1E+3 1 1E+3 1 10 100000 1000 1E+6 1E+3
+0.000: 0.000 0.000 0.000 0 0.001 0 0.00000 0.0 0.000 0 0
+1.2E+2 123.5 1E+2
+-- divide
+1 / 8 = 0.125
+10 / 4 = 2.5
+1.00 / 4 = 0.25
+100 / 4 = 25
+6 / 2 = 3
+1E+1 / 1 = 1E+1
+1 / 32 = 0.03125
+-7 / 0.125 = -56
+12345678901234567890 / 0.0005 = 2.469135780246913578E+22
+0 / 7 = 0
+0.000 / 0.5 = 0.00
+1 / 3: java.lang.ArithmeticException: Non-terminating decimal expansion; no exact representable decimal result.
+1 / 0: java.lang.ArithmeticException: Division by zero
+0 / 0: java.lang.ArithmeticException: Division undefined
+10 / 6: java.lang.ArithmeticException: Non-terminating decimal expansion; no exact representable decimal result.
+1 / 3: 0.3333333 0.34 0.3333333333333333333333333333333333
+2 / 3: 0.6666667 0.67 0.6666666666666666666666666666666667
+-2 / 3: -0.6666667 -0.67 -0.6666666666666666666666666666666667
+1000 / 1: 1000 1.0E+3 1000
+1 / 7: 0.1428571 0.15 0.1428571428571428571428571428571429
+22 / 7: 3.142857 3.2 3.142857142857142857142857142857143
+1E+5 / 3E-5: 3.333333E+9 3.4E+9 3333333333.333333333333333333333333
+0.00 / 3: 0.00 0.00 0.00
+9.99 / 1: 9.99 10 9.99
+2 / 2: 1 1 1
+1 / 1E+6: 0.000001 0.000001 0.000001
+UP: 4 -4 3 -3 1
+DOWN: 3 -3 2 -2 0
+CEILING: 4 -3 3 -2 1
+FLOOR: 3 -4 2 -3 0
+HALF_UP: 4 -4 3 -3 1
+HALF_DOWN: 3 -3 2 -2 0
+HALF_EVEN: 4 -4 2 -2 0
+UNNECESSARY: !Rounding necessary !Rounding necessary !Rounding necessary !Rounding necessary !Rounding necessary
+3.33333 1E+1 3.33 2
+1 / 0 (scale): java.lang.ArithmeticException: / by zero
+1 / 0 (mc): java.lang.ArithmeticException: Division by zero
+0 / 0 (scale): java.lang.ArithmeticException: / by zero
+0 / 0 (mc): java.lang.ArithmeticException: Division undefined
+1 / 0E-30 (scale): java.lang.ArithmeticException: BigInteger divide by zero
+1 / 0E-30 (mc): java.lang.ArithmeticException: Division by zero
+1000000000000000000000000000000 / 0 (scale): java.lang.ArithmeticException: BigInteger divide by zero
+1000000000000000000000000000000 / 0 (mc): java.lang.ArithmeticException: Division by zero
+invalid rounding mode: java.lang.IllegalArgumentException: Invalid rounding mode
+-- divideToIntegralValue, remainder, divideAndRemainder
+7, 2: 3 1 [3, 1] 3 1
+-7, 2: -3 -1 [-3, -1] -3 -1
+7.5, 2: 3.0 1.5 [3.0, 1.5] 3.0 1.5
+1E+3, 3: 333 1 [333, 1] 333 1
+12345, 0.1: 1.2345E+5 0 [1.2345E+5, 0] 1.2345E+5 0
+1, 3: 0 1 [0, 1] 0 1
+0.5, 0.2: 2 0.1 [2, 0.1] 2 0.1
+-10.75, 0.5: -21.0 -0.25 [-21.0, -0.25] -21.0 -0.25
+100, 1E+1: 10.0 0 [10.0, 0] 10.0 0
+division impossible: java.lang.ArithmeticException: Division impossible
+remainder by zero: java.lang.ArithmeticException: Division by zero
+remainder zero by zero: java.lang.ArithmeticException: Division undefined
+-- pow, sqrt
+1.331 -9223372036854775808 1 0.0009765625 28679718602997181072337614380936720482949
+0.7513148 17.449 1 1.267650600228229E+30
+pow -1: java.lang.ArithmeticException: Invalid operation
+pow too big for mc: java.lang.ArithmeticException: Invalid operation
+sqrt(2, 7): 1.414214
+sqrt(2, 3): 1.42
+sqrt(4.00, 0): 2.0
+sqrt(0.0400, 7): 0.20
+sqrt(100, 7): 10
+sqrt(1E+2, 7): 1E+1
+sqrt(1E+3, 7): 31.62278
+sqrt(0E+3, 7): 0E+1
+sqrt(0E-3, 7): 0.0
+sqrt(1.21, 1): 1
+sqrt(1.2100, 5): 1.10
+sqrt(12100, 0): 110
+sqrt(1.44E+4, 5): 1.2E+2
+sqrt(2, 34): 1.414213562373095048801688724209698
+sqrt(0.000000000001, 16): 0.000001
+sqrt negative: java.lang.ArithmeticException: Attempted square root of negative BigDecimal
+sqrt inexact: java.lang.ArithmeticException: Computed square root not exact.
+sqrt unnecessary: java.lang.ArithmeticException: Computed square root not exact.
+-- conversions
+0: 0 0 0 0 0.0 0.0 0
+1.99: 1 1 1 1 1.99 1.99 1
+-1.99: -1 -1 -1 -1 -1.99 -1.99 -1
+123456789012.75: -1097262572 123456789012 6676 20 1.2345678901275E11 1.2345679E11 123456789012
+9223372036854775807: -1 9223372036854775807 -1 -1 9.223372036854776E18 9.223372E18 9223372036854775807
+9223372036854775808: 0 -9223372036854775808 0 0 9.223372036854776E18 9.223372E18 9223372036854775808
+-9223372036854775809: -1 9223372036854775807 -1 -1 -9.223372036854776E18 -9.223372E18 -9223372036854775809
+18446744073709551617.5: 1 1 1 1 1.8446744073709552E19 1.8446744E19 18446744073709551617
+1E+20: 1661992960 7766279631452241920 0 0 1.0E20 1.0E20 100000000000000000000
+1E+100: 0 0 0 0 1.0E100 Infinity 10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0.0001: 0 0 0 0 1.0E-4 1.0E-4 0
+2147483648: -2147483648 2147483648 0 0 2.147483648E9 2.1474836E9 2147483648
+-129: -129 -129 -129 127 -129.0 -129.0 -129
+exact 123: 123 123
+intValueExact 123: 123
+shortValueExact 123: 123
+byteValueExact 123: 123
+exact 1.5: java.lang.ArithmeticException: Rounding necessary
+intValueExact 1.5: java.lang.ArithmeticException: Rounding necessary
+shortValueExact 1.5: java.lang.ArithmeticException: Rounding necessary
+byteValueExact 1.5: java.lang.ArithmeticException: Rounding necessary
+exact 1E+19: java.lang.ArithmeticException: Overflow
+intValueExact 1E+19: java.lang.ArithmeticException: Overflow
+shortValueExact 1E+19: java.lang.ArithmeticException: Overflow
+byteValueExact 1E+19: java.lang.ArithmeticException: Overflow
+exact 0.5: java.lang.ArithmeticException: Rounding necessary
+intValueExact 0.5: java.lang.ArithmeticException: Rounding necessary
+shortValueExact 0.5: java.lang.ArithmeticException: Rounding necessary
+byteValueExact 0.5: java.lang.ArithmeticException: Rounding necessary
+exact 1E+10: 10000000000 10000000000
+intValueExact 1E+10: java.lang.ArithmeticException: Overflow
+shortValueExact 1E+10: java.lang.ArithmeticException: Overflow
+byteValueExact 1E+10: java.lang.ArithmeticException: Overflow
+exact -2147483648: -2147483648 -2147483648
+intValueExact -2147483648: -2147483648
+shortValueExact -2147483648: java.lang.ArithmeticException: Overflow
+byteValueExact -2147483648: java.lang.ArithmeticException: Overflow
+exact 200: 200 200
+intValueExact 200: 200
+shortValueExact 200: 200
+byteValueExact 200: java.lang.ArithmeticException: Overflow
+exact -128: -128 -128
+intValueExact -128: -128
+shortValueExact -128: -128
+byteValueExact -128: -128
+exact 1.000: 1 1
+intValueExact 1.000: 1
+shortValueExact 1.000: 1
+byteValueExact 1.000: 1
+exact 9223372036854775807.0: 9223372036854775807 9223372036854775807
+intValueExact 9223372036854775807.0: java.lang.ArithmeticException: Overflow
+shortValueExact 9223372036854775807.0: java.lang.ArithmeticException: Overflow
+byteValueExact 9223372036854775807.0: java.lang.ArithmeticException: Overflow
+0.1: 0.1 0.1
+1.00000017881393432617187499: 1.0000001788139343 1.0000001
+2.2250738585072011e-308: 2.225073858507201E-308 0.0
+1e-400: 0.0 0.0
+-1e400: -Infinity -Infinity
+123456789012345678901234567890: 1.2345678901234568E29 1.2345679E29
+9007199254740993: 9.007199254740992E15 9.007199E15
+4.9e-324: 4.9E-324 0.0
+1.7976931348623157e308: 1.7976931348623157E308 Infinity
+0.30000000000000001665: 0.3 0.3
+-- compareTo, equals, hashCode, min, max
+2.0: 0 0 0 1 1 1 -1 -1 -1 1 1 | 10000000000 | 621 | 2.0 2.0
+2.00: 0 0 0 1 1 1 -1 -1 -1 1 1 | 01000000000 | 6202 | 2.00 2.00
+2: 0 0 0 1 1 1 -1 -1 -1 1 1 | 00100000000 | 62 | 2 2
+-2: -1 -1 -1 0 -1 -1 -1 -1 -1 1 -1 | 00010000000 | -62 | -2 2
+0: -1 -1 -1 1 0 0 -1 -1 -1 1 -1 | 00001000000 | 0 | 0 2
+0.000: -1 -1 -1 1 0 0 -1 -1 -1 1 -1 | 00000100000 | 3 | 0.000 2
+1E+1: 1 1 1 1 1 1 0 0 -1 1 1 | 00000010000 | 30 | 2 1E+1
+10: 1 1 1 1 1 1 0 0 -1 1 1 | 00000001000 | 310 | 2 10
+9223372036854775808: 1 1 1 1 1 1 1 1 0 1 1 | 00000000100 | -2147483648 | 2 9223372036854775808
+-9223372036854775808: -1 -1 -1 -1 -1 -1 -1 -1 -1 0 -1 | 00000000010 | -2147483648 | -9223372036854775808 2
+1E-2147483647: -1 -1 -1 1 1 1 -1 -1 -1 1 0 | 00000000001 | -2147483618 | 1E-2147483647 2
+true
+false
+true
+false
+15.5
+List(-1.5, 2.25, 3)
+1
+java.math.BigDecimal
+-- MathContext, RoundingMode
+precision=7 roundingMode=HALF_EVEN | precision=16 roundingMode=HALF_EVEN | precision=34 roundingMode=HALF_EVEN | precision=0 roundingMode=HALF_UP
+precision=5 roundingMode=HALF_UP | precision=7 roundingMode=HALF_DOWN
+true
+negative precision: java.lang.IllegalArgumentException: Digits < 0
+bad string: java.lang.IllegalArgumentException: bad string format
+bad string 2: java.lang.IllegalArgumentException: bad string format
+UP DOWN CEILING FLOOR HALF_UP HALF_DOWN HALF_EVEN UNNECESSARY 6 CEILING
+valueOf(9): java.lang.IllegalArgumentException: argument out of range
+valueOf(FOO): java.lang.IllegalArgumentException: No enum constant java.math.RoundingMode.FOO
+true
+-- scala.math.BigDecimal
+3.305 -1.105 2.42550 0.4988662131519274376417233560090703 2.004545454545454545454545454545455 -1.10 1.10 1
+0.3333333333333333333333333333333333
+2E+7
+1
+(3.0,1.5)
+3.3
+true
+true
+true
+true
+true
+false
+12345678901234567890
+1329
+3 -3 3.7
+1267650600228229401496703205376
+0.3333333333333333
+0.1000000000000000055511151231257827
+0.1000000000000000055511151231257827021181583404541015625
+6 3 0.001
+123.5
+1.2E+2
+List(-1, 2.5, 10)
+11.5
+10
+true false true
+Infinity
+10.00
+59.97
+0.143

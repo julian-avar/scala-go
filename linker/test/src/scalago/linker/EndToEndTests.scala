@@ -103,7 +103,7 @@ class EndToEndTests extends munit.FunSuite:
       deleteRecursively(work)
     else if isLibrary then
       Linker.link(classpath, goDir, config)
-      assertEquals(run(Seq("go", "vet", "./..."), goDir), "", "go vet output (library)")
+      assertEquals(run(Seq("go", "vet", "./..."), goDir, goEnv), "", "go vet output (library)")
       val consumer = copyDirectory(dir.resolve("consumer"), work.resolve("consumer"))
       Files.writeString(consumer.resolve("go.mod"),
         s"\nrequire $LibraryModule v0.0.0\n\nreplace $LibraryModule => ${goDir.toAbsolutePath}\n",
@@ -153,15 +153,21 @@ class EndToEndTests extends munit.FunSuite:
     Option.when(Files.exists(file))(RaceCheck(
       Files.readAllLines(file, UTF_8).asScala.toSeq.collect { case s"allow-race: $function" => function.trim }))
 
+  /** Each case builds in a new temporary directory. Without `-trimpath` the directory is part of
+   *  every Go build cache key, so each run would add the whole generated package to the cache
+   *  again (tens of MB per case); with it, unchanged generated code is a cache hit.
+   */
+  private val goEnv = Map("GOFLAGS" -> "-trimpath")
+
   private val raceReport = raw"(?s)==================\nWARNING: DATA RACE\n.*?==================\n".r
 
   /** Vets, builds and runs the Go main package in `goDir`, checking its output. */
   private def runGo(goDir: Path, expected: String, race: Option[RaceCheck], io: ProgramIO): Unit =
-    assertEquals(run(Seq("go", "vet", "./..."), goDir), "", "go vet output")
-    assertEquals(run(Seq("go", "build", "-o", "app", "."), goDir), "", "go build output")
+    assertEquals(run(Seq("go", "vet", "./..."), goDir, goEnv), "", "go vet output")
+    assertEquals(run(Seq("go", "build", "-o", "app", "."), goDir, goEnv), "", "go build output")
     assertNoDiff(run(Seq(goDir.resolve("app").toString), goDir, io = io), expected, "Go output")
     for check <- race do
-      assertEquals(run(Seq("go", "build", "-race", "-o", "app-race", "."), goDir), "", "go build -race output")
+      assertEquals(run(Seq("go", "build", "-race", "-o", "app-race", "."), goDir, goEnv), "", "go build -race output")
       // Reports are checked here rather than through the exit status, so that allowed ones can be
       // told apart and dropped from the output.
       val output = run(Seq(goDir.resolve("app-race").toString), goDir, Map("GORACE" -> "exitcode=0"), io)
