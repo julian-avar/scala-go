@@ -16,6 +16,11 @@ abstract class Charset protected (canonicalName: String, aliasNames: Array[Strin
   def newDecoder(): CharsetDecoder
   def newEncoder(): CharsetEncoder
 
+  final def aliases(): java.util.Set[String] =
+    val set = new java.util.HashSet[String]()
+    for a <- aliasNames do set.add(a)
+    java.util.Collections.unmodifiableSet(set)
+
   private[charset] def matches(name: String): Boolean =
     canonicalName.equalsIgnoreCase(name) || aliasNames.exists(_.equalsIgnoreCase(name))
 
@@ -38,6 +43,12 @@ object Charset:
     cs
 
   @static def isSupported(charsetName: String): Boolean = lookup(charsetName) != null
+
+  @static def availableCharsets(): java.util.SortedMap[String, Charset] =
+    val byName: java.util.Comparator[String] = (a, b) => a.compareToIgnoreCase(b)
+    val map = new java.util.TreeMap[String, Charset](byName)
+    for cs <- List(StandardCharsets.ISO_8859_1, StandardCharsets.US_ASCII, StandardCharsets.UTF_8) do map.put(cs.name(), cs)
+    java.util.Collections.unmodifiableSortedMap(map)
 
   private def lookup(name: String): Charset =
     if name == null then throw new IllegalArgumentException("Null charset name")

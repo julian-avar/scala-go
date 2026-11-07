@@ -7,7 +7,7 @@ import java.io.{
   InputStream, InputStreamReader, OutputStream, OutputStreamWriter
 }
 import java.nio.charset.{Charset, CodingErrorAction, StandardCharsets}
-import java.nio.file.attribute.{BasicFileAttributes, FileAttribute, FileTime}
+import java.nio.file.attribute.{BasicFileAttributes, FileAttribute, FileTime, PosixFilePermission, PosixFilePermissions}
 
 import scalago.runtime.OS
 
@@ -66,6 +66,13 @@ object Files:
 
   @static def setLastModifiedTime(path: Path, time: FileTime): Path =
     check(OS.setModified(path.toString, time.toMillis()), path)
+    path
+
+  @static def getPosixFilePermissions(path: Path, options: Array[LinkOption]): java.util.Set[PosixFilePermission] =
+    PosixFilePermissions.fromBits(stat(path, !noFollow(options))(3).toInt)
+
+  @static def setPosixFilePermissions(path: Path, perms: java.util.Set[PosixFilePermission]): Path =
+    check(OS.chmod(path.toString, PosixFilePermissions.toBits(perms)), path)
     path
 
   @static def readAttributes[A <: BasicFileAttributes](path: Path, kind: Class[A], options: Array[LinkOption]): A =
@@ -280,6 +287,19 @@ object Files:
     new String(chars, 0, d.outPos)
 
   @static def readString(path: Path, cs: Charset): String = decode(readAllBytes(path), cs)
+
+  @static def readAllLines(path: Path, cs: Charset): java.util.List[String] =
+    val reader = newBufferedReader(path, cs)
+    try
+      val lines = new java.util.ArrayList[String]()
+      var line = reader.readLine()
+      while line != null do
+        lines.add(line)
+        line = reader.readLine()
+      lines
+    finally reader.close()
+
+  @static def readAllLines(path: Path): java.util.List[String] = readAllLines(path, StandardCharsets.UTF_8)
   @static def readString(path: Path): String = readString(path, StandardCharsets.UTF_8)
 
   @static def write(path: Path, bytes: Array[Byte], options: Array[OpenOption]): Path =
@@ -350,6 +370,12 @@ object Files:
 
   @static def walkFileTree(start: Path, visitor: FileVisitor[? >: Path]): Path =
     walk(start, Int.MaxValue, false, visitor.asInstanceOf[FileVisitor[Path]])
+    start
+
+  @static def walkFileTree(start: Path, options: java.util.Set[FileVisitOption], maxDepth: Int,
+      visitor: FileVisitor[? >: Path]): Path =
+    if maxDepth < 0 then throw new IllegalArgumentException("'maxDepth' is negative")
+    walk(start, maxDepth, options.contains(FileVisitOption.FOLLOW_LINKS), visitor.asInstanceOf[FileVisitor[Path]])
     start
 
   /** Depth-first, as the JDK's FileTreeWalker: CONTINUE, TERMINATE or SKIP_SIBLINGS. */

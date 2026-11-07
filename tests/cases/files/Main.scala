@@ -130,6 +130,12 @@ object Main:
     }
     Files.write(dir.resolve("lines.txt"), lines(Seq("alpha", "beta", "gamma")))
     println(Source.fromFile(dir.resolve("lines.txt").toFile).getLines().toList)
+    println(Files.readAllLines(dir.resolve("lines.txt")))
+    println(Files.readAllLines(text, StandardCharsets.UTF_8).size())
+    val perms = java.nio.file.attribute.PosixFilePermissions.fromString("rw-r-----")
+    Files.setPosixFilePermissions(dir.resolve("lines.txt"), perms)
+    println(java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(dir.resolve("lines.txt"))))
+    println(s"${perms.contains(java.nio.file.attribute.PosixFilePermission.GROUP_READ)} ${perms.size()}")
     Using.resource(Files.newBufferedWriter(dir.resolve("w.txt"), StandardCharsets.ISO_8859_1)) { w =>
       w.write("é")
       w.newLine()
@@ -185,6 +191,13 @@ object Main:
     println(error(Files.writeString(dir.resolve("bad.txt"), "€", StandardCharsets.US_ASCII)))
 
     section("walkFileTree")
+    var shallow = List.empty[String]
+    Files.walkFileTree(dir, java.util.Collections.emptySet[FileVisitOption](), 1, new SimpleFileVisitor[Path]:
+      override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult =
+        shallow ::= s"${dir.relativize(file)} ${attrs.isDirectory}"
+        FileVisitResult.CONTINUE
+    )
+    println(shallow.map(_.replaceAll("tmpdir[0-9]+", "tmpdir*")).sorted.mkString(", "))
     var visited = List.empty[String]
     Files.walkFileTree(dir, new SimpleFileVisitor[Path]:
       override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult =

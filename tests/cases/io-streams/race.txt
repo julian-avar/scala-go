@@ -1,0 +1,1 @@
+Threads print through the console, Console.withOut and thread locals: run under the race detector.

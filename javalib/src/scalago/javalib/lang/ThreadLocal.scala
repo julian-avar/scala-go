@@ -30,6 +30,11 @@ class ThreadLocal[T] extends Object:
     t.threadLocals
 
 object ThreadLocal:
+  @scala.annotation.static def withInitial[S](supplier: java.util.function.Supplier[? <: S]): ThreadLocal[S] =
+    if supplier == null then throw new java.lang.NullPointerException()
+    new ThreadLocal[S]:
+      override protected def initialValue(): S = supplier.get()
+
   private val HashIncrement = 0x61c88647 // as in the JDK: spreads consecutive hashes well
   private var lastHash = 0
 

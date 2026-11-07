@@ -46,6 +46,7 @@ US-ASCII: 14 bytes, 47 72 3f 3f 65 2c 20 3f -> Gr??e, ? and ?
   getBytes: 14 bytes, new String: Gr??e, ? and ?
 UTF-8 ISO-8859-1 UTF-8
 true false
+true true
 java.nio.charset.UnsupportedCharsetException: x-unknown
 UTF8
 replaced: 0061 fffd 0062 fffd 0063 fffd
@@ -76,6 +77,7 @@ Success(first)
 -- thread locals
 main: 5 / parent value; thread: 0 / parent value (child)
 after remove: 0
+initial
 -- system
 true
 List(\n, /, :)
@@ -86,6 +88,9 @@ null 1
 java.lang.IllegalArgumentException
 true
 null
+true
+true
+java.lang.UnsupportedOperationException
 true
 true
 java.lang.NullPointerException

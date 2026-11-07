@@ -28,6 +28,16 @@ object System:
 
   @static def lineSeparator(): String = separator
 
+  /** The environment, as an unmodifiable map (`getenv(name)` is native). */
+  @static def getenv(): java.util.Map[String, String] =
+    val kv = Process.environment()
+    val env = new java.util.HashMap[String, String]()
+    var i = 0
+    while i + 1 < kv.length do
+      env.put(kv(i), kv(i + 1))
+      i += 2
+    java.util.Collections.unmodifiableMap(env)
+
   private def checkKey(key: String): Unit =
     if key == null then throw new java.lang.NullPointerException("key can't be null")
     if key.isEmpty() then throw new java.lang.IllegalArgumentException("key can't be empty")

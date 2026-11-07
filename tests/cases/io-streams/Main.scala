@@ -148,6 +148,7 @@ object Main:
       println(s"  getBytes: ${text.getBytes(cs).length} bytes, new String: ${new String(text.getBytes(cs), cs)}")
     println(Charset.forName("utf8").name + " " + Charset.forName("latin1") + " " + Charset.defaultCharset())
     println(s"${Charset.isSupported("UTF-8")} ${Charset.isSupported("x-unknown")}")
+    println(s"${StandardCharsets.UTF_8.aliases().contains("UTF8")} ${Seq("UTF-8", "ISO-8859-1", "US-ASCII").forall(Charset.availableCharsets().containsKey)}")
     try Charset.forName("x-unknown")
     catch case e: IllegalArgumentException => println(s"${e.getClass.getName}: ${e.getMessage}")
     println(new InputStreamReader(new ByteArrayInputStream(Array[Byte]()), StandardCharsets.UTF_8).getEncoding)
@@ -242,6 +243,8 @@ object Main:
     println(s"main: ${counter.get} / ${inherited.get}; thread: $seen")
     counter.remove()
     println(s"after remove: ${counter.get}")
+    val withInitial = ThreadLocal.withInitial(() => "initial")
+    println(withInitial.get)
 
   def system(): Unit =
     section("system")
@@ -254,6 +257,9 @@ object Main:
     println(Try(System.getProperty("")).failed.get.getClass.getName)
     println(System.getenv("PATH") != null)
     println(System.getenv("SCALAGO_NO_SUCH_VARIABLE"))
+    println(System.getenv().get("PATH") == System.getenv("PATH"))
+    println(sys.env.contains("PATH"))
+    println(Try(System.getenv().put("X", "Y")).failed.get.getClass.getName)
     println(Runtime.getRuntime.availableProcessors() > 0)
     println(Runtime.getRuntime.maxMemory() > 0)
     println(Try(Runtime.getRuntime.addShutdownHook(null)).failed.get.getClass.getName)
