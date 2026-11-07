@@ -10,13 +10,16 @@ import java.util.stream.Collector.{Characteristics, IdentityFinish, Impl, NoChar
  * partitioningBy accumulate into the downstream collectors as elements arrive (in
  * computeIfAbsent order, so HashMaps iterate as on the JDK), toMap's duplicate-key message,
  * compensated sums of doubles, reducing(op)'s Optional.ofNullable, and the order in which
- * finishers run. The concurrent collectors (groupingByConcurrent, toConcurrentMap) need
- * java.util.concurrent's maps and are left out.
+ * finishers run. The concurrent collectors (groupingByConcurrent, toConcurrentMap) collect into
+ * ConcurrentHashMaps.
  */
 object Collectors {
 
   private val UnorderedIdentityFinish: Set[Characteristics] =
     characteristicsSet(Array(Characteristics.UNORDERED), identityFinish = true)
+
+  private val ConcurrentIdentityFinish: Set[Characteristics] =
+    characteristicsSet(Array(Characteristics.CONCURRENT, Characteristics.UNORDERED), identityFinish = true)
 
   private def collector[T, A, R](
       supplier: Supplier[A],
@@ -489,6 +492,71 @@ object Collectors {
     new IllegalStateException(
       "Duplicate key " + k + " (attempted merging values " + u + " and " + v + ")"
     )
+
+  // (javalib's ConcurrentHashMap bounds its type parameters by AnyRef; erased, they are the same.)
+  private def newConcurrentMap[K, V](): concurrent.ConcurrentMap[K, V] =
+    new concurrent.ConcurrentHashMap[AnyRef, AnyRef]().asInstanceOf[concurrent.ConcurrentMap[K, V]]
+
+  def toConcurrentMap[T, K, U](
+      keyMapper: Function[? >: T, ? <: K],
+      valueMapper: Function[? >: T, ? <: U]
+  ): Collector[T, AnyRef, concurrent.ConcurrentMap[K, U]] = {
+    Objects.requireNonNull(keyMapper)
+    Objects.requireNonNull(valueMapper)
+    identityCollector[T, concurrent.ConcurrentMap[K, U]](
+      () => newConcurrentMap[K, U](),
+      (map, element) => {
+        val k = keyMapper.apply(element)
+        val v = Objects.requireNonNull(valueMapper.apply(element))
+        val u = map.putIfAbsent(k, v)
+        if (u != null) throw duplicateKeyException(k, u, v)
+      },
+      (m1, m2) => {
+        m2.forEach { (k, v) =>
+          val u = m1.putIfAbsent(k, Objects.requireNonNull(v))
+          if (u != null) throw duplicateKeyException(k, u, v)
+        }
+        m1
+      },
+      ConcurrentIdentityFinish
+    ).asInstanceOf[Collector[T, AnyRef, concurrent.ConcurrentMap[K, U]]]
+  }
+
+  def toConcurrentMap[T, K, U](
+      keyMapper: Function[? >: T, ? <: K],
+      valueMapper: Function[? >: T, ? <: U],
+      mergeFunction: BinaryOperator[U]
+  ): Collector[T, AnyRef, concurrent.ConcurrentMap[K, U]] =
+    toConcurrentMap[T, K, U, concurrent.ConcurrentMap[K, U]](keyMapper, valueMapper, mergeFunction,
+      () => newConcurrentMap[K, U]())
+      .asInstanceOf[Collector[T, AnyRef, concurrent.ConcurrentMap[K, U]]]
+
+  def toConcurrentMap[T, K, U, M <: concurrent.ConcurrentMap[K, U]](
+      keyMapper: Function[? >: T, ? <: K],
+      valueMapper: Function[? >: T, ? <: U],
+      mergeFunction: BinaryOperator[U],
+      mapFactory: Supplier[M]
+  ): Collector[T, AnyRef, M] =
+    toMap[T, K, U, M](keyMapper, valueMapper, mergeFunction, mapFactory)
+
+  def groupingByConcurrent[T, K](
+      classifier: Function[? >: T, ? <: K]
+  ): Collector[T, AnyRef, concurrent.ConcurrentMap[K, List[T]]] =
+    groupingByConcurrent[T, K, AnyRef, List[T]](classifier, toList[T]())
+
+  def groupingByConcurrent[T, K, A, D](
+      classifier: Function[? >: T, ? <: K],
+      downstream: Collector[? >: T, A, D]
+  ): Collector[T, AnyRef, concurrent.ConcurrentMap[K, D]] =
+    groupingBy[T, K, D, A, concurrent.ConcurrentMap[K, D]](classifier, () => newConcurrentMap[K, D](), downstream)
+      .asInstanceOf[Collector[T, AnyRef, concurrent.ConcurrentMap[K, D]]]
+
+  def groupingByConcurrent[T, K, A, D, M <: concurrent.ConcurrentMap[K, D]](
+      classifier: Function[? >: T, ? <: K],
+      mapFactory: Supplier[M],
+      downstream: Collector[? >: T, A, D]
+  ): Collector[T, AnyRef, M] =
+    groupingBy[T, K, D, A, M](classifier, mapFactory, downstream)
 
   def toMap[T, K, U](
       keyMapper: Function[? >: T, ? <: K],
