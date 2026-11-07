@@ -1,7 +1,7 @@
 package scalago.javalib.lang
 
 /** A mutable sequence of UTF-16 code units, backed by a growable char array. */
-final class StringBuilder private (private var chars: Array[Char], private var count: Int)
+final class StringBuilder private (private var value: Array[Char], private var count: Int)
     extends Object
     with CharSequence
     with Appendable
@@ -18,21 +18,21 @@ final class StringBuilder private (private var chars: Array[Char], private var c
     append(seq)
 
   def length(): Int = count
-  def capacity(): Int = chars.length
+  def capacity(): Int = value.length
 
   def charAt(index: Int): Char =
     if index < 0 || index >= count then throw new java.lang.StringIndexOutOfBoundsException("index " + index + ",length " + count)
-    chars(index)
+    value(index)
 
   def setCharAt(index: Int, ch: Char): Unit =
     if index < 0 || index >= count then throw new java.lang.StringIndexOutOfBoundsException("index " + index + ",length " + count)
-    chars(index) = ch
+    value(index) = ch
 
   def ensureCapacity(minimumCapacity: Int): Unit =
-    if minimumCapacity > chars.length then
-      val grown = new Array[Char](scala.math.max(minimumCapacity, chars.length * 2 + 2))
-      java.lang.System.arraycopy(chars, 0, grown, 0, count)
-      chars = grown
+    if minimumCapacity > value.length then
+      val grown = new Array[Char](scala.math.max(minimumCapacity, value.length * 2 + 2))
+      java.lang.System.arraycopy(value, 0, grown, 0, count)
+      value = grown
 
   def trimToSize(): Unit = ()
 
@@ -41,7 +41,7 @@ final class StringBuilder private (private var chars: Array[Char], private var c
     ensureCapacity(newLength)
     var i = count
     while i < newLength do
-      chars(i) = '\u0000'
+      value(i) = '\u0000'
       i += 1
     count = newLength
 
@@ -50,7 +50,7 @@ final class StringBuilder private (private var chars: Array[Char], private var c
     ensureCapacity(count + n)
     var i = 0
     while i < n do
-      chars(count + i) = s.charAt(i)
+      value(count + i) = s.charAt(i)
       i += 1
     count += n
     this
@@ -70,13 +70,13 @@ final class StringBuilder private (private var chars: Array[Char], private var c
   def append(str: Array[Char]): StringBuilder = append(str, 0, str.length)
   def append(str: Array[Char], offset: Int, len: Int): StringBuilder =
     ensureCapacity(count + len)
-    java.lang.System.arraycopy(str, offset, chars, count, len)
+    java.lang.System.arraycopy(str, offset, value, count, len)
     count += len
     this
   def append(b: scala.Boolean): StringBuilder = appendChars(String.valueOf(b))
   def append(c: Char): StringBuilder =
     ensureCapacity(count + 1)
-    chars(count) = c
+    value(count) = c
     count += 1
     this
   def append(i: Int): StringBuilder = appendChars(String.valueOf(i))
@@ -95,10 +95,10 @@ final class StringBuilder private (private var chars: Array[Char], private var c
     val s = if str == null then "null" else str
     val n = s.length()
     ensureCapacity(count + n)
-    java.lang.System.arraycopy(chars, offset, chars, offset + n, count - offset)
+    java.lang.System.arraycopy(value, offset, value, offset + n, count - offset)
     var i = 0
     while i < n do
-      chars(offset + i) = s.charAt(i)
+      value(offset + i) = s.charAt(i)
       i += 1
     count += n
     this
@@ -113,7 +113,7 @@ final class StringBuilder private (private var chars: Array[Char], private var c
   def delete(start: Int, end: Int): StringBuilder =
     val e = scala.math.min(end, count)
     if start < 0 || start > e then throw new java.lang.StringIndexOutOfBoundsException("start " + start + ", end " + end + ", length " + count)
-    java.lang.System.arraycopy(chars, e, chars, start, count - e)
+    java.lang.System.arraycopy(value, e, value, start, count - e)
     count -= e - start
     this
 
@@ -129,29 +129,29 @@ final class StringBuilder private (private var chars: Array[Char], private var c
     var i = 0
     var j = count - 1
     while i < j do
-      val c = chars(i)
-      chars(i) = chars(j)
-      chars(j) = c
+      val c = value(i)
+      value(i) = value(j)
+      value(j) = c
       i += 1
       j -= 1
     // Surrogate pairs keep their order, as in the JDK.
     var k = 0
     while k < count - 1 do
-      if Character.isLowSurrogate(chars(k)) && Character.isHighSurrogate(chars(k + 1)) then
-        val c = chars(k)
-        chars(k) = chars(k + 1)
-        chars(k + 1) = c
+      if Character.isLowSurrogate(value(k)) && Character.isHighSurrogate(value(k + 1)) then
+        val c = value(k)
+        value(k) = value(k + 1)
+        value(k + 1) = c
         k += 2
       else k += 1
     this
 
-  override def toString(): String = new String(chars, 0, count)
+  override def toString(): String = new String(value, 0, count)
 
   def substring(start: Int): String = substring(start, count)
   def substring(start: Int, end: Int): String =
     if start < 0 || end > count || start > end then
       throw new java.lang.StringIndexOutOfBoundsException("start " + start + ", end " + end + ", length " + count)
-    new String(chars, start, end - start)
+    new String(value, start, end - start)
   // A java.lang.String is a CharSequence at run time (the compiler only sees the JDK's String here).
   def subSequence(start: Int, end: Int): CharSequence = substring(start, end).asInstanceOf[CharSequence]
 
@@ -163,7 +163,7 @@ final class StringBuilder private (private var chars: Array[Char], private var c
   override def getChars(srcBegin: Int, srcEnd: Int, dst: Array[Char], dstBegin: Int): Unit =
     if srcBegin < 0 || srcEnd > count || srcBegin > srcEnd then
       throw new java.lang.StringIndexOutOfBoundsException("start " + srcBegin + ", end " + srcEnd + ", length " + count)
-    java.lang.System.arraycopy(chars, srcBegin, dst, dstBegin, srcEnd - srcBegin)
+    java.lang.System.arraycopy(value, srcBegin, dst, dstBegin, srcEnd - srcBegin)
 
   def compareTo(another: StringBuilder): Int = toString().compareTo(another.toString())
 

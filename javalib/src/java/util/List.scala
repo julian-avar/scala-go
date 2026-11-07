@@ -21,7 +21,7 @@
 
 package java.util
 
-import java.util.function.UnaryOperator
+import java.util.function.{Consumer, UnaryOperator}
 
 trait List[E] extends SequencedCollection[E] {
 
@@ -109,9 +109,69 @@ trait List[E] extends SequencedCollection[E] {
 
   def subList(fromIndex: Int, toIndex: Int): List[E]
 
+  /** As the JDK's: by index for `RandomAccess` lists, otherwise through the iterator. */
+  override def spliterator(): Spliterator[E] =
+    if (this.isInstanceOf[RandomAccess]) new List.RandomAccessSpliterator[E](this)
+    else Spliterators.spliterator[E](this, Spliterator.ORDERED)
+
 }
 
 object List {
+
+  /** A late-binding spliterator over a `RandomAccess` list, through `get`; fail-fast for
+   *  `AbstractList`s.
+   */
+  private final class RandomAccessSpliterator[E](list: List[E]) extends Spliterator[E] {
+    private val alist: AbstractList[E] = list match {
+      case l: AbstractList[E] @unchecked => l
+      case _                             => null
+    }
+    private var index = 0
+    private var fence = -1
+    private var expectedModCount = 0
+
+    private def getFence(): Int = {
+      if (fence < 0) {
+        fence = list.size()
+        if (alist != null) expectedModCount = alist.modCount
+      }
+      fence
+    }
+
+    private def checkForComodification(): Unit =
+      if (alist != null && alist.modCount != expectedModCount)
+        throw new ConcurrentModificationException()
+
+    def tryAdvance(action: Consumer[? >: E]): Boolean = {
+      Objects.requireNonNull(action)
+      val hi = getFence()
+      val i = index
+      if (i < hi) {
+        index = i + 1
+        action.accept(list.get(i))
+        checkForComodification()
+        true
+      } else false
+    }
+
+    override def forEachRemaining(action: Consumer[? >: E]): Unit = {
+      Objects.requireNonNull(action)
+      val hi = getFence()
+      var i = index
+      index = hi
+      while (i < hi) {
+        action.accept(list.get(i))
+        i += 1
+      }
+      checkForComodification()
+    }
+
+    def trySplit(): Spliterator[E] = null
+
+    def estimateSize(): Long = getFence() - index
+
+    def characteristics(): Int = Spliterator.ORDERED | Spliterator.SIZED | Spliterator.SUBSIZED
+  }
 
   private class UnmodifiableList[E](underlying: ArrayList[E])
       extends AbstractList[E]

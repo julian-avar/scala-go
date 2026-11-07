@@ -71,6 +71,34 @@ class BufferedReader(in: Reader, sz: Int) extends Reader {
     } else -1
   }
 
+  /** The lines, read as the stream is traversed; an IOException becomes an UncheckedIOException. */
+  def lines(): java.util.stream.Stream[String] = {
+    val it = new java.util.Iterator[String] {
+      private var nextLine: String = null
+
+      def hasNext(): Boolean =
+        nextLine != null || {
+          try nextLine = readLine()
+          catch { case e: IOException => throw new UncheckedIOException(e) }
+          nextLine != null
+        }
+
+      def next(): String =
+        if (nextLine != null || hasNext()) {
+          val line = nextLine
+          nextLine = null
+          line
+        } else throw new java.util.NoSuchElementException()
+    }
+    java.util.stream.StreamSupport.stream(
+      java.util.Spliterators.spliteratorUnknownSize(
+        it,
+        java.util.Spliterator.ORDERED | java.util.Spliterator.NONNULL
+      ),
+      false
+    )
+  }
+
   def readLine(): String = {
     ensureOpen()
 
