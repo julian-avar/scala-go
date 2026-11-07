@@ -26,6 +26,8 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
   val reachedMethods = mutable.LinkedHashSet.empty[(ClassName, MethodName)]
   val staticInit = mutable.LinkedHashSet.empty[ClassName]
   val usedStaticFields = mutable.LinkedHashSet.empty[(ClassName, String)]
+  /** Natives called by reachable code (only those of objects' methods, which the linker asks about). */
+  val usedNatives = mutable.HashSet.empty[(ClassName, MethodName)]
   /** Go facades used by reachable code: their packages' APIs are loaded for code generation. */
   val usedFacades = mutable.LinkedHashSet.empty[ClassName]
   private val bodies = mutable.HashMap.empty[(ClassName, MethodName), Tree]
@@ -159,7 +161,8 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
       case Apply(receiver, decl, m, args, _) =>
         Natives.calledBy(decl, m).foreach(callVirtual)
         Natives.lookup(decl, m) match
-          case Some(Natives.Native.Static(_)) => () // module method: the receiver is not evaluated
+          case Some(Natives.Native.Static(_)) => // module method: the receiver is not evaluated
+            usedNatives += ((decl, m))
           case Some(_)                        => scan(receiver)
           case None =>
             scan(receiver)

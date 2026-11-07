@@ -771,6 +771,21 @@ object Natives:
     )
   do staticFn(OS, desc, fn)
 
+  // java.time's native side (javalib/src/scalago/runtime/Time.scala).
+  private val Time = "scalago.runtime.Time$"
+  /** Loads a time zone: programs that can reach it embed Go's tz database (see `Linker`). */
+  val TimeZoneLoad: (ClassName, MethodName) = (Time, parseMethod(s"zone($JS)$JO"))
+  for (desc, fn) <- List(
+      "nowNanos()J" -> "rt.TimeNowNanos",
+      s"zone($JS)$JO" -> "rt.TimeZone",
+      s"offset(${JO}J)I" -> "rt.TimeOffset",
+      s"period(${JO}J)[J" -> "rt.TimePeriod",
+      s"abbreviation(${JO}J)$JS" -> "rt.TimeAbbreviation",
+      s"systemZoneId()$JS" -> "rt.TimeSystemZoneID",
+      s"zoneIds()[$JS" -> "rt.TimeZoneIDs"
+    )
+  do staticFn(Time, desc, fn)
+
   // ---- scalago.go: Go strings (library/) --------------------------------------------------------
 
   // A top-level opaque type's companion lives in the file's package object.

@@ -1,0 +1,139 @@
+-- LocalDate
+2024-02-28 2024-02-29 2024-03-01 2024-03-28 2025-03-01
+true false false true
+WEDNESDAY 59 29 366 FEBRUARY 2
+2024-02-29 2024-02-29
+2024-02-01 2024-02-29 2024-03-01
+2024-03-04 2024-02-28
+2024-02-02 2024-12-31
+true false -1 true true
+492 70 16 1
+P1Y4M6D P1Y4M6D P-1Y-4M-5D 20273 1970-01-01
+2024-12-31 -999999999-01-01 +999999999-12-31 1970-01-01
+9 9 1 9
+-0001-12-31 +10000-01-01 -10000-01-01
+2023-11-22 2023-12-05 2023-12-18 2023-12-31 2024-01-13 2024-01-26 2024-02-08 2024-02-21 2024-03-05 2024-03-18 2024-03-31
+2023-12-30 2023-12-31 2024-01-01 2024-01-02 2024-01-30 2024-01-31 2024-02-01 2024-12-02 2023-12-02
+-- Period, DayOfWeek, Month, Year, YearMonth, MonthDay
+P1Y14M40D P2Y2M40D 26 P21D P0D P1Y2M8D P-1Y-14M-40D P2Y28M80D
+2026-06-07 2023-01-28
+THURSDAY 7 WEDNESDAY List(MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY) 4
+Tuesday Feb
+NOVEMBER 29 29 JULY 61
+true false 2024-02-29 365
+2024-02 29 2024-02-29 2025-01 2024-01 false --12-25
+-- LocalTime, LocalDateTime
+23:59:30.123456789 00:00:15.123456789 01:59:30.123456789 23:59 23:59:30 86370 86370123456789
+10:00 10:00:05 10:00:00.000001 10:00:00.001 00:00 12:00 23:59:59.999999999
+884 true 01:01:01
+2024-12-31T23:30 2025-01-01T00:15 2024-12-31T23:30:00.000000001 2024-12-31 23:30 TUESDAY 2024-12-31T23:00
+1735687800 2023-11-15T00:13:20.000000005 2024-12-31T23:30+05:30
+PT48H7S 24
+2024-03-01T08:15 2024-03-01T00:00
+-- Instant, Duration, Clock
+2023-11-14T22:13:20.123Z 1700000000123 2023-11-14T22:13:21Z 2023-11-13T22:13:20.123Z 2023-11-14T22:13:20.123000001Z 1969-12-31T23:59:59.999Z
+1970-01-01T00:00:00Z 1970-01-01T00:00:00.000000100Z 2024-02-29T12:00:00Z 500000000
+-1000000000-01-01T00:00:00Z +1000000000-12-31T23:59:59.999999999Z 2023-11-14T22:13:20Z true 1
+PT1H2M5.5S 62 3725500 3725 500000000 PT3H6M16.5S PT15M31.375S PT-1H-2M-5.5S PT1H2M5.5S
+PT0S PT-1.5S PT48H 1 5400 PT-0.5S
+1 PT-0.999999999S PT36H 1 2 5 500
+3 PT1H2M 0 500000000
+2023-11-14T22:13:20.123Z 2023-11-14T23:13:20.123 2023-11-14 2023-11-14T23:13:20.123+01:00[Europe/Paris] 2023-11-14T23:13:20.123Z
+true true true
+-- zones
+America/New_York false UTC Z +05:30 GMT+02:00 Z -07:00
+America/New_York America/Los_Angeles Z -03:25:45 5400
+2024-03-10T03:30-04:00[America/New_York] [] Transition[Gap at 2024-03-10T02:00-05:00 to -04:00]
+2024-11-03T01:30-04:00[America/New_York] 2024-11-03T01:30-05:00[America/New_York] 2024-11-03T01:30-04:00[America/New_York] [-04:00, -05:00] Transition[Overlap at 2024-11-03T02:00-04:00 to -05:00]
+true true PT1H [-04:00]
+2024-03-10T03:00-04:00[America/New_York] 2024-03-10T03:59-04:00[America/New_York] 2024-03-11T01:59-04:00[America/New_York] 2024-03-11T02:59-04:00[America/New_York] PT23H
+2024-07-14T12:00+02:00[Europe/Paris] 2024-07-14T06:00-04:00[America/New_York] 2024-07-14T12:00-04:00[America/New_York] 2024-07-14T10:00:00Z 2024-07-14T12:00+02:00 +02:00 1720951200
+2024-07-14T15:30+05:30[Asia/Kolkata] 2024-07-14T20:30+10:30[Australia/Lord_Howe] 2024-07-14T10:00Z
+-04:00 -05:00 true PT1H Transition[Overlap at 2024-11-03T02:00-04:00 to -05:00] Transition[Gap at 2024-03-10T02:00-05:00 to -04:00]
+false Transition[Gap at 2025-03-09T02:00-05:00 to -04:00] Transition[Gap at 2024-03-10T02:00-05:00 to -04:00]
++00:09:21 -05:00 false
+1970-01-01T09:00+09:00[Asia/Tokyo] 2023-12-31T15:00Z
+2024-11-03T01:30-05:00[America/New_York] 2024-11-03T01:30-05:00[America/New_York]
+08:00Z true
+2024-12-31T23:00-05:00[America/New_York] 2024-06-01T16:00:00Z
+-- formatting
+yyyy-MM-dd HH:mm => 2024-03-05 07:08
+dd/MM/yy h:mm a => 05/03/24 7:08 AM
+EEE, d MMM yyyy => Tue, 5 Mar 2024
+EEEE MMMM dd => Tuesday March 05
+uuuu-DDD => 2024-065
+HH:mm:ss.SSS => 07:08:09.010
+yyyyMMdd'T'HHmmss => 20240305T070809
+'Q'Q yyyy, 'week' w => Q1 2024, week 10
+MMMMM LLL => M Mar
+G yyyy => AD 2024
+hh 'o''clock' a, K => 07 o'clock AM, 7
+SSSSSS n => 010000 10000000
+yyyy-MM-dd'T'HH:mmXXX => 2024-03-05T07:08-05:00
+x xx xxx X => -05 -0500 -05:00 -05
+Z ZZZZ ZZZZZ => -0500 GMT-05:00 -05:00
+O OOOO => GMT-5 GMT-05:00
+VV => America/New_York
+z => EST
+yyyy-MM-dd HH:mm z (VV) => 2024-03-05 07:08 EST (America/New_York)
+13:08 CET
+12:08 Z
+2024-03-05
+2024-03-05T07:08:09.01-05:00[America/New_York]
+2024-03-05T07:08:09.01-05:00
+2024-03-05T07:08:09.01-05:00[America/New_York]
+2024-03-05T12:08:09.010Z
+20240305-0500
+2024-W10-2-05:00
+2024-065-05:00
+Tue, 5 Mar 2024 07:08:09 -0500
+07:08:09.01
+Mar 5, 2024
+Tuesday, March 5, 2024
+3/5/24
+2023-11-14 22:13
+-- parsing
+2024-02-29
+2024-02-29T10:15:30
+2024-02-29T10:15
+2024-03-05
+2024-03-05
+19:08
+2024-02-29T10:15:30+01:00
+2024-02-29T10:15:30+01:00[Europe/Paris]
+2024-07-01T12:00+02:00[Europe/Paris]
+2024-02-29T10:15:30.123456Z
+2024-02-29
+PT51H4M5.5S
+P-1Y-2M
+60
+2024-02-29
+-- java.util.Date, TimeZone
+Tue Nov 14 17:13:20 EST 2023 1700000000123 2023-11-14T22:13:20.123Z Thu Jul 04 08:00:00 EDT 2024 Wed Dec 31 19:00:00 EST 1969
+true true 1
+America/New_York -18000000 true -14400000 false America/New_York
+Europe/Paris 3600000 7200000 CET CEST
+GMT GMT+05:00 GMT-03:00
+Asia/Tokyo Thu Jan 01 09:00:00 JST 1970
+UTC Thu Jan 01 00:00:00 UTC 1970
+America/New_York
+-- exceptions
+parse: java.time.format.DateTimeParseException: Text '2024-13-01' could not be parsed: Invalid value for MonthOfYear (valid values 1 - 12): 13
+parse2: java.time.format.DateTimeParseException: Text '2023-02-29' could not be parsed: Invalid date 'February 29' as '2023' is not a leap year
+parse3: java.time.format.DateTimeParseException: Text 'not a date' could not be parsed at index 0
+parse4: java.time.format.DateTimeParseException: Text '25:00' could not be parsed: Invalid value for HourOfDay (valid values 0 - 23): 25
+parse5: java.time.format.DateTimeParseException: Text '2024-02-29' could not be parsed at index 4
+8 2024-02-3x
+of: java.time.DateTimeException: Invalid date 'February 29' as '2023' is not a leap year
+of2: java.time.DateTimeException: Invalid value for HourOfDay (valid values 0 - 23): 24
+zone: java.time.zone.ZoneRulesException: Unknown time-zone ID: Mars/Olympus_Mons
+zone2: java.time.DateTimeException: Invalid ID for region-based ZoneId, invalid format: not a zone!
+offset: java.time.DateTimeException: Zone offset hours not in valid range: value 19 is not in the range -18 to 18
+unsupported: java.time.temporal.UnsupportedTemporalTypeException: Unsupported unit: Hours
+field: java.time.temporal.UnsupportedTemporalTypeException: Unsupported field: Year
+pattern: java.lang.IllegalArgumentException: Pattern includes reserved character: '{'
+format: java.time.temporal.UnsupportedTemporalTypeException: Unsupported field: HourOfDay
+overflow: java.time.DateTimeException: Instant exceeds minimum or maximum instant
+duration: java.time.format.DateTimeParseException: Text cannot be parsed to a Duration
+arith: java.time.DateTimeException: Invalid value for Year (valid values -999999999 - 999999999): 1000000000
+from: java.time.DateTimeException: Unable to obtain LocalDate from TemporalAccessor: 12:00 of type java.time.LocalTime

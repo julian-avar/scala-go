@@ -13,8 +13,9 @@ matching, lambdas, `lazy val`, the standard collections and `java.util` (collect
 packages, and Go code can call Scala libraries. Threads run on goroutines, with `synchronized`,
 `wait`/`notify`, volatiles and atomics, and gears runs on them. The generated code is safe to
 call from any goroutine. `BigDecimal` and `BigInt` match the JDK. Programs read and write files
-(`java.io`, `java.nio.file`, `scala.io.Source`) and standard input. `java.util.stream`, reflection and most of
-`java.util.concurrent` don't work yet.
+(`java.io`, `java.nio.file`, `scala.io.Source`) and standard input. `java.time` works, with time
+zones from Go's tz database. `java.util.stream`, reflection and most of `java.util.concurrent`
+don't work yet.
 
 ## Using it with Mill
 
@@ -168,7 +169,8 @@ a `link-errors.txt` lists errors that linking must report instead of running. Ca
 known races in third-party libraries). A `library.txt` case is linked as a library and
 used by the Go program in its `consumer/` directory. The entry point is
 `Main` unless `main.txt` names another one. Both runs read `stdin.txt` on standard input if there
-is one (otherwise standard input is closed), and must exit with the status in `exit-status.txt`
+is one (otherwise standard input is closed), get the environment variables of `env.txt`
+(`NAME=value` lines, such as a fixed `TZ`), and must exit with the status in `exit-status.txt`
 (0 by default; an uncaught exception exits with 1). The test compiles the program with the plugin and
 runs it on the JVM. It then links it to Go, runs `go vet` and `go build`, and runs the binary.
 Both outputs must equal `expected.txt`. The work directory of a failing case is kept under
