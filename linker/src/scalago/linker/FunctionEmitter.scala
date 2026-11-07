@@ -393,7 +393,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     case DoubleLiteral(v)  => s"float64(${floatingLiteral(v, v.toString)})"
     case StringLiteral(v)  => ctx.stringLiteral(v)
     case Null()            => "nil"
-    case ClassOf(t)        => s"""rt.ClassOf("${jvmClassName(t)}")"""
+    case ClassOf(t)        => ctx.classLiteral(jvmClassName(t))
 
     case VarRef(name, _) => Mangling.local(name)
     case This(_)         => "this"

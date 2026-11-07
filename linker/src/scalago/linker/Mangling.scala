@@ -21,6 +21,7 @@ import scalago.ir.*
  *  Disp_<method>             dynamic dispatch on receivers that may be strings or boxed values
  *  InstanceOf_<class>        type test for classes that strings or boxed values may belong to
  *  SL_<n>                    interned string literal
+ *  CL_<n>                    `classOf` constant (a *rt.Class)
  *  }}}
  *  Methods on structs: `M_<method>` (virtual methods, exported so the runtime can call
  *  `toString` and friends), `A_<class>` (returns the struct of an ancestor class) and
