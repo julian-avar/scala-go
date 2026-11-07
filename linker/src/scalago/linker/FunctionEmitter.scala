@@ -39,12 +39,19 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
 
   private val isVoidMethod = isVoidLike(method.name.result)
 
+  /** Classes whose struct field accesses on `this` reach. `this` is an interface, and getting a
+   *  struct from it (`this.A_C()`) is a call Go cannot inline, so each body does it once, in its
+   *  prelude, instead of at every field access.
+   */
+  private val thisStructs = mutable.LinkedHashSet.empty[ClassName]
+
   /** Lines of the function body, without the enclosing braces. */
   def emitBody(body: Tree): List[String] =
     genTree(body, if isVoidMethod then Dest.Discard else Dest.Return)
     // Go requires a terminating statement at the end of a function with results.
     if !isVoidMethod && !alwaysReturns(body) then emit("panic(\"unreachable\")")
     val prelude = List.newBuilder[String]
+    for cls <- thisStructs do prelude += s"${Mangling.thisStruct(cls)} := this.${Mangling.accessor(cls)}()"
     if usesCtl then prelude += "var ctl int"
     if usesRet then prelude += s"var ret ${ctx.goType(method.name.result)}"
     prelude.result() ++ out.toList
@@ -308,7 +315,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       emit(s"${Mangling.local(name)} = ${adapt(genExpr(rhs), rhs.tpe, tpe)}")
     case Select(qual, cls, field, tpe) =>
       val List(q, r) = genExprs(List(qual, rhs), List(qual.tpe, tpe)): @unchecked
-      emit(store(s"${fieldAccess(q, qual.tpe, cls)}.${Mangling.field(field)}", cls, field, r))
+      emit(store(s"${fieldAccess(qual, q, cls)}.${Mangling.field(field)}", cls, field, r))
     case SelectStatic(cls, field, tpe) =>
       val r = adapt(genExpr(rhs), rhs.tpe, tpe)
       initStatics(cls)
@@ -328,7 +335,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   /** The storage of the volatile field `field` refers to, for `CompareAndSet`. */
   private def volatileRef(tree: Tree, field: Tree): Option[String] = field match
     case Select(qual, cls, f, _) if ctx.isVolatile(cls, f) =>
-      Some(s"${fieldAccess(genExpr(qual), qual.tpe, cls)}.${Mangling.field(f)}")
+      Some(s"${fieldAccess(qual, genExpr(qual), cls)}.${Mangling.field(f)}")
     case SelectStatic(cls, f, _) if ctx.isVolatile(cls, f) =>
       initStatics(cls)
       Some(Mangling.staticField(cls, f))
@@ -336,11 +343,16 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       error(tree, "compareAndSet needs a @volatile field")
       None
 
-  /** Accesses the struct of `cls` holding a field, from a reference to an instance. */
-  private def fieldAccess(q: String, qualType: Type, cls: ClassName): String =
-    if ctx.goType(qualType) != Mangling.iface(cls) && ctx.goType(qualType) == "any" then
-      s"rt.Cast[${Mangling.iface(cls)}]($q).${Mangling.accessor(cls)}()"
-    else s"$q.${Mangling.accessor(cls)}()"
+  /** Accesses the struct of `cls` holding a field, from `qual` (whose Go expression is `q`). */
+  private def fieldAccess(qual: Tree, q: String, cls: ClassName): String =
+    val qualGoType = ctx.goType(qual.tpe)
+    qual match
+      case This(_) if qualGoType != "any" =>
+        thisStructs += cls
+        Mangling.thisStruct(cls)
+      case _ if qualGoType != Mangling.iface(cls) && qualGoType == "any" =>
+        s"rt.Cast[${Mangling.iface(cls)}]($q).${Mangling.accessor(cls)}()"
+      case _ => s"$q.${Mangling.accessor(cls)}()"
 
   /** Triggers the static initializer of `cls` (unless we are in `cls` itself). */
   private def initStatics(cls: ClassName): Unit =
@@ -391,7 +403,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       else error(tree, s"module $cls is not available (no IR)")
 
     case Select(qual, cls, field, _) =>
-      load(s"${fieldAccess(genExpr(qual), qual.tpe, cls)}.${Mangling.field(field)}", cls, field)
+      load(s"${fieldAccess(qual, genExpr(qual), cls)}.${Mangling.field(field)}", cls, field)
 
     case SelectStatic(cls, field, _) =>
       Natives.staticField(cls, field) match
