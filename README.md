@@ -30,6 +30,10 @@ mill app.goRun arg1 arg2    # compile, link, go build, run
 mill app.goLink             # just the Go module (out/app/goLink.dest/go)
 ```
 
+The output is a plain Go module (generated code and runtime are pure Go): `goBuildEnv` and
+`goBuildFlags` cross-compile (`Map("GOOS" -> "windows", "GOARCH" -> "amd64")`) or strip release
+binaries (`Seq("-trimpath", "-ldflags=-s -w")`).
+
 Nothing is published yet: `mill __.publishLocal` publishes everything to the local Ivy
 repository. Requires a JDK and Go ≥ 1.22 on the `PATH`.
 

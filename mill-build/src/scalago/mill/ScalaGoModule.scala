@@ -188,9 +188,19 @@ trait ScalaGoModule extends ScalaModule {
   /** Compiles the linked Go module into an executable (requires `go` on the PATH). */
   def goBuild: T[PathRef] = Task {
     val binary = Task.dest / "app"
-    os.proc("go", "build", "-o", binary, ".").call(cwd = goLink().path, stdout = os.Inherit, stderr = os.Inherit)
+    os.proc("go", "build", goBuildFlags(), "-o", binary, ".").call(
+      cwd = goLink().path, env = goBuildEnv(), stdout = os.Inherit, stderr = os.Inherit)
     PathRef(binary)
   }
+
+  /** Environment of `go build`: `GOOS`/`GOARCH` cross-compile (the generated code and the runtime
+   *  are pure Go, so any platform Go supports works), `CGO_ENABLED=0` gives a static binary.
+   *  For example `Map("GOOS" -> "linux", "GOARCH" -> "arm64")`.
+   */
+  def goBuildEnv: T[Map[String, String]] = Task { Map.empty[String, String] }
+
+  /** Extra `go build` flags, e.g. `Seq("-trimpath", "-ldflags=-s -w")` for a smaller release binary. */
+  def goBuildFlags: T[Seq[String]] = Task { Seq.empty[String] }
 
   /** Builds and runs the executable with the given arguments. */
   def goRun(args: String*): Command[Unit] = Task.Command {
