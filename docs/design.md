@@ -150,8 +150,47 @@ internal/rt/            the runtime
   dereference becomes `NullPointerException`, index out of range `ArrayIndexOutOfBoundsException`,
   division by zero `ArithmeticException`, and a failed type assertion `ClassCastException`. A
   `return` or `break` from inside the closure sets `ctl` and is replayed after the closure
-  returns, after the `finally` block if there is one. Uncaught exceptions print
-  `Exception in thread "main" ...` and exit with status 1.
+  returns, after the `finally` block if there is one. An uncaught exception prints
+  `Exception in thread "main" ` and its stack trace to standard error and exits with status 1,
+  as on the JVM (in other threads: the thread's handler, or the same report).
+- **Stack traces** look like the JVM's (`at Main$.deep(Main.scala:5)`):
+  - *Positions.* The linker writes Go line directives into method bodies
+    (`/*line Main.scala:5:3*/`, see `LineDirectives.scala`), so Go reports Scala files and
+    lines: in stack traces, but also in Go panics and Go compiler and `go vet` messages. A
+    directive is only written where a line's Scala position differs from the one Go would count
+    on to, and lines that cannot fail (braces, jumps, declarations) need none: about 5% more
+    generated code, with no measurable effect on `go build` time. Code around method bodies
+    keeps its Go positions. `Linker.Config.lineDirectives` (`--line-directives false`, Mill's
+    `goLineDirectives`, `SCALAGO_LINE_DIRECTIVES=false` in the tests) turns them off, to see
+    Go positions when debugging the generated code.
+  - *Capture.* `Throwable`'s constructor calls `fillInStackTrace` (unless
+    `writableStackTrace` is false: `ControlThrowable`s, `NoStackTrace` and `boundary`'s
+    `Break` capture nothing), which records the stack as Go program counters by following
+    frame pointers (amd64 and arm64; `runtime.Callers` elsewhere): about a nanosecond per
+    frame. A Go runtime error becomes a Java exception while its panic is being recovered,
+    before the stack unwinds, so its trace starts at the fault; those use `runtime.Callers`,
+    since a faulting leaf function has no frame record of its own (as do programs that have
+    called C code).
+  - *Symbolization* happens on the first `getStackTrace` or `printStackTrace`, from the
+    program counters: method implementations (`Impl_<class>__<method>...`, see `Mangling`)
+    demangle back to Scala class and method names, so no table is needed. Frames the JVM would
+    not show are dropped: Go runtime and `rt` frames, generated helpers (forwarders,
+    dispatchers, allocators, module accessors), lambda classes, the Throwable's own
+    `fillInStackTrace` and constructors, and the enclosing function of a `try` block's closure
+    (the closure's frame stands for it, as the JVM has one frame per invocation). An object's
+    entry point is called through a static forwarder, `Main.main`, which the JVM shows without
+    a line number (`at Main.main(Main.scala)`), so whole traces of user code match the JVM's.
+  - `printStackTrace` prints the JVM's format, with `Caused by:` and `Suppressed:` blocks,
+    `... n more` for frames in common with the enclosing trace, and circular causes.
+  - Differences from the JVM: frames of JDK classes are missing where scala-go implements them
+    in Go (`Integer.parseInt`, `String` methods) and are javalib's Scala methods elsewhere
+    (`java.lang.Thread.run(Thread.scala:23)`, not `java.base/...(Thread.java:...)`); module
+    initialization shows no `<clinit>` frame; lines are those of statements (an exception in a
+    call on the second line of a multi-line statement reports the statement's first line);
+    inlined code reports its own source file and line; and `NullPointerException`s have no
+    message (the JVM's "helpful" messages name the null expression).
+  - `SCALAGO_TRACE=1` keeps every frame, with Go function names and Go positions: for
+    debugging the runtime and the generated code.
 - **`lazy val`** relies on JVM `VarHandle`s. The plugin rewrites the handle's compare-and-set
   into IR `CompareAndSet` on the (volatile) lazy val field, so lazy vals are thread-safe as on
   the JVM (see [Concurrency](#concurrency-and-the-memory-model)).
@@ -484,7 +523,7 @@ the race detector). `gears-go-context` cancels gears code with a Go deadline.
 Supported and covered by end-to-end tests:
 - classes and traits (fields, `super[T]`, self types)
 - objects and `@main`
-- exceptions (`try`/`catch`/`finally`, runtime errors)
+- exceptions (`try`/`catch`/`finally`, runtime errors), with JVM-like stack traces
 - pattern matching, including case classes, `Option`, tuples, guards, and switches on ints and
   strings
 - lambdas (captured `var`s, SAM types, `andThen`/`compose`)
@@ -534,8 +573,6 @@ Known gaps:
 - Concurrency: `java.util.concurrent` beyond what gears needs (executors, concurrent maps,
   `CompletableFuture`), thread groups. `scala.concurrent.Future` needs an
   `ExecutionContext` on `java.util.concurrent`; gears is the supported API.
-- Stack traces: exceptions carry none. `SCALAGO_TRACE=1` prints the Go stack where a Go runtime
-  error (a nil dereference, ...) becomes a Java exception.
 
 When reachable code uses something missing, linking fails with a "called from" chain naming
 the API.
@@ -593,8 +630,10 @@ earlier has to be redone:
 7. **Library coverage** and **publishing**, in parallel with the steps above. Done so far:
    regular expressions on Go's `regexp` (`java.util.regex`, Scala's `Regex`), the
    `java.util.concurrent` subset gears needs, `java.util` (collections and utilities), Scala
-   library dependencies compiled from TASTy, `BigDecimal`, and I/O (files, streams, charsets,
-   stdin). Still to do: `java.util.stream`, `java.time`, stack traces, and publishing (organization `io.github.scalago` is a placeholder).
+   library dependencies compiled from TASTy, `BigDecimal`, I/O (files, streams, charsets,
+   stdin), and JVM-like stack traces. Still to do: `java.util.concurrent` beyond gears' subset,
+   `java.util.stream`, `java.time`, and publishing (organization `io.github.scalago` is a
+   placeholder).
 
 ## Open questions
 

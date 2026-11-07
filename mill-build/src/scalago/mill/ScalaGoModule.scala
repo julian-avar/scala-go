@@ -99,6 +99,11 @@ trait ScalaGoModule extends ScalaModule {
   /** Package name of a library's root Go package ("" for the module path's last element). */
   def goPackageName: T[String] = Task { "" }
 
+  /** Whether the generated Go code carries line directives, so that stack traces, Go panics and
+   *  Go compiler messages give Scala positions. Turn off to see positions in the generated Go code.
+   */
+  def goLineDirectives: T[Boolean] = Task { true }
+
   /** Directories of local Go modules (each with its own `go.mod`) that the program's Go facades
    *  import, e.g. `Task.Sources(moduleDir / "go" / "mylib")`.
    */
@@ -159,6 +164,7 @@ trait ScalaGoModule extends ScalaModule {
       "--out", out,
       if (goLibrary()) Seq("--library", "true") else Seq("--main", scalaGoMainObject()),
       if (goPackageName().nonEmpty) Seq("--package", goPackageName()) else Seq.empty[String],
+      if (goLineDirectives()) Seq.empty[String] else Seq("--line-directives", "false"),
       "--go-module", goModulePath(),
       goModuleArgs()
     ).call(stdout = os.Inherit, stderr = os.Inherit, check = false)

@@ -4,7 +4,6 @@ import (
 	"os"
 	"regexp"
 	"runtime"
-	"runtime/debug"
 	"strings"
 )
 
@@ -104,25 +103,24 @@ func Try(body func()) (throwable any) {
 	return nil
 }
 
-// traceRuntimeErrors (SCALAGO_TRACE=1) prints where Go runtime errors (nil dereferences, ...)
-// happen before they become Java exceptions: exceptions carry no stack traces yet.
-var traceRuntimeErrors = os.Getenv("SCALAGO_TRACE") != ""
-
 var indexOutOfRange = regexp.MustCompile(`index out of range \[(-?\d+)\] with length (\d+)`)
 
 // Caught converts a recovered panic value into a Throwable, translating Go runtime errors into
-// the corresponding Java exceptions.
+// the corresponding Java exceptions. It must be called by the deferred function that recovers:
+// the panicking frames are still on the stack then, so the stack trace of an exception made from
+// a runtime error starts where the error happened.
 func Caught(r any) any {
-	switch e := r.(type) {
-	case *Exception:
+	if e, ok := r.(*Exception); ok {
 		return e.Value
+	}
+	// The faulting function may have no frame record (see CaptureStackTrace).
+	preciseCaptures.Add(1)
+	defer preciseCaptures.Add(-1)
+	switch e := r.(type) {
 	case *runtime.TypeAssertionError:
 		return NewException(ClassCast, e.Error())
 	case runtime.Error:
 		msg := e.Error()
-		if traceRuntimeErrors {
-			os.Stderr.WriteString("scala-go: Go runtime error: " + msg + "\n" + string(debug.Stack()))
-		}
 		switch {
 		case strings.Contains(msg, "nil pointer dereference"):
 			return NewException(NullPointer, "")
@@ -137,4 +135,16 @@ func Caught(r any) any {
 		return NewException(RuntimeError, msg)
 	}
 	return NewException(RuntimeError, ToGoString(r))
+}
+
+// ReportUncaught prints an exception that ended a thread, as the JVM's default handler does:
+// `Exception in thread "main" ` and the stack trace, on standard error.
+func ReportUncaught(threadName string, throwable any) {
+	FlushStdout()
+	os.Stderr.WriteString("Exception in thread \"" + threadName + "\" ")
+	if t, ok := throwable.(interface{ M_printStackTrace_p_rV() }); ok {
+		Try(t.M_printStackTrace_p_rV) // as on the JVM, an exception thrown while reporting is ignored
+		return
+	}
+	os.Stderr.WriteString(ToGoString(throwable) + "\n")
 }

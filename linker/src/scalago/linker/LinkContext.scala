@@ -15,7 +15,7 @@ final class Errors:
  *  (string literals, dispatchers, type tests) that method bodies request.
  */
 final class LinkContext(val program: Program, val analyzer: Analyzer, val errors: Errors, val goApi: GoApi = GoApi.empty,
-    val libraryMode: Boolean = false):
+    val libraryMode: Boolean = false, val lineDirectives: Boolean = true):
   /** Go facades: conversions, calls and Go types (see [[GoInterop]]). */
   val interop: GoInterop = GoInterop(this)
 

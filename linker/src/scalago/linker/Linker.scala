@@ -41,7 +41,12 @@ object Linker:
       /** Link a library (`@GoExport`ed definitions) instead of a program. */
       library: Boolean = false,
       /** The Go package name of a library's root package (default: the module path's last element). */
-      packageName: Option[String] = None
+      packageName: Option[String] = None,
+      /** Emit Go line directives, so that stack traces, Go panics and Go compiler and `go vet`
+       *  messages give Scala positions (see [[LineDirectives]]). Without them, they give positions
+       *  in the generated Go code, and stack traces have no file names or line numbers.
+       */
+      lineDirectives: Boolean = true
   ):
     def rootPackageName: String =
       packageName.getOrElse {
@@ -89,17 +94,20 @@ object Linker:
     // Roots: the entry point (or the exports), the methods the runtime calls dynamically, and the
     // exceptions it throws.
     val mainModule = config.mainObject + "$"
+    val isModuleMain =
+      !config.library &&
+        program.vtable(mainModule).get(MainMethod).exists(o => program.findMethod(o, MainMethod).exists(!_.isAbstract))
     val entry =
       if config.library then
         Exports.addRoots(program, analyzer)
         if Exports.functions(program).isEmpty && Exports.classes(program).isEmpty then
           throw LinkingException(List("nothing to link into a library: no definition is marked @GoExport"))
         ""
-      else if program.vtable(mainModule).get(MainMethod).exists(o => program.findMethod(o, MainMethod).exists(!_.isAbstract)) then
+      else if isModuleMain then
         analyzer.instantiate(mainModule)
         analyzer.reach(mainModule, ModuleConstructor)
         analyzer.callVirtual(MainMethod)
-        s"${Mangling.module(mainModule)}().${Mangling.virtualMethod(MainMethod)}(rt.Args())"
+        s"${Mangling.staticForwarder(config.mainObject, MainMethod)}(rt.Args())"
       else if program.findMethod(config.mainObject, MainMethod).exists(_.isStatic) then
         analyzer.reach(config.mainObject, MainMethod)
         analyzer.initializeStatics(config.mainObject)
@@ -123,12 +131,13 @@ object Linker:
       try GoApi.load(outputDir, goPackages)
       catch case e: GoApi.GoApiException => throw LinkingException(List(s"loading Go packages failed: ${e.getMessage}"))
 
-    val ctx = LinkContext(program, analyzer, errors, goApi, libraryMode = config.library)
+    val ctx = LinkContext(program, analyzer, errors, goApi, libraryMode = config.library, lineDirectives = config.lineDirectives)
     val classFiles = program.classes.toList
       .sortBy(_.name)
       .map(c => Mangling.fileName(c.name) -> ClassEmitter(ctx, c).emit())
       .filter(_._2.nonEmpty)
-    val entryFile = entryCode(ctx, entry, exceptionClasses)
+    val forwarder = Option.when(isModuleMain)(mainForwarder(ctx, config.mainObject, mainModule))
+    val entryFile = entryCode(ctx, entry, forwarder, exceptionClasses)
     val exportsFile = Option.when(config.library)(ctx.exports.internalFile)
     val rootFile = Option.when(config.library)(ctx.exports.rootFile(config.rootPackageName, s"${config.goModulePath}/$ScalaPackageDir"))
     val support = supportFile(ctx)
@@ -138,10 +147,12 @@ object Linker:
     rootFile match
       case Some(root) => write(outputDir.resolve("exports.go"), root)
       case None       => write(outputDir.resolve("main.go"), mainFile(config))
-    exportsFile.foreach(f => write(scalaDir.resolve("exports.go"), goFile(ctx, config, f)))
-    write(scalaDir.resolve("entry.go"), goFile(ctx, config, entryFile))
-    write(scalaDir.resolve("support.go"), goFile(ctx, config, support))
-    for (fileName, body) <- classFiles do write(scalaDir.resolve(fileName), goFile(ctx, config, body))
+    def writeGo(fileName: String, body: String): Unit =
+      write(scalaDir.resolve(fileName), LineDirectives.resolveRestores(goFile(ctx, config, body), fileName))
+    exportsFile.foreach(writeGo("exports.go", _))
+    writeGo("entry.go", entryFile)
+    writeGo("support.go", support)
+    for (fileName, body) <- classFiles do writeGo(fileName, body)
     copyRuntime(outputDir.resolve(RuntimeDir))
 
   private def goMod(config: Config): String =
@@ -176,9 +187,21 @@ object Linker:
        |func main() { $ScalaPackage.Main() }
        |""".stripMargin
 
+  /** The static `main` that the JVM's launcher calls for an object with a `main` method: `Main.main`,
+   *  which calls `Main$.main`. It has a frame in JVM stack traces (without a line number), so it
+   *  has one here too.
+   */
+  private def mainForwarder(ctx: LinkContext, mainClass: ClassName, mainModule: ClassName): String =
+    val pos = ctx.program.get(mainModule).fold(Position.NoPosition)(_.pos)
+    val header = s"func ${Mangling.staticForwarder(mainClass, MainMethod)}(args ${ctx.goType(MainMethod.params.head)}) {"
+    val call = GoLine(s"${Mangling.module(mainModule)}().${Mangling.virtualMethod(MainMethod)}(args)", pos)
+    val directives = LineDirectives(ctx.lineDirectives)
+    (directives.function(header, pos, List(call)) ++ List("}") ++ directives.end()).mkString("", "\n", "\n\n")
+
   /** `Main()`, which runs the Scala entry point, and the hooks the runtime needs. */
-  private def entryCode(ctx: LinkContext, entry: String, exceptions: List[(String, ClassName)]): String =
+  private def entryCode(ctx: LinkContext, entry: String, forwarder: Option[String], exceptions: List[(String, ClassName)]): String =
     val sb = StringBuilder()
+    forwarder.foreach(sb ++= _)
     if ctx.analyzer.instantiated.contains(GoInterop.GoException) then
       val struct = Mangling.struct(GoInterop.GoException)
       sb ++= "func init() {\n"

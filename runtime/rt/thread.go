@@ -172,8 +172,7 @@ func RunMain(body func()) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				FlushStdout()
-				os.Stderr.WriteString("Exception in thread \"main\" " + ToGoString(Caught(r)) + "\n")
+				ReportUncaught("main", Caught(r))
 				status = 1
 			}
 		}()

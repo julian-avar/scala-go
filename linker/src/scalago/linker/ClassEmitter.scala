@@ -26,6 +26,7 @@ final class ClassEmitter(ctx: LinkContext, cls: ClassDef):
   private val analyzer = ctx.analyzer
   private val sb = StringBuilder()
   private def line(s: String = ""): Unit = sb ++= s ++= "\n"
+  private val directives = LineDirectives(ctx.lineDirectives)
 
   private val name = cls.name
   private val struct = Mangling.struct(name)
@@ -44,7 +45,9 @@ final class ClassEmitter(ctx: LinkContext, cls: ClassDef):
     for f <- cls.fields if f.isStatic && analyzer.usedStaticFields.contains((name, f.name)) do
       line(s"var ${Mangling.staticField(name, f.name)} ${ctx.fieldGoType(f)}")
     if analyzer.staticInit.contains(name) then emitStaticInitializer()
+    // Last: the code with Scala positions (see LineDirectives).
     for m <- cls.methods if analyzer.reachedMethods.contains((name, m.name)) do emitImplementation(m)
+    directives.end().foreach(line(_))
     if sb.isEmpty then "" else s"// ${kindString} $name\n\n$sb"
 
   private def kindString = cls.kind match
@@ -145,9 +148,9 @@ final class ClassEmitter(ctx: LinkContext, cls: ClassDef):
   private def emitImplementation(m: MethodDef): Unit =
     val thisParam = if m.isStatic then Nil else List(s"this ${ctx.goType(Type.Class(name))}")
     val allParams = (thisParam ++ paramDecls(m)).mkString(", ")
-    line(s"func ${Mangling.impl(name, m.name)}($allParams)${resultDecl(m.name)} {")
-    val body = analyzer.body(name, m.name)
-    FunctionEmitter(ctx, cls, m).emitBody(body).foreach(l => line("\t" + l))
+    val header = s"func ${Mangling.impl(name, m.name)}($allParams)${resultDecl(m.name)} {"
+    val body = FunctionEmitter(ctx, cls, m).emitBody(analyzer.body(name, m.name))
+    directives.function(header, m.pos, body).foreach(line(_))
     line("}")
     line()
 

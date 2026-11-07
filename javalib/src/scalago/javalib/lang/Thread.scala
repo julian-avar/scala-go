@@ -49,7 +49,9 @@ class Thread private (target: Runnable, private var name: String, attached: scal
   private def uncaught(e: java.lang.Throwable): Unit =
     val h = if handler != null then handler else Thread.defaultHandler
     if h != null then h.uncaughtException(this, e)
-    else java.lang.System.err.println("Exception in thread \"" + name + "\" " + e)
+    else
+      java.lang.System.err.print("Exception in thread \"" + name + "\" ")
+      e.printStackTrace(java.lang.System.err)
 
   def join(): Unit = synchronized {
     while isAlive() do wait()

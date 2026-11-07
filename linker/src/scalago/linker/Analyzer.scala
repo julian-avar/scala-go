@@ -265,9 +265,12 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
 end Analyzer
 
 object Analyzer:
-  /** java.lang.Object methods the runtime calls dynamically (`rt.ToString`, `rt.Equals`, ...). */
+  /** Methods the runtime calls dynamically: java.lang.Object's (`rt.ToString`, `rt.Equals`, ...)
+   *  and `Throwable.printStackTrace()` (`rt.ReportUncaught`).
+   */
   val runtimeCalledMethods: List[MethodName] = List(
     Natives.parseMethod("toString()Ljava.lang.String;"),
     Natives.parseMethod("equals(Ljava.lang.Object;)Z"),
-    Natives.parseMethod("hashCode()I")
+    Natives.parseMethod("hashCode()I"),
+    Natives.parseMethod("printStackTrace()V")
   )

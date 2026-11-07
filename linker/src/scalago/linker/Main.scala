@@ -7,14 +7,14 @@ import java.nio.file.Path
  *  {{{
  *  scalago-link --classpath <cp> --out <dir> [--main <Object>] [--go-module <path>]
  *               [--go-require <module>@<version>]... [--go-replace <module>=<dir>]...
- *               [--library true] [--package <name>]
+ *               [--library true] [--package <name>] [--line-directives false]
  *  }}}
  */
 object Main:
   private val usage =
     "usage: scalago-link --classpath <cp> --out <dir> [--main <Object>] [--go-module <path>]\n" +
       "                    [--go-require <module>@<version>]... [--go-replace <module>=<dir>]...\n" +
-      "                    [--library true] [--package <name>]"
+      "                    [--library true] [--package <name>] [--line-directives false]"
 
   def main(args: Array[String]): Unit =
     val pairs = args.grouped(2).collect { case Array(k, v) => k -> v }.toList
@@ -39,7 +39,8 @@ object Main:
       goRequires = all("--go-require").map(split(_, '@')),
       goReplaces = all("--go-replace").map(split(_, '=')),
       library = one("--library").contains("true"),
-      packageName = one("--package")
+      packageName = one("--package"),
+      lineDirectives = !one("--line-directives").contains("false")
     )
     try Linker.link(classpath, Path.of(one("--out").get), config)
     catch

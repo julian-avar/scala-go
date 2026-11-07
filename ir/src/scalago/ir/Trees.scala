@@ -1,6 +1,6 @@
 package scalago.ir
 
-/** A source position, kept for diagnostics only. */
+/** A source position, for diagnostics and stack traces (the linker emits Go line directives). */
 final case class Position(source: String, line: Int, column: Int):
   override def toString: String = if this == Position.NoPosition then "<no position>" else s"$source:$line:$column"
 

@@ -91,7 +91,9 @@ class EndToEndTests extends munit.FunSuite:
       goModulePath = if isLibrary then LibraryModule else "scalagoapp",
       goRequires = goModules.map((m, _) => m -> "v0.0.0"),
       goReplaces = goModules,
-      library = isLibrary
+      library = isLibrary,
+      // SCALAGO_LINE_DIRECTIVES=false: Go positions in Go error messages, for debugging the linker.
+      lineDirectives = !sys.env.get("SCALAGO_LINE_DIRECTIVES").contains("false")
     )
     val goDir = work.resolve("go")
     val classpath = (classes +: Path.of(userLibrary) +: extraIR) ++ libraryIR
