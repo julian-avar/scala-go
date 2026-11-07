@@ -389,9 +389,14 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
         s"${ctx.ifaceCast(cls, q)}.${Mangling.accessor(cls)}()"
       case _ => s"$q.${Mangling.accessor(cls)}()"
 
-  /** Triggers the static initializer of `cls` (unless we are in `cls` itself). */
+  /** Triggers the static initializer of `cls` (unless we are in `cls` itself). The static fields
+   *  of an object (Scala 3's enum cases) are set by its constructor, which the JVM runs as the
+   *  static initializer: those need the object.
+   */
   private def initStatics(cls: ClassName): Unit =
-    if cls != owner.name && ctx.analyzer.staticInit.contains(cls) then emit(s"${Mangling.clinit(cls)}()")
+    if cls != owner.name then
+      if ctx.analyzer.staticInit.contains(cls) then emit(s"${Mangling.clinit(cls)}()")
+      if program.isModuleClass(cls) then emit(s"${Mangling.module(cls)}()")
 
   // ---------------------------------------------------------------------------------------------
   // Expressions

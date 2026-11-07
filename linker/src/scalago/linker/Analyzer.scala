@@ -183,6 +183,8 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
           if program.get(cls).exists(_.fields.exists(f => f.isStatic && f.name == field)) then
             usedStaticFields += ((cls, field))
             initializeStatics(cls)
+            // The static fields of an object (Scala 3's enum cases) are set by its constructor.
+            if program.isModuleClass(cls) then loadModule(tree, cls)
           else program.staticFieldViaCompanion(sel) match
             case Some(read) => scan(read)
             case None       => error(tree, s"static field $cls.$field is not available")

@@ -53,3 +53,9 @@ UNNECESSARY: java.lang.ArithmeticException: Rounding necessary
 NumericRange 1 to 2 by 0.25
 List(1, 1.5)
 1.5
+-- Scala 3 enums
+Red
+List(Red, Green)
+1
+Green ff00 -1
+List(A, B) 1 A

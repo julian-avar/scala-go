@@ -1,3 +1,14 @@
+/** A Scala 3 enum that is a Java enum: its cases are static fields of the companion object. */
+enum Color(val rgb: Int) extends java.lang.Enum[Color] {
+  case Red extends Color(0xff0000)
+  case Green extends Color(0x00ff00)
+  def hex: String = Integer.toHexString(rgb)
+}
+
+enum Simple {
+  case A, B
+}
+
 object WeekDay extends Enumeration {
   type WeekDay = Value
   val Mon, Tue, Wed, Thu, Fri, Sat, Sun = Value
@@ -128,5 +139,12 @@ object Main {
     println(BigDecimal(1) to BigDecimal(2) by BigDecimal("0.25"))
     println((BigDecimal(1) until BigDecimal(2) by BigDecimal("0.5")).toList)
     println((BigDecimal("0.1") to BigDecimal("0.5") by BigDecimal("0.1")).sum)
+
+    println("-- Scala 3 enums")
+    println(Color.Red) // the first use of Color: reads the companion's static field
+    println(Color.values.toList)
+    println(Color.valueOf("Green").ordinal)
+    println(s"${Color.Green.name()} ${Color.Green.hex} ${Color.Red.compareTo(Color.Green)}")
+    println(s"${Simple.values.toList} ${Simple.B.ordinal} ${Simple.fromOrdinal(0)}")
   }
 }
