@@ -71,6 +71,11 @@ class EndToEndTests extends munit.FunSuite:
     // The entry point is `Main` unless the case names another one in `main.txt`.
     val mainClass =
       if Files.exists(dir.resolve("main.txt")) then Files.readString(dir.resolve("main.txt"), UTF_8).trim else "Main"
+    // The program's exit status is 0 unless the case gives another one in `exit-code.txt` (an
+    // uncaught exception exits with 1).
+    val exitCode =
+      if Files.exists(dir.resolve("exit-code.txt")) then Files.readString(dir.resolve("exit-code.txt"), UTF_8).trim.toInt
+      else 0
     val work = Files.createTempDirectory(s"scalago-${dir.getFileName}-")
     val classes = Files.createDirectories(work.resolve("classes"))
 
@@ -80,7 +85,7 @@ class EndToEndTests extends munit.FunSuite:
     // Programs calling Go code (`go-only.txt` says why) cannot run on the JVM.
     if !Files.exists(dir.resolve("go-only.txt")) && !isLibrary then
       val jvmClasspath = (classes.toString +: userLibrary +: (extraClasspath ++ scalaLibrary)).mkString(File.pathSeparator)
-      assertNoDiff(run(Seq(javaBinary, "-cp", jvmClasspath, mainClass), work), expected, "JVM output")
+      assertNoDiff(run(Seq(javaBinary, "-cp", jvmClasspath, mainClass), work, exitCode), expected, "JVM output")
 
     // Subdirectories with a go.mod are local Go modules the program uses.
     val goModules = Using.resource(Files.list(dir))(_.iterator.asScala.filter(d => Files.exists(d.resolve("go.mod"))).toList)
@@ -90,7 +95,9 @@ class EndToEndTests extends munit.FunSuite:
       goModulePath = if isLibrary then LibraryModule else "scalagoapp",
       goRequires = goModules.map((m, _) => m -> "v0.0.0"),
       goReplaces = goModules,
-      library = isLibrary
+      library = isLibrary,
+      // SCALAGO_LINE_DIRECTIVES=false: Go positions in Go error messages, for debugging the linker.
+      lineDirectives = !sys.env.get("SCALAGO_LINE_DIRECTIVES").contains("false")
     )
     val goDir = work.resolve("go")
     val classpath = (classes +: Path.of(userLibrary) +: extraIR) ++ libraryIR
@@ -107,11 +114,12 @@ class EndToEndTests extends munit.FunSuite:
       Files.writeString(consumer.resolve("go.mod"),
         s"\nrequire $LibraryModule v0.0.0\n\nreplace $LibraryModule => ${goDir.toAbsolutePath}\n",
         java.nio.file.StandardOpenOption.APPEND)
-      runGo(consumer, expected, race = Files.exists(dir.resolve("race.txt")))
+      runGo(consumer, expected, exitCode, race = Files.exists(dir.resolve("race.txt")))
       deleteRecursively(work)
     else
       // `race.txt`: the Go build also runs under the race detector.
-      linkAndRun(classpath, goDir, config, expected, race = Files.exists(dir.resolve("race.txt")))
+      Linker.link(classpath, goDir, config)
+      runGo(goDir, expected, exitCode, race = Files.exists(dir.resolve("race.txt")))
       deleteRecursively(work) // kept on failure, for inspection
 
   /** Module path of libraries linked by the tests (their consumers import it). */
@@ -125,18 +133,14 @@ class EndToEndTests extends munit.FunSuite:
     }
     to
 
-  private def linkAndRun(classpath: Seq[Path], goDir: Path, config: Linker.Config, expected: String, race: Boolean): Unit =
-    Linker.link(classpath, goDir, config)
-    runGo(goDir, expected, race)
-
   /** Vets, builds and runs the Go main package in `goDir`, checking its output. */
-  private def runGo(goDir: Path, expected: String, race: Boolean): Unit =
+  private def runGo(goDir: Path, expected: String, exitCode: Int, race: Boolean): Unit =
     assertEquals(run(Seq("go", "vet", "./..."), goDir), "", "go vet output")
     assertEquals(run(Seq("go", "build", "-o", "app", "."), goDir), "", "go build output")
-    assertNoDiff(run(Seq(goDir.resolve("app").toString), goDir), expected, "Go output")
+    assertNoDiff(run(Seq(goDir.resolve("app").toString), goDir, exitCode), expected, "Go output")
     if race then
       assertEquals(run(Seq("go", "build", "-race", "-o", "app-race", "."), goDir), "", "go build -race output")
-      assertNoDiff(run(Seq(goDir.resolve("app-race").toString), goDir), expected, "Go output under the race detector")
+      assertNoDiff(run(Seq(goDir.resolve("app-race").toString), goDir, exitCode), expected, "Go output under the race detector")
 
   private def goModulePath(goMod: Path): String =
     Files.readAllLines(goMod, UTF_8).asScala.collectFirst { case s"module $path" => path.trim }
@@ -159,11 +163,13 @@ class EndToEndTests extends munit.FunSuite:
 
   private def javaBinary: String = Path.of(sys.props("java.home"), "bin", "java").toString
 
-  /** Runs a process to completion, failing the test on a non-zero exit. Returns stdout+stderr. */
-  private def run(command: Seq[String], cwd: Path): String =
+  /** Runs a process to completion, failing the test unless it exits with `exitCode`. Returns
+   *  stdout+stderr.
+   */
+  private def run(command: Seq[String], cwd: Path, exitCode: Int = 0): String =
     val process = ProcessBuilder(command.asJava).directory(cwd.toFile).redirectErrorStream(true).start()
     process.getOutputStream.close()
     val output = String(process.getInputStream.readAllBytes(), UTF_8)
     val exit = process.waitFor()
-    assertEquals(exit, 0, s"`${command.mkString(" ")}` failed:\n$output")
+    assertEquals(exit, exitCode, s"`${command.mkString(" ")}` exited with $exit:\n$output")
     output

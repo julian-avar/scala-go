@@ -520,6 +520,15 @@ object Natives:
   staticFn(Threads, "sleep(JI)V", "rt.Sleep")
   staticFn(Threads, "yieldNow()V", "rt.Yield")
 
+  // Throwable's stack traces (javalib/src/scalago/runtime/StackTraces.scala).
+  private val StackTraces = "scalago.runtime.StackTraces$"
+  staticFn(StackTraces, "capture()Ljava.lang.Object;", "rt.CaptureStackTrace")
+  staticFn(StackTraces, "depth(Ljava.lang.Object;)I", "rt.StackTraceDepth")
+  staticFn(StackTraces, "className(Ljava.lang.Object;I)Ljava.lang.String;", "rt.StackTraceClassName")
+  staticFn(StackTraces, "methodName(Ljava.lang.Object;I)Ljava.lang.String;", "rt.StackTraceMethodName")
+  staticFn(StackTraces, "fileName(Ljava.lang.Object;I)Ljava.lang.String;", "rt.StackTraceFileName")
+  staticFn(StackTraces, "lineNumber(Ljava.lang.Object;I)I", "rt.StackTraceLineNumber")
+
   // java.util.concurrent.locks' native side (javalib/src/scalago/runtime/Locks.scala).
   private val Locks = "scalago.runtime.Locks$"
   for (desc, fn) <- List(

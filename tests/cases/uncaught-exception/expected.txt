@@ -1,0 +1,7 @@
+before
+Exception in thread "main" java.lang.IllegalStateException: boom
+	at Main$.fail(Main.scala:3)
+	at Main$.main(Main.scala:8)
+	at Main.main(Main.scala)
+Caused by: java.lang.RuntimeException: cause
+	... 3 more

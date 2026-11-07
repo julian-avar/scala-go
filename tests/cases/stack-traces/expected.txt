@@ -1,0 +1,40 @@
+throw: java.lang.IllegalStateException: Main$.deep(Main.scala:27) < Main$.deep(Main.scala:28) < Main$.deep(Main.scala:28) < Main$.main$$anonfun$1(Main.scala:59) < Main$.report(Main.scala:20) < Main$.main(Main.scala:59) < Main.main(Main.scala)
+Main$.deep(Main.scala:27)
+lambda: java.lang.IllegalArgumentException: Main$.main$$anonfun$2$$anonfun$1(Main.scala:62) < Main$.main$$anonfun$2(Main.scala:62) < Main$.report(Main.scala:20) < Main$.main(Main.scala:62) < Main.main(Main.scala)
+null: java.lang.NullPointerException: Main$.npe(Main.scala:30) < Main$.main$$anonfun$3(Main.scala:63) < Main$.report(Main.scala:20) < Main$.main(Main.scala:63) < Main.main(Main.scala)
+index: java.lang.ArrayIndexOutOfBoundsException: Main$.index(Main.scala:32) < Main$.main$$anonfun$4(Main.scala:64) < Main$.report(Main.scala:20) < Main$.main(Main.scala:64) < Main.main(Main.scala)
+divide: java.lang.ArithmeticException: Main$.divide(Main.scala:34) < Main$.main$$anonfun$5(Main.scala:65) < Main$.report(Main.scala:20) < Main$.main(Main.scala:65) < Main.main(Main.scala)
+cast: java.lang.ClassCastException: Main$.cast(Main.scala:36) < Main$.main$$anonfun$6(Main.scala:66) < Main$.report(Main.scala:20) < Main$.main(Main.scala:66) < Main.main(Main.scala)
+finally
+in try: java.lang.IllegalStateException: Main$.deep(Main.scala:27) < Main$.deep(Main.scala:28) < Main$.inTry(Main.scala:41) < Main$.main$$anonfun$7(Main.scala:67) < Main$.report(Main.scala:20) < Main$.main(Main.scala:67) < Main.main(Main.scala)
+constructor: java.lang.IllegalArgumentException: Widget.<init>(Main.scala:10) < Main$.main$$anonfun$8(Main.scala:68) < Main$.report(Main.scala:20) < Main$.main(Main.scala:68) < Main.main(Main.scala)
+custom: AppException: Main$.custom(Main.scala:46) < Main$.main$$anonfun$9(Main.scala:69) < Main$.report(Main.scala:20) < Main$.main(Main.scala:69) < Main.main(Main.scala)
+Main$.main(Main.scala:71) < Main.main(Main.scala)
+Main$.refill(Main.scala:48) < Main$.main(Main.scala:73) < Main.main(Main.scala)
+0
+0
+0
+pkg.Cls.run(Cls.scala:12) < pkg.Cls.<init>(Unknown Source)
+stackTrace[0]
+true true false
+C.m(C.scala)
+C.m(Unknown Source)
+C.m(Native Method)
+loader/mod@1.0/C.m(C.java:9)
+C m C.scala 3 false
+java.lang.RuntimeException: wrapped
+	at Main$.level2(Main.scala:54)
+	at Main$.level1(Main.scala:56)
+	at Main$.main(Main.scala:101)
+	at Main.main(Main.scala)
+	Suppressed: java.lang.Exception: suppressed
+		at Main$.main(Main.scala:104)
+		... 1 more
+Caused by: java.lang.IllegalStateException: root
+	at Main$.level3(Main.scala:50)
+	at Main$.level2(Main.scala:53)
+	... 3 more
+java.lang.Exception: loop1
+Caused by: java.lang.Exception: loop2
+Caused by: [CIRCULAR REFERENCE: java.lang.Exception: loop1]
+Thread-0: java.lang.IllegalStateException: boom: Main$.deep(Main.scala:27) < Main$.$anonfun$1(Main.scala:115)

@@ -158,9 +158,15 @@ Each directory in `tests/cases/` holds a program and an `expected.txt`. Cases wi
 a `link-errors.txt` lists errors that linking must report instead of running. Cases with a
 `race.txt` also run under Go's race detector. A `library.txt` case is linked as a library and
 used by the Go program in its `consumer/` directory. The entry point is
-`Main` unless `main.txt` names another one. The test compiles the program with the plugin and
+`Main` unless `main.txt` names another one, and the program must exit with status 0 unless
+`exit-code.txt` gives another (an uncaught exception exits with 1). The test compiles the program with the plugin and
 runs it on the JVM. It then links it to Go, runs `go vet` and `go build`, and runs the binary.
 Both outputs must equal `expected.txt`. The work directory of a failing case is kept under
 `/tmp/scalago-<case>-*` for inspection. Set `SCALAGO_KEEP_WORK=1` to keep passing ones too.
 Cases run concurrently; `SCALAGO_TEST_PARALLELISM` sets how many at once, and
 `SCALAGO_TEST_ONLY=regex,traits` runs only the named cases.
+
+The generated Go code carries line directives, so Go reports Scala positions, also in
+compiler errors. `SCALAGO_LINE_DIRECTIVES=false` (the linker's `--line-directives false`)
+leaves them out, to see positions in the generated code. `SCALAGO_TRACE=1` at run time keeps
+all Go frames in stack traces.
