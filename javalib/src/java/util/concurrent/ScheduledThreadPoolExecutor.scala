@@ -161,7 +161,8 @@ object ScheduledThreadPoolExecutor {
       finally lock.unlock()
     }
 
-    override def isEmpty(): Boolean = _size == 0
+    // scala-go: through the lock, as in the JDK (Scala Native read `_size` without it: a data race).
+    override def isEmpty(): Boolean = size() == 0
     override def remainingCapacity(): Int = Integer.MAX_VALUE
     override def peek(): RunnableScheduledFuture[AnyRef] = {
       val lock = this.lock

@@ -231,8 +231,9 @@ class PriorityBlockingQueue[E <: AnyRef] private (
           throw new OutOfMemoryError(
             s"Required array length $oldCap + $growth is too large"
           )
-        if (queue eq array)
-          newArray = new Array[AnyRef](newCap).asInstanceOf[Array[E]]
+        // scala-go: the JDK checks `queue eq array` here, without the lock: a benign race on the
+        // JVM, but a data race for Go. The check under the lock below discards a stale array.
+        newArray = new Array[AnyRef](newCap).asInstanceOf[Array[E]]
       } finally allocationSpinLock = 0
     }
     if (newArray == null) { // back off if another thread is allocating
