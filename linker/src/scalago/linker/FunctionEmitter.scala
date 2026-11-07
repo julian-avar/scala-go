@@ -382,7 +382,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   private def load(fieldRef: String, cls: ClassName, field: String): String =
     if ctx.isVolatile(cls, field) then s"$fieldRef.Load()" else fieldRef
 
-  /** The storage of the volatile field `field` refers to, for `CompareAndSet`. */
+  /** The storage of the volatile field `field` refers to, for atomic operations. */
   private def volatileRef(tree: Tree, field: Tree): Option[String] = field match
     case Select(qual, cls, f, _) if ctx.isVolatile(cls, f) =>
       Some(s"${fieldAccess(qual, genExpr(qual), cls)}.${Mangling.field(f)}")
@@ -390,8 +390,18 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       initStaticFields(cls)
       Some(Mangling.staticField(cls, f))
     case _ =>
-      error(tree, "compareAndSet needs a @volatile field")
+      error(tree, s"${tree.productPrefix} needs a @volatile field")
       None
+
+  /** `GetAndSet` or `GetAndAdd`: the field reference is evaluated first, then the operand. */
+  private def atomicUpdate(tree: Tree, field: Tree, operand: Tree, method: String): String =
+    volatileRef(tree, field) match
+      case Some(ref) =>
+        val refVar = freshTemp()
+        emit(s"$refVar := &$ref")
+        val List(v) = genExprs(List(operand), List(field.tpe)): @unchecked
+        s"$refVar.$method($v)"
+      case None => zeroValue(field.tpe)
 
   /** Accesses the struct of `cls` holding a field, from `qual` (whose Go expression is `q`). */
   private def fieldAccess(qual: Tree, q: String, cls: ClassName): String =
@@ -490,6 +500,9 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
           val List(e, u) = genExprs(List(expected, update), List(field.tpe, field.tpe)): @unchecked
           s"$refVar.CompareAndSet($e, $u)"
         case None => "false"
+
+    case GetAndSet(field, value) => atomicUpdate(tree, field, value, "GetAndSet")
+    case GetAndAdd(field, delta) => atomicUpdate(tree, field, delta, "GetAndAdd")
 
     case New(cls, _, _) if program.isFacade(cls) =>
       ctx.interop.zeroValue(cls, tree.pos)
@@ -675,6 +688,11 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   private def genApplyStatically(tree: ApplyStatically): String =
     val ApplyStatically(receiver, cls, m, args, _) = tree
     if Natives.isNoOpConstructor(cls, m) || program.isFacade(cls) then ""
+    else if isObjectDefault(cls, m) then
+      // `super.toString()` (etc.) reaching java.lang.Object: its own implementation, not the
+      // dynamically dispatching native, which would call the overriding method again.
+      val r :: as = genExprs(receiver :: args): @unchecked
+      s"${ClassEmitter.objectDefaults(m)}(${(r :: as).mkString(", ")})"
     else Natives.lookup(cls, m) match
       case Some(native) => genNative(native, Some(receiver), args, m)
       case None =>
@@ -684,6 +702,10 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
             s"${Mangling.impl(implClass, m)}(${(r :: as).mkString(", ")})"
           case None =>
             error(tree, s"method $cls.$m is not available")
+
+  private def isObjectDefault(cls: ClassName, m: MethodName): Boolean =
+    ClassEmitter.objectDefaults.contains(m) && !Hijacked.isHijacked(cls) &&
+      program.resolveImplementation(cls, m).forall(_ == ClassName.Object)
 
   // ---------------------------------------------------------------------------------------------
   // Primitive operations
