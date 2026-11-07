@@ -16,6 +16,13 @@ import scalago.ir.Tree.*
 final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
   val instantiated = mutable.LinkedHashSet.empty[ClassName]
   val calledNames = mutable.LinkedHashSet.empty[MethodName]
+  /** Virtual calls on receivers whose static type is a class, as (class, method). */
+  val typedCalls = mutable.HashSet.empty[(ClassName, MethodName)]
+  /** Methods called other than on a receiver of a class type: through dispatchers, natives, Go
+   *  code, exports and the runtime. Every instantiated class with such a method in its vtable
+   *  needs it as a Go method (see LinkContext.goMethods).
+   */
+  val untypedCalls = mutable.HashSet.empty[MethodName]
   val reachedMethods = mutable.LinkedHashSet.empty[(ClassName, MethodName)]
   val staticInit = mutable.LinkedHashSet.empty[ClassName]
   val usedStaticFields = mutable.LinkedHashSet.empty[(ClassName, String)]
@@ -45,7 +52,12 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
           useScalaType(g.result, toScala = false)
           callVirtual(m.name)
 
+  /** A virtual call of `m` on a receiver of unknown class (see `untypedCalls`). */
   def callVirtual(m: MethodName): Unit =
+    untypedCalls += m
+    reachVirtual(m)
+
+  private def reachVirtual(m: MethodName): Unit =
     if calledNames.add(m) then
       for c <- instantiated.toList; impl <- program.vtable(c).get(m) do reach(impl, m)
 
@@ -151,7 +163,11 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
           case Some(_)                        => scan(receiver)
           case None =>
             scan(receiver)
-            callVirtual(m)
+            receiver.tpe match
+              case Type.Class(c) =>
+                typedCalls += ((c, m))
+                reachVirtual(m)
+              case _ => callVirtual(m)
             if Natives.objectMethod(m).isEmpty then
               receiver.tpe match
                 case Type.Class(c) if program.contains(c) && !program.vtable(c).contains(m) && !Hijacked.hijackedAncestors(c) =>

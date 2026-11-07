@@ -104,7 +104,7 @@ published with the full Scala version as suffix.
 | `GoSlice[T]`, `GoMap[K, V]`, `GoChan[T]`, `GoPtr[T]` | the Go slice, map, channel or pointer inside an `any` |
 | `Array[prim]` / `Array[AnyRef]`  | `*rt.Array[prim]` / `*rt.Array[any]` (covariance works)         |
 | class `C`                        | struct `S_C` embedding the superclass's struct (root classes embed `rt.ObjectHeader`, which holds the monitor) |
-| reference of static type `C`     | interface `C_C`: embeds parents' interfaces, lists called methods |
+| reference of static type `C`     | interface `C_C`: embeds parents' interfaces, lists the methods called on `C` receivers |
 | trait `T`                        | interface `C_T`, with a marker method `I_T()`                   |
 | method body                      | free function `Impl_C_m(this C_C, ...)`                         |
 | virtual method                   | forwarding method on each instantiated struct                   |
@@ -114,9 +114,13 @@ published with the full Scala version as suffix.
 
 - **Calls through `this` stay virtual.** Method bodies take `this` as an interface, so calls on it
   stay virtual even in inherited code. Go's struct embedding alone cannot do that.
-- **Forwarders.** Every instantiated class gets forwarders for each called method in its vtable,
+- **Forwarders.** An instantiated class gets a forwarding Go method for each method its
+  ancestors' interfaces declare, plus each method called without a static class (through
+  dispatchers, by Go code or the runtime), with the implementation the vtable resolves,
   including trait default methods (JVM resolution rules: class methods win, then the most
-  specific default). An abstract slot for `toString`/`equals`/`hashCode` falls back to
+  specific default). `C_C` declares only the methods called on receivers of static type `C`, so
+  a method called on a `List` does not give every collection class a Go method (this cut the
+  generated code by a quarter). An abstract slot for `toString`/`equals`/`hashCode` falls back to
   `java.lang.Object`'s implementation.
 - **Exact type tests.** Accessors (`A_C`) and markers (`I_T`) are unique per class, so a Go type
   assertion is an exact `isInstanceOf`.

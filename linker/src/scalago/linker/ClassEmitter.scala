@@ -8,8 +8,8 @@ import scalago.ir.*
  *  have the type of an interface listing its virtual methods, embedding the interfaces of its
  *  superclass and traits. Method bodies are free functions taking `this` as that interface, so
  *  calls on `this` stay virtual even in inherited code. Each instantiated class gets a
- *  forwarding Go method for every called virtual method in its vtable (including trait default
- *  methods), which is what makes the struct satisfy its interfaces.
+ *  forwarding Go method for the virtual methods it needs (see LinkContext.goMethods; including
+ *  trait default methods), which is what makes the struct satisfy its interfaces.
  *
  *  Only what the [[Analyzer]] found reachable is emitted.
  */
@@ -34,8 +34,6 @@ final class ClassEmitter(ctx: LinkContext, cls: ClassDef):
   private val isInterface = cls.kind == ClassKind.Interface
   private val isInstantiated = analyzer.instantiated.contains(name)
 
-  private def calledVtable: List[(MethodName, ClassName)] =
-    program.vtable(name).toList.filter((m, _) => analyzer.calledNames.contains(m)).sortBy(_._1.descriptor)
 
   /** The Go code for this class; empty if nothing of it is reachable. */
   def emit(): String =
@@ -71,7 +69,7 @@ final class ClassEmitter(ctx: LinkContext, cls: ClassDef):
     irParents.foreach(p => line(s"\t${Mangling.iface(p)}"))
     if isInterface then line(s"\t${Mangling.marker(name)}()")
     else line(s"\t${Mangling.accessor(name)}() *$struct")
-    for (m, _) <- calledVtable do line(s"\t${Mangling.virtualMethod(m)}${signature(m)}")
+    for (m, _) <- ctx.interfaceMethods(name) do line(s"\t${Mangling.virtualMethod(m)}${signature(m)}")
     line("}")
     line()
     if !isInterface then
@@ -79,7 +77,7 @@ final class ClassEmitter(ctx: LinkContext, cls: ClassDef):
       line()
 
   private def emitInstanceMembers(): Unit =
-    for (m, implClass) <- calledVtable do
+    for (m, implClass) <- ctx.goMethods(name) do
       val args = m.params.indices.map(i => s"a$i").toList
       val body = program.findMethod(implClass, m).filterNot(_.isAbstract) match
         case Some(_) =>

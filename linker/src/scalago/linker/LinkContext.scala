@@ -27,6 +27,43 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
     val instantiated = analyzer.instantiated.toSet
     (instantiated ++ instantiated.flatMap(program.ancestors)).filter(program.contains)
 
+  // ---- Go method sets ----------------------------------------------------------------------------
+  //
+  // A class's Go interface declares only the methods called on receivers of that static type
+  // (its parents' interfaces declare theirs), so an instantiated class needs Go methods only for
+  // those of its ancestors' interfaces, plus the methods called without a static class (through
+  // dispatchers, by Go code or the runtime). Using every called method of the vtable instead would
+  // give each collection class a Go method for every collection method called anywhere.
+
+  /** Whether a call of `m` on a receiver of static type `cls` goes through `cls`'s Go interface
+   *  (otherwise it goes through a dispatcher; see FunctionEmitter.genApply).
+   */
+  private def callsThroughInterface(cls: ClassName, m: MethodName): Boolean =
+    goType(Type.Class(cls)) == Mangling.iface(cls) && program.vtable(cls).contains(m)
+
+  /** Methods every class with them in its vtable needs as Go methods. */
+  private lazy val untypedMethods: Set[MethodName] =
+    analyzer.untypedCalls.toSet ++ analyzer.typedCalls.collect { case (c, m) if !callsThroughInterface(c, m) => m }
+
+  private lazy val typedByClass: Map[ClassName, Set[MethodName]] =
+    analyzer.typedCalls.toList.filter(callsThroughInterface).groupMap(_._1)(_._2).view.mapValues(_.toSet).toMap
+
+  /** The methods `cls`'s Go interface declares (besides its parents'), in a stable order. Methods
+   *  called without a static class are declared too: code generated outside method bodies (the
+   *  entry point, exports, Go interop) calls them through class interfaces, and every class has
+   *  them anyway.
+   */
+  def interfaceMethods(cls: ClassName): List[(MethodName, ClassName)] =
+    val called = typedByClass.getOrElse(cls, Set.empty)
+    program.vtable(cls).toList.filter((m, _) => called.contains(m) || untypedMethods.contains(m)).sortBy(_._1.descriptor)
+
+  /** The virtual methods an instantiated class needs as Go methods, with their implementing class. */
+  def goMethods(cls: ClassName): List[(MethodName, ClassName)] =
+    val fromInterfaces = (program.ancestors(cls) + cls).flatMap(typedByClass.getOrElse(_, Set.empty))
+    program.vtable(cls).toList
+      .filter((m, _) => untypedMethods.contains(m) || fromInterfaces.contains(m))
+      .sortBy(_._1.descriptor)
+
   /** Whether references of type `cls` are typed with its generated interface (rather than `any`). */
   def hasInterfaceType(cls: ClassName): Boolean =
     declared(cls) && !Hijacked.hijackedAncestors(cls) && !Hijacked.isHijacked(cls)
