@@ -698,9 +698,7 @@ object Natives:
   // java.lang.System's properties and java.lang.Runtime (javalib/src/scalago/runtime/Process.scala).
   private val Process = "scalago.runtime.Process$"
   for (desc, fn) <- List(
-      "getProperty(Ljava.lang.String;)Ljava.lang.String;" -> "rt.GetProperty",
-      "setProperty(Ljava.lang.String;Ljava.lang.String;)Ljava.lang.String;" -> "rt.SetProperty",
-      "propertyNames()[Ljava.lang.String;" -> "rt.PropertyNames",
+      "properties()[Ljava.lang.String;" -> "rt.Properties",
       "environment()[Ljava.lang.String;" -> "rt.Environ",
       "exit(I)V" -> "rt.Exit",
       "halt(I)V" -> "rt.Halt",

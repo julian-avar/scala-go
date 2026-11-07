@@ -48,6 +48,10 @@ in the directory
 #< into a file
 #&& and #|| or
 run: 5
+#| piped through two cats
+#| status 6
+lazyLines 6
+lazyLines 2000 line 1999
 before !
 printed by the child
 ! 0

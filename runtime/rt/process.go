@@ -5,17 +5,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 )
 
-// The native side of java.lang.System's properties and of java.lang.Runtime
-// (javalib/src/scalago/runtime/Process.scala).
-
-var (
-	propertiesMu   sync.Mutex
-	properties     map[string]*String
-	propertiesOnce sync.Once
-)
+// The native side of java.lang.System's properties (their initial values) and environment, and
+// of java.lang.Runtime (javalib/src/scalago/runtime/Process.scala).
 
 // defaultProperties are the JDK's standard system properties that describe the platform.
 func defaultProperties() map[string]*String {
@@ -91,41 +84,14 @@ func osArch() string {
 	return runtime.GOARCH
 }
 
-func withProperties[T any](f func(map[string]*String) T) T {
-	propertiesOnce.Do(func() { properties = defaultProperties() })
-	propertiesMu.Lock()
-	defer propertiesMu.Unlock()
-	return f(properties)
-}
-
-func GetProperty(key *String) *String {
-	k := key.GoString()
-	return withProperties(func(p map[string]*String) *String { return p[k] })
-}
-
-// SetProperty sets a property (or removes it, if value is null) and returns the previous value.
-func SetProperty(key, value *String) *String {
-	k := key.GoString()
-	return withProperties(func(p map[string]*String) *String {
-		old := p[k]
-		if value == nil {
-			delete(p, k)
-		} else {
-			p[k] = value
-		}
-		return old
-	})
-}
-
-// PropertyNames returns the names of the properties.
-func PropertyNames() *Array[any] {
-	return withProperties(func(p map[string]*String) *Array[any] {
-		names := make([]any, 0, len(p))
-		for k := range p {
-			names = append(names, Str(k))
-		}
-		return &Array[any]{Data: names}
-	})
+// Properties returns the platform's system properties as alternating names and values.
+func Properties() *Array[any] {
+	p := defaultProperties()
+	out := make([]any, 0, 2*len(p))
+	for k, v := range p {
+		out = append(out, Str(k), v)
+	}
+	return &Array[any]{Data: out}
 }
 
 // Environ returns the environment as alternating names and values.

@@ -116,6 +116,11 @@ object Main:
     println(s"#< ${(Seq("cat") #< file).!!.trim}")
     println(s"#&& ${(Seq("sh", "-c", "exit 0") #&& Seq("echo", "and")).!!.trim} #|| ${(Seq("sh", "-c", "exit 1") #|| Seq("echo", "or")).!!.trim}")
     println(s"run: ${Seq("sh", "-c", "exit 5").run().exitValue()}")
+    println(s"#| ${(Seq("echo", "piped through") #| Seq("cat") #| Seq("sh", "-c", "cat; echo two cats")).!!.replace('\n', ' ').trim}")
+    println(s"#| status ${(Seq("echo", "x") #| Seq("sh", "-c", "cat >/dev/null; exit 6")).!}")
+    println(s"lazyLines ${Seq("printf", "1\\n2\\n3\\n").lazyLines.map(_.toInt).sum}")
+    val big = Seq("sh", "-c", "i=0; while [ $i -lt 2000 ]; do echo line $i; i=$((i+1)); done").lazyLines
+    println(s"lazyLines ${big.length} ${big.last}")
     println("before !")
     println(s"! ${Seq("echo", "printed by the child").!}")
 

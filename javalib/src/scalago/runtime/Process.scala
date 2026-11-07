@@ -6,10 +6,8 @@ package scalago.runtime
 object Process:
   private def native: Nothing = throw new UnsupportedOperationException("scala-go native")
 
-  def getProperty(key: String): String = native
-  /** Sets a property, or removes it if `value` is null; returns the previous value. */
-  def setProperty(key: String, value: String): String = native
-  def propertyNames(): Array[String] = native
+  /** The platform's system properties, as alternating names and values. */
+  def properties(): Array[String] = native
   /** The environment as alternating names and values. */
   def environment(): Array[String] = native
 
