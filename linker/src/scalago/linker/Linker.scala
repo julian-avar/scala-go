@@ -222,6 +222,27 @@ object Linker:
       line(")")
       line()
 
+    if ctx.classLiterals.nonEmpty then
+      line("var (")
+      for (name, v) <- ctx.classLiterals do line(s"\t$v = rt.ClassOf(${FunctionEmitter.goStringLiteral(name)})")
+      line(")")
+      line()
+
+    for cls <- ctx.ifaceCasts.toList.sorted do
+      val iface = Mangling.iface(cls)
+      line(s"func ${Mangling.ifaceCast(cls)}(x any) $iface {")
+      line("\tif x == nil {")
+      line("\t\treturn nil")
+      line("\t}")
+      line(s"\treturn x.($iface)")
+      line("}")
+    for cls <- ctx.ifaceTests.toList.sorted do
+      line(s"func ${Mangling.ifaceTest(cls)}(x any) bool {")
+      line(s"\t_, ok := x.(${Mangling.iface(cls)})")
+      line("\treturn ok")
+      line("}")
+    if ctx.ifaceCasts.nonEmpty || ctx.ifaceTests.nonEmpty then line()
+
     for m <- ctx.dispatchers.toList.sortBy(_.descriptor) do
       val params = m.params.zipWithIndex.map((t, i) => (s"a$i", ctx.goType(t)))
       val result = ctx.goType(m.result)

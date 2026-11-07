@@ -24,8 +24,11 @@ type (
 	scalaHashCode interface {
 		M_hashCode_p_rI() int32
 	}
-	// scalaClassName is implemented by every generated concrete class.
+	// scalaClassName and scalaClass are implemented by every generated concrete class.
 	scalaClassName interface {
 		ScalaClassName() string
+	}
+	scalaClass interface {
+		ScalaClass() *Class
 	}
 )
