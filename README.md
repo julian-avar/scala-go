@@ -151,6 +151,7 @@ Methods annotated with `@throws` return a Go `error`. Other exceptions are panic
 | `gostd/`             | Generated facades of Go standard library packages (`scalago-gostd`)     |
 | `mill-build/src/`    | `ScalaGoModule`/`ScalaGoLibraryModule` and `TastyIR`, published as `mill-scalago` |
 | `example/`           | A program built with `ScalaGoModule`: `mill example.goRun Ada Grace`    |
+| `ecosystem/`         | Popular Scala libraries compiled from TASTy (`mill ecosystem.check`: JVM and Go agree) |
 | `bench/`             | CPU benchmarks, run on the JVM (`mill bench.run`) and as Go (`mill bench.goRun`) |
 | `tests/cases/`       | End-to-end programs with their expected output                          |
 

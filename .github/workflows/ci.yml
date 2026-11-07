@@ -74,3 +74,5 @@ jobs:
         run: ./mill --ticker false linker.test
       - name: example
         run: ./mill --ticker false example.goRun Ada Grace
+      - name: popular libraries (compiled from TASTy), JVM and Go output compared
+        run: ./mill --ticker false ecosystem.check
