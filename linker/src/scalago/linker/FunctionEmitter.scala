@@ -16,12 +16,18 @@ import scalago.ir.Tree.*
  *  `try` blocks run inside Go closures (`rt.Try`) so that `recover` can catch panics. A `return`
  *  or a jump to a label outside the closure sets the variable `ctl` to a jump code and returns
  *  from the closure; after the call, the enclosing code performs the jump.
+ *
+ *  Each emitted line carries the position of the tree being emitted ([[GoLine]]), from which
+ *  [[LineDirectives]] makes Go report Scala positions. Lines that cannot fail or call anything
+ *  (braces, jumps, declarations) are emitted without one (`emitPlain`).
  */
 final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef):
   import FunctionEmitter.*
 
   private val program = ctx.program
-  private var out = mutable.ArrayBuffer.empty[String]
+  private var out = mutable.ArrayBuffer.empty[GoLine]
+  /** The position of the innermost tree being emitted that has one. */
+  private var pos: Position = method.pos
   private var tempCounter = 0
   private val mutableLocals = mutable.HashSet.empty[LocalName]
 
@@ -40,23 +46,36 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   private val isVoidMethod = isVoidLike(method.name.result)
 
   /** Lines of the function body, without the enclosing braces. */
-  def emitBody(body: Tree): List[String] =
+  def emitBody(body: Tree): List[GoLine] =
     genTree(body, if isVoidMethod then Dest.Discard else Dest.Return)
     // Go requires a terminating statement at the end of a function with results.
-    if !isVoidMethod && !alwaysReturns(body) then emit("panic(\"unreachable\")")
-    val prelude = List.newBuilder[String]
-    if usesCtl then prelude += "var ctl int"
-    if usesRet then prelude += s"var ret ${ctx.goType(method.name.result)}"
+    if !isVoidMethod && !alwaysReturns(body) then emitPlain("panic(\"unreachable\")")
+    val prelude = List.newBuilder[GoLine]
+    if usesCtl then prelude += GoLine("var ctl int", Position.NoPosition)
+    if usesRet then prelude += GoLine(s"var ret ${ctx.goType(method.name.result)}", Position.NoPosition)
     prelude.result() ++ out.toList
 
   // ---------------------------------------------------------------------------------------------
   // Output helpers
   // ---------------------------------------------------------------------------------------------
 
-  private def emit(line: String): Unit = out += line
+  private def emit(line: String): Unit = out += GoLine(line, pos)
+
+  /** Emits a line that needs no source position: it cannot fail or call anything. */
+  private def emitPlain(line: String): Unit = out += GoLine(line, Position.NoPosition)
+
+  /** Runs `body` with `p` as the current position (unless `p` is unknown). */
+  private inline def atPos[A](p: Position)(inline body: A): A =
+    if p.line <= 0 then body
+    else
+      val saved = pos
+      pos = p
+      val result = body
+      pos = saved
+      result
 
   /** Runs `body` against a fresh buffer and returns the lines it emitted. */
-  private def nested[A](body: => A): (List[String], A) =
+  private def nested[A](body: => A): (List[GoLine], A) =
     val saved = out
     out = mutable.ArrayBuffer.empty
     try
@@ -64,7 +83,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       (out.toList, result)
     finally out = saved
 
-  private def emitIndented(lines: List[String]): Unit = lines.foreach(l => emit("\t" + l))
+  private def emitIndented(lines: List[GoLine]): Unit = lines.foreach(l => out += l.indented)
 
   private def freshTemp(): String =
     tempCounter += 1
@@ -78,20 +97,22 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   // Statements: trees whose value goes to a destination
   // ---------------------------------------------------------------------------------------------
 
-  private def genTree(tree: Tree, dest: Dest): Unit = tree match
+  private def genTree(tree: Tree, dest: Dest): Unit = atPos(tree.pos)(genTreeHere(tree, dest))
+
+  private def genTreeHere(tree: Tree, dest: Dest): Unit = tree match
     case VarDef(name, tpe, mutable, rhs) =>
       if mutable then mutableLocals += name
       val v = Mangling.local(name)
       if isVoidLike(tpe) then
         genTree(rhs, Dest.Discard)
-        emit(s"var $v any = rt.UnitValue")
+        emitPlain(s"var $v any = rt.UnitValue")
       else
         val goType = ctx.goType(tpe)
         if isControlStructure(rhs) then
-          emit(s"var $v $goType")
+          emitPlain(s"var $v $goType")
           genTree(rhs, Dest.AssignTo(v, tpe))
         else emit(s"var $v $goType = ${adapt(genExpr(rhs), rhs.tpe, tpe)}")
-      emit(s"_ = $v")
+      emitPlain(s"_ = $v")
       deliver(dest, "", Type.Void)
 
     case Block(stats, expr) =>
@@ -112,22 +133,23 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       emit(s"if ${unparen(c)} {")
       emitIndented(thenLines)
       if elseLines.nonEmpty then
-        emit("} else {")
+        emitPlain("} else {")
         emitIndented(elseLines)
-      emit("}")
+      emitPlain("}")
 
     case While(cond, body) =>
       val (condLines, c) = nested(genExpr(cond))
       val (bodyLines, _) = nested(genTree(body, Dest.Discard))
-      if condLines.isEmpty then emit(if c == "true" then "for {" else s"for ${unparen(c)} {")
+      if condLines.isEmpty then
+        if c == "true" then emitPlain("for {") else emit(s"for ${unparen(c)} {")
       else
-        emit("for {")
+        emitPlain("for {")
         emitIndented(condLines)
         emit(s"\tif !$c {")
-        emit("\t\tbreak")
-        emit("\t}")
+        emitPlain("\t\tbreak")
+        emitPlain("\t}")
       emitIndented(bodyLines)
-      emit("}")
+      emitPlain("}")
       // `while (true)` never completes normally (Scala has no `break` statement).
       if !isInfinite(cond) then deliver(dest, "", Type.Void)
 
@@ -137,12 +159,12 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       val (bodyLines, _) = nested(genTree(body, dest))
       if usedLabels.contains(label) then
         val goLabel = Mangling.label(label)
-        emit(s"$goLabel:")
-        emit("for {")
+        emitPlain(s"$goLabel:")
+        emitPlain("for {")
         emitIndented(bodyLines)
-        if !endsAbruptly(body) then emit(s"\tbreak $goLabel")
-        emit("}")
-      else bodyLines.foreach(emit)
+        if !endsAbruptly(body) then emitPlain(s"\tbreak $goLabel")
+        emitPlain("}")
+      else out ++= bodyLines
 
     case Return(None, expr) =>
       genTree(expr, Dest.Return)
@@ -153,7 +175,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       if info.dest != Dest.Return && !endsAbruptly(expr) then
         if info.depth == depth then
           usedLabels += label
-          emit(s"break ${Mangling.label(label)}")
+          emitPlain(s"break ${Mangling.label(label)}")
         else jumpOutOfClosure(info.code)
 
     case Assign(lhs, rhs) =>
@@ -172,11 +194,11 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
           case StringLiteral(s) => goStringLiteral(s)
           case lit              => genExpr(lit)
         }
-        emit(s"case ${values.mkString(", ")}:")
+        emitPlain(s"case ${values.mkString(", ")}:")
         emitIndented(nested(genTree(body, dest))._1)
-      emit("default:")
+      emitPlain("default:")
       emitIndented(nested(genTree(default, dest))._1)
-      emit("}")
+      emitPlain("}")
 
     case TryCatch(block, cases, tpe) =>
       withValueDest(dest, tpe) { bodyDest =>
@@ -186,31 +208,33 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
           val (lines, _) = nested {
             c.binder.foreach { b =>
               val v = Mangling.local(b)
-              emit(s"var $v ${ctx.goType(c.tpe)} = ${ctx.cast(exc, Type.Object, c.tpe)}")
-              emit(s"_ = $v")
+              // The cast cannot fail: the exception's type was tested.
+              emitPlain(s"var $v ${ctx.goType(c.tpe)} = ${ctx.cast(exc, Type.Object, c.tpe)}")
+              emitPlain(s"_ = $v")
             }
             genTree(c.body, bodyDest)
           }
           (test, lines)
         }
-        emit(s"if $exc != nil {")
+        // The exception's stack trace was captured when it was created: rethrowing needs no position.
+        emitPlain(s"if $exc != nil {")
         branches.zipWithIndex.foreach { case ((test, lines), i) =>
-          emit(if i == 0 then s"\tif ${unparen(test)} {" else s"\t} else if ${unparen(test)} {")
-          lines.foreach(l => emit("\t\t" + l))
+          emitPlain(if i == 0 then s"\tif ${unparen(test)} {" else s"\t} else if ${unparen(test)} {")
+          lines.foreach(l => out += l.indented.indented)
         }
-        emit("\t} else {")
-        emit(s"\t\tpanic(rt.Exc($exc))")
-        emit("\t}")
-        emit("}")
+        emitPlain("\t} else {")
+        emitPlain(s"\t\tpanic(rt.Exc($exc))")
+        emitPlain("\t}")
+        emitPlain("}")
       }
 
     case TryFinally(block, finalizer, tpe) =>
       withValueDest(dest, tpe) { bodyDest =>
         val (exc, jumps) = runInTryClosure(block, bodyDest, dispatch = false)
         genTree(finalizer, Dest.Discard)
-        emit(s"if $exc != nil {")
-        emit(s"\tpanic(rt.Exc($exc))")
-        emit("}")
+        emitPlain(s"if $exc != nil {")
+        emitPlain(s"\tpanic(rt.Exc($exc))")
+        emitPlain("}")
         dispatchJumps(jumps)
       }
 
@@ -225,7 +249,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       deliver(dest, "", Type.Void)
     case Dest.Return =>
       val temp = freshTemp()
-      emit(s"var $temp ${ctx.goType(tpe)}")
+      emitPlain(s"var $temp ${ctx.goType(tpe)}")
       body(Dest.AssignTo(temp, tpe))
       deliver(dest, temp, tpe)
 
@@ -242,7 +266,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     val jumps = pendingJumps.pop().toSet
     emit(s"$exc := rt.Try(func() {")
     emitIndented(lines)
-    emit("})")
+    emitPlain("})")
     if dispatch then dispatchJumps(jumps)
     (exc, jumps)
 
@@ -251,31 +275,31 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     var propagate = false
     for code <- jumps.toList.sorted do
       if code == ReturnCode && depth == 0 then
-        emit("if ctl == 1 {")
-        emit(if isVoidMethod then "\treturn" else "\treturn ret")
-        emit("}")
+        emitPlain("if ctl == 1 {")
+        emitPlain(if isVoidMethod then "\treturn" else "\treturn ret")
+        emitPlain("}")
       else
         labels.collectFirst { case (label, info) if info.code == code => (label, info) } match
           case Some((label, info)) if info.depth == depth =>
             usedLabels += label
-            emit(s"if ctl == $code {")
-            emit("\tctl = 0")
-            emit(s"\tbreak ${Mangling.label(label)}")
-            emit("}")
+            emitPlain(s"if ctl == $code {")
+            emitPlain("\tctl = 0")
+            emitPlain(s"\tbreak ${Mangling.label(label)}")
+            emitPlain("}")
           case _ =>
             propagate = true
             pendingJumps.top += code
     if propagate then
-      emit("if ctl != 0 {")
-      emit("\treturn")
-      emit("}")
+      emitPlain("if ctl != 0 {")
+      emitPlain("\treturn")
+      emitPlain("}")
 
   /** Inside a try closure: requests a jump to be performed by the enclosing code. */
   private def jumpOutOfClosure(code: Int): Unit =
     usesCtl = true
     pendingJumps.top += code
-    emit(s"ctl = $code")
-    emit("return")
+    emitPlain(s"ctl = $code")
+    emitPlain("return")
 
   /** Sends the value of an already-evaluated expression to `dest`. `expr` is empty for no value. */
   private def deliver(dest: Dest, expr: String, tpe: Type): Unit = dest match
@@ -286,20 +310,26 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     case Dest.Return if depth > 0 =>
       if !isVoidMethod && !isVoidLike(tpe) then
         usesRet = true
-        emit(s"ret = ${adapt(expr, tpe, method.name.result)}")
+        emitUsing(adapt(expr, tpe, method.name.result))(e => s"ret = $e")
       else if expr.nonEmpty then deliver(Dest.Discard, expr, tpe)
       jumpOutOfClosure(ReturnCode)
     case Dest.Return =>
       if isVoidMethod then
         if expr.nonEmpty then deliver(Dest.Discard, expr, tpe)
-        emit("return")
+        emitPlain("return")
       else if isVoidLike(tpe) then
         // Only reachable in ill-typed trees; keep the Go code well-formed.
         if expr.nonEmpty then deliver(Dest.Discard, expr, tpe)
-        emit("panic(\"unreachable\")")
-      else emit(s"return ${adapt(expr, tpe, method.name.result)}")
+        emitPlain("panic(\"unreachable\")")
+      else emitUsing(adapt(expr, tpe, method.name.result))(e => s"return $e")
     case Dest.AssignTo(v, target) =>
-      if expr.nonEmpty then emit(s"$v = ${adapt(expr, tpe, target)}")
+      if expr.nonEmpty then emitUsing(adapt(expr, tpe, target))(e => s"$v = $e")
+
+  /** Emits a line that uses the value `expr`: without a position if `expr` is a variable or a
+   *  literal, which cannot fail.
+   */
+  private def emitUsing(expr: String)(line: String => String): Unit =
+    if isSimple(expr) then emitPlain(line(expr)) else emit(line(expr))
 
   private def genAssign(lhs: Tree, rhs: Tree): Unit = lhs match
     case VarRef(name, tpe) =>
@@ -349,7 +379,9 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   // ---------------------------------------------------------------------------------------------
 
   /** Go expression for `tree`, emitting any statements it needs first. Empty for void trees. */
-  private def genExpr(tree: Tree): String = tree match
+  private def genExpr(tree: Tree): String = atPos(tree.pos)(genExprHere(tree))
+
+  private def genExprHere(tree: Tree): String = tree match
     case Block(stats, expr) =>
       val (live, dead) = stats.span(!endsAbruptly(_))
       live.foreach(genTree(_, Dest.Discard))
@@ -470,7 +502,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   private def viaTemp(tree: Tree): String =
     val temp = freshTemp()
     val goType = ctx.goType(tree.tpe)
-    emit(s"var $temp ${if goType.isEmpty then "any" else goType}")
+    emitPlain(s"var $temp ${if goType.isEmpty then "any" else goType}")
     genTree(tree, Dest.AssignTo(temp, tree.tpe))
     temp
 
@@ -482,10 +514,10 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     else
       val temp = freshTemp()
       emit(s"var $temp bool = $c")
-      emit(if op == "&&" then s"if $temp {" else s"if !$temp {")
+      emitPlain(if op == "&&" then s"if $temp {" else s"if !$temp {")
       emitIndented(rhsLines)
       emit(s"\t$temp = $r")
-      emit("}")
+      emitPlain("}")
       temp
 
   /** Evaluates `trees` left to right, spilling earlier results that later statements could affect.
@@ -502,7 +534,8 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     for i <- trees.indices.reverse if marks(i) < end && !isPure(trees(i)) do
       val temp = freshTemp()
       val goType = ctx.goType(trees(i).tpe)
-      out.insert(marks(i), s"var $temp ${if goType.isEmpty then "any" else goType} = ${exprs(i)}")
+      val p = if trees(i).pos.line > 0 then trees(i).pos else pos
+      out.insert(marks(i), GoLine(s"var $temp ${if goType.isEmpty then "any" else goType} = ${exprs(i)}", p))
       exprs(i) = temp
     exprs.toList
 

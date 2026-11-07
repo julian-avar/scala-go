@@ -9,14 +9,19 @@ import scalago.ir.*
  *  `[A-Za-z0-9]` is kept, `_` becomes `_u`, `.` becomes `_d`, `$` becomes `_S`, and anything
  *  else becomes `_x` followed by four hex digits.
  *
+ *  An escaped name never contains `__` and never ends with `_`, so `__` separates a class from
+ *  one of its members, and the runtime can demangle `Impl_` names back to Scala class and method
+ *  names for stack traces (`rt/stacktrace.go`).
+ *
  *  Package-level declarations use these prefixes:
  *  {{{
  *  S_<class>                 struct holding the fields of <class> (embeds the superclass struct)
  *  C_<class>                 interface: the Go type of references to <class>
- *  Impl_<class>_<method>     implementation of a method, taking `this` as a C_<class>
- *  New_<class>_<ctor>        allocates an instance and runs a constructor
+ *  Impl_<class>__<method>    implementation of a method, taking `this` as a C_<class>
+ *  Fwd_<class>__<method>     static forwarder to a module's method (the entry point's `main`)
+ *  New_<class>__<ctor>       allocates an instance and runs a constructor
  *  Mod_<class>()             accessor for the instance of a module class
- *  SF_<class>_<field>        static field
+ *  SF_<class>__<field>       static field
  *  Clinit_<class>()          runs the static initializer once
  *  Disp_<method>             dynamic dispatch on receivers that may be strings or boxed values
  *  InstanceOf_<class>        type test for classes that strings or boxed values may belong to
@@ -54,7 +59,9 @@ object Mangling:
     case Type.Class(name) => s"L${escape(name)}_e"
     case Type.Array(elem) => s"A${typeCode(elem)}"
 
-  /** Constructors are named `_init` (escaped names never start with `_i`). */
+  /** Constructors are named `_init` (escaped names never start with `_i`). The simple name ends at
+   *  the first `_p`, which escaped names never contain.
+   */
   def method(m: MethodName): String =
     val simple = if m.isConstructor then "_init" else escape(m.simple)
     s"${simple}_p${m.params.map(typeCode).mkString}_r${typeCode(m.result)}"
@@ -62,11 +69,12 @@ object Mangling:
   def struct(cls: ClassName): String = s"S_${escape(cls)}"
   def iface(cls: ClassName): String = s"C_${escape(cls)}"
   def accessor(cls: ClassName): String = s"A_${escape(cls)}"
-  def impl(cls: ClassName, m: MethodName): String = s"Impl_${escape(cls)}_${method(m)}"
-  def newInstance(cls: ClassName, ctor: MethodName): String = s"New_${escape(cls)}_${method(ctor)}"
+  def impl(cls: ClassName, m: MethodName): String = s"Impl_${escape(cls)}__${method(m)}"
+  def staticForwarder(cls: ClassName, m: MethodName): String = s"Fwd_${escape(cls)}__${method(m)}"
+  def newInstance(cls: ClassName, ctor: MethodName): String = s"New_${escape(cls)}__${method(ctor)}"
   def module(cls: ClassName): String = s"Mod_${escape(cls)}"
   def moduleVar(cls: ClassName): String = s"mod_${escape(cls)}"
-  def staticField(cls: ClassName, field: String): String = s"SF_${escape(cls)}_${escape(field)}"
+  def staticField(cls: ClassName, field: String): String = s"SF_${escape(cls)}__${escape(field)}"
   def virtualMethod(m: MethodName): String = s"M_${method(m)}"
   def field(name: String): String = s"f_${escape(name)}"
   def local(name: LocalName): String = s"l_${escape(name)}"
