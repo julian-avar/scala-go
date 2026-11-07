@@ -1,0 +1,5 @@
+[{"id":1,"items":["x"]},{"id":2,"items":["x","x"]},{"id":3,"items":["x","x","x"]}]
+6
+total 60
+2024-03-01
+gogogo

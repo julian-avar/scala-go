@@ -153,6 +153,7 @@ Methods annotated with `@throws` return a Go `error`. Other exceptions are panic
 | `example/`           | A program built with `ScalaGoModule`: `mill example.goRun Ada Grace`    |
 | `ecosystem/`         | Popular Scala libraries compiled from TASTy (`mill ecosystem.check`: JVM and Go agree) |
 | `bench/`             | CPU benchmarks, run on the JVM (`mill bench.run`) and as Go (`mill bench.goRun`) |
+| `tests/published/`   | A project using only the published artifacts (`tests/published/check.sh` after `publishLocal`) |
 | `tests/cases/`       | End-to-end programs with their expected output                          |
 
 The `stdlib` module produces the Scala standard library's IR (`mill stdlib.ir`).

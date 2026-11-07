@@ -76,3 +76,7 @@ jobs:
         run: ./mill --ticker false example.goRun Ada Grace
       - name: popular libraries (compiled from TASTy), JVM and Go output compared
         run: ./mill --ticker false ecosystem.check
+      - name: published artifacts, used by an outside project
+        run: |
+          ./mill --ticker false __.publishLocal
+          tests/published/check.sh
