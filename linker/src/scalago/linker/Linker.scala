@@ -46,7 +46,11 @@ object Linker:
        *  messages give Scala positions (see [[LineDirectives]]). Without them, they give positions
        *  in the generated Go code, and stack traces have no file names or line numbers.
        */
-      lineDirectives: Boolean = true
+      lineDirectives: Boolean = true,
+      /** Reachable uses of APIs without an implementation: link errors (the default), or
+       *  warnings and exceptions thrown when they run (see [[Analyzer.MissingApis]]).
+       */
+      missingApis: Analyzer.MissingApis = Analyzer.MissingApis.Error
   ):
     def rootPackageName: String =
       packageName.getOrElse {
@@ -82,14 +86,17 @@ object Linker:
     "Interrupted"            -> "java.lang.InterruptedException",
     "NoClassDefFound"        -> "java.lang.NoClassDefFoundError",
     "IndexOutOfBounds"       -> "java.lang.IndexOutOfBoundsException",
-    "IO"                     -> "java.io.IOException"
+    "IO"                     -> "java.io.IOException",
+    "NoSuchMethod"           -> "java.lang.NoSuchMethodError",
+    "NoSuchField"            -> "java.lang.NoSuchFieldError"
   )
   private val MessageConstructor = MethodName(MethodName.ConstructorSimpleName, List(Type.String), Type.Void)
 
-  def link(classpath: Seq[Path], outputDir: Path, config: Config = Config()): Unit =
+  /** Links the program and writes its Go module; returns the warnings. */
+  def link(classpath: Seq[Path], outputDir: Path, config: Config = Config()): List[String] =
     val program = Program(IRLoader.load(classpath))
     val errors = Errors()
-    val analyzer = Analyzer(program, Lambdas(program), errors)
+    val analyzer = Analyzer(program, Lambdas(program), errors, config.missingApis)
 
     // Roots: the entry point (or the exports), the methods the runtime calls dynamically, and the
     // exceptions it throws.
@@ -154,6 +161,7 @@ object Linker:
     writeGo("support.go", support)
     for (fileName, body) <- classFiles do writeGo(fileName, body)
     copyRuntime(outputDir.resolve(RuntimeDir))
+    errors.warnings
 
   private def goMod(config: Config): String =
     val sb = StringBuilder(s"module ${config.goModulePath}\n\ngo 1.22\n")

@@ -4,12 +4,15 @@ import scala.collection.mutable
 
 import scalago.ir.*
 
-/** Collects linking errors so that all of them can be reported at once. */
+/** Collects linking errors (and warnings) so that all of them can be reported at once. */
 final class Errors:
   private val messages = mutable.LinkedHashSet.empty[String]
+  private val warningMessages = mutable.LinkedHashSet.empty[String]
   def add(pos: Position, msg: String): Unit = messages += s"$pos: $msg"
   def add(msg: String): Unit = messages += msg
+  def warn(pos: Position, msg: String): Unit = warningMessages += s"$pos: warning: $msg"
   def all: List[String] = messages.toList
+  def warnings: List[String] = warningMessages.toList
 
 /** Shared state for code generation after analysis: Go types, and the program-wide helpers
  *  (string literals, dispatchers, type tests) that method bodies request.

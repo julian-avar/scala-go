@@ -93,7 +93,10 @@ class EndToEndTests extends munit.FunSuite:
       goReplaces = goModules,
       library = isLibrary,
       // SCALAGO_LINE_DIRECTIVES=false: Go positions in Go error messages, for debugging the linker.
-      lineDirectives = !sys.env.get("SCALAGO_LINE_DIRECTIVES").contains("false")
+      lineDirectives = !sys.env.get("SCALAGO_LINE_DIRECTIVES").contains("false"),
+      // `missing-apis.txt`: linked with --missing-apis throw (the file says why).
+      missingApis =
+        if Files.exists(dir.resolve("missing-apis.txt")) then Analyzer.MissingApis.Throw else Analyzer.MissingApis.Error
     )
     val goDir = work.resolve("go")
     val classpath = (classes +: Path.of(userLibrary) +: extraIR) ++ libraryIR

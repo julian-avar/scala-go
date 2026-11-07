@@ -276,3 +276,12 @@ class LinkageError(message: String, cause: Throwable) extends Error(message, cau
 
 class NoClassDefFoundError(message: String) extends LinkageError(message):
   def this() = this(null)
+
+class IncompatibleClassChangeError(message: String) extends LinkageError(message):
+  def this() = this(null)
+
+class NoSuchMethodError(message: String) extends IncompatibleClassChangeError(message):
+  def this() = this(null)
+
+class NoSuchFieldError(message: String) extends IncompatibleClassChangeError(message):
+  def this() = this(null)

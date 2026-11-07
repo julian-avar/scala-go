@@ -104,6 +104,13 @@ trait ScalaGoModule extends ScalaModule {
    */
   def goLineDirectives: T[Boolean] = Task { true }
 
+  /** What reachable uses of APIs scala-go does not implement do: `"error"` (the default) fails
+   *  linking; `"throw"` makes them warnings, and they throw the JVM's linkage errors
+   *  (`NoClassDefFoundError`, `NoSuchMethodError`, ...) if they run. Reachability
+   *  over-approximates, so code that never runs can need APIs that do not exist.
+   */
+  def goMissingApis: T[String] = Task { "error" }
+
   /** Directories of local Go modules (each with its own `go.mod`) that the program's Go facades
    *  import, e.g. `Task.Sources(moduleDir / "go" / "mylib")`.
    */
@@ -165,6 +172,7 @@ trait ScalaGoModule extends ScalaModule {
       if (goLibrary()) Seq("--library", "true") else Seq("--main", scalaGoMainObject()),
       if (goPackageName().nonEmpty) Seq("--package", goPackageName()) else Seq.empty[String],
       if (goLineDirectives()) Seq.empty[String] else Seq("--line-directives", "false"),
+      Seq("--missing-apis", goMissingApis()),
       "--go-module", goModulePath(),
       goModuleArgs()
     ).call(stdout = os.Inherit, stderr = os.Inherit, check = false)

@@ -1,0 +1,5 @@
+linked and running
+static method: java.lang.NoSuchMethodError, true
+class: java.lang.NoClassDefFoundError, true
+false
+done
