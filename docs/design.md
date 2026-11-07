@@ -574,6 +574,10 @@ Known gaps:
   `Date`/`Calendar`/`Timer`, `EnumSet`/`EnumMap`, `WeakHashMap`, `ServiceLoader`,
   `Arrays.compare`/`mismatch` and the range forms of `Arrays.equals`, `String.CASE_INSENSITIVE_ORDER`,
   `String.join(delimiter, Iterable)`, and `Properties` keys continued over several lines.
+- Scala libraries are compiled from their TASTy, so classes of a library written in Java (which
+  have none) are missing; natives cover those of popular libraries that reachable code uses
+  (ujson's float formatting). `WeakHashMap` holds its keys strongly (Go's weak pointers need
+  Go 1.24); `java.nio.CharBuffer` only wraps text for use as a `CharSequence`.
 - Locales: there is no locale data. `java.util.Locale` carries identifiers only, and every
   locale formats and maps case as `Locale.ROOT` does (so `String.format(Locale.GERMANY, "%.1f",
   x)` uses a `.`).
