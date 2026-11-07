@@ -615,8 +615,6 @@ Known gaps:
   x)` uses a `.`).
 - Reflection: `getClass` and `Class` names work; nothing else.
 - `BigInteger` and `BigDecimal` cannot be subclassed (they are Go values).
-- String literals cannot contain unpaired surrogates (the IR's string table is UTF-8; they
-  become `?`). Strings built at run time can.
 - Concurrency: `java.util.concurrent` beyond what gears needs (executors, concurrent maps,
   `CompletableFuture`), thread groups. `scala.concurrent.Future` needs an
   `ExecutionContext` on `java.util.concurrent`; gears is the supported API.

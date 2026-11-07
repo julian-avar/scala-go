@@ -1,7 +1,6 @@
 package scalago.ir
 
 import java.io.*
-import java.nio.charset.StandardCharsets.UTF_8
 import scala.collection.mutable
 
 /** Binary format of a `.goir` file: one `ClassDef` per file.
@@ -11,7 +10,7 @@ import scala.collection.mutable
  */
 object Serialization:
   val Magic: Int = 0x53474f49 // "SGOI"
-  val FormatVersion: Int = 5
+  val FormatVersion: Int = 6
   val FileExtension: String = ".goir"
 
   final class IRFormatException(msg: String) extends IOException(msg)
@@ -27,12 +26,44 @@ object Serialization:
     out.writeInt(FormatVersion)
     out.writeInt(strings.size)
     for s <- strings.keys do
-      val bytes = s.getBytes(UTF_8)
+      val bytes = encodeString(s)
       out.writeInt(bytes.length)
       out.write(bytes)
     body.writeTo(out)
     out.flush()
     result.toByteArray
+
+  /** Strings are encoded as each UTF-16 unit on its own (like Java's modified UTF-8, without its
+   *  64 KB limit): unlike UTF-8, this keeps unpaired surrogates, which string literals may hold.
+   */
+  private def encodeString(s: String): Array[Byte] =
+    val out = ByteArrayOutputStream(s.length)
+    for c <- s do
+      if c >= 0x01 && c <= 0x7f then out.write(c)
+      else if c <= 0x7ff then
+        out.write(0xc0 | (c >> 6))
+        out.write(0x80 | (c & 0x3f))
+      else
+        out.write(0xe0 | (c >> 12))
+        out.write(0x80 | ((c >> 6) & 0x3f))
+        out.write(0x80 | (c & 0x3f))
+    out.toByteArray
+
+  private def decodeString(bytes: Array[Byte]): String =
+    val sb = java.lang.StringBuilder(bytes.length)
+    var i = 0
+    while i < bytes.length do
+      val b = bytes(i) & 0xff
+      if b < 0x80 then
+        sb.append(b.toChar)
+        i += 1
+      else if b < 0xe0 then
+        sb.append((((b & 0x1f) << 6) | (bytes(i + 1) & 0x3f)).toChar)
+        i += 2
+      else
+        sb.append((((b & 0x0f) << 12) | ((bytes(i + 1) & 0x3f) << 6) | (bytes(i + 2) & 0x3f)).toChar)
+        i += 3
+    sb.toString
 
   def deserialize(bytes: Array[Byte]): ClassDef =
     val in = DataInputStream(ByteArrayInputStream(bytes))
@@ -43,7 +74,7 @@ object Serialization:
     val strings = Array.fill(in.readInt()) {
       val bytes = new Array[Byte](in.readInt())
       in.readFully(bytes)
-      String(bytes, UTF_8)
+      decodeString(bytes)
     }
     Reader(in, strings).readClassDef()
 

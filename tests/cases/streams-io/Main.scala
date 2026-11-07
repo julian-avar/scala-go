@@ -28,8 +28,8 @@ object Main:
     println(s.chars().count())
     println(s.chars().filter(Character.isLetter).mapToObj(c => c.toChar.toString).collect(Collectors.joining()))
     println(s.chars().map(Character.toUpperCase).boxed().toList)
-    // A lone surrogate built at run time: the IR's UTF-8 string table cannot hold one.
-    val emoji = "a\uD83D\uDE00b" + 0xD800.toChar + "c"
+    // A surrogate pair and a lone surrogate, in a literal.
+    val emoji = "a\uD83D\uDE00b\uD800c"
     show(emoji.chars().count(), emoji.codePoints().count())
     println(emoji.codePoints().mapToObj(Integer.toHexString).toList)
     val cs: CharSequence = "xyz"
