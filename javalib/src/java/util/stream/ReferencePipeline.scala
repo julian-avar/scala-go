@@ -57,8 +57,8 @@ private[stream] class ReferencePipeline[T](previous: AbstractPipeline, setFlags:
     val p = pred.asInstanceOf[Predicate[Any]]
     op[T](0, Spliterator.SIZED)(down =>
       new Sink.Chained(down):
-        override def begin(size: Long): Unit = downstream.begin(-1)
-        override def accept(t: Any): Unit = if p.test(t) then downstream.accept(t)
+        override def begin(size: Long): Unit = down.begin(-1)
+        override def accept(t: Any): Unit = if p.test(t) then down.accept(t)
     )
 
   def map[R](mapper: Function[? >: T, ? <: R]): Stream[R] =
@@ -66,7 +66,7 @@ private[stream] class ReferencePipeline[T](previous: AbstractPipeline, setFlags:
     val f = mapper.asInstanceOf[Function[Any, Any]]
     op[R](0, NotSortedOrDistinct)(down =>
       new Sink.Chained(down):
-        override def accept(t: Any): Unit = downstream.accept(f.apply(t))
+        override def accept(t: Any): Unit = down.accept(f.apply(t))
     )
 
   def mapToInt(mapper: ToIntFunction[? >: T]): IntStream =
@@ -74,7 +74,7 @@ private[stream] class ReferencePipeline[T](previous: AbstractPipeline, setFlags:
     val f = mapper.asInstanceOf[ToIntFunction[Any]]
     new IntPipeline(this, 0, NotSortedOrDistinct, down =>
       new Sink.Chained(down):
-        override def accept(t: Any): Unit = downstream.accept(f.applyAsInt(t))
+        override def accept(t: Any): Unit = down.accept(f.applyAsInt(t))
     )
 
   def mapToLong(mapper: ToLongFunction[? >: T]): LongStream =
@@ -82,7 +82,7 @@ private[stream] class ReferencePipeline[T](previous: AbstractPipeline, setFlags:
     val f = mapper.asInstanceOf[ToLongFunction[Any]]
     new LongPipeline(this, 0, NotSortedOrDistinct, down =>
       new Sink.Chained(down):
-        override def accept(t: Any): Unit = downstream.accept(f.applyAsLong(t))
+        override def accept(t: Any): Unit = down.accept(f.applyAsLong(t))
     )
 
   def mapToDouble(mapper: ToDoubleFunction[? >: T]): DoubleStream =
@@ -90,7 +90,7 @@ private[stream] class ReferencePipeline[T](previous: AbstractPipeline, setFlags:
     val f = mapper.asInstanceOf[ToDoubleFunction[Any]]
     new DoublePipeline(this, 0, NotSortedOrDistinct, down =>
       new Sink.Chained(down):
-        override def accept(t: Any): Unit = downstream.accept(f.applyAsDouble(t))
+        override def accept(t: Any): Unit = down.accept(f.applyAsDouble(t))
     )
 
   def flatMap[R](mapper: Function[? >: T, ? <: Stream[? <: R]]): Stream[R] =
@@ -130,8 +130,8 @@ private[stream] class ReferencePipeline[T](previous: AbstractPipeline, setFlags:
     val f = mapper.asInstanceOf[BiConsumer[Any, Consumer[Any]]]
     op[R](0, NotSortedDistinctOrSized)(down =>
       new Sink.Chained(down):
-        override def begin(size: Long): Unit = downstream.begin(-1)
-        override def accept(t: Any): Unit = f.accept(t, downstream)
+        override def begin(size: Long): Unit = down.begin(-1)
+        override def accept(t: Any): Unit = f.accept(t, down)
     )
 
   override def mapMultiToInt(mapper: BiConsumer[? >: T, ? >: IntConsumer]): IntStream =
@@ -139,8 +139,8 @@ private[stream] class ReferencePipeline[T](previous: AbstractPipeline, setFlags:
     val f = mapper.asInstanceOf[BiConsumer[Any, IntConsumer]]
     new IntPipeline(this, 0, NotSortedDistinctOrSized, down =>
       new Sink.Chained(down):
-        override def begin(size: Long): Unit = downstream.begin(-1)
-        override def accept(t: Any): Unit = f.accept(t, downstream)
+        override def begin(size: Long): Unit = down.begin(-1)
+        override def accept(t: Any): Unit = f.accept(t, down)
     )
 
   override def mapMultiToLong(mapper: BiConsumer[? >: T, ? >: LongConsumer]): LongStream =
@@ -148,8 +148,8 @@ private[stream] class ReferencePipeline[T](previous: AbstractPipeline, setFlags:
     val f = mapper.asInstanceOf[BiConsumer[Any, LongConsumer]]
     new LongPipeline(this, 0, NotSortedDistinctOrSized, down =>
       new Sink.Chained(down):
-        override def begin(size: Long): Unit = downstream.begin(-1)
-        override def accept(t: Any): Unit = f.accept(t, downstream)
+        override def begin(size: Long): Unit = down.begin(-1)
+        override def accept(t: Any): Unit = f.accept(t, down)
     )
 
   override def mapMultiToDouble(mapper: BiConsumer[? >: T, ? >: DoubleConsumer]): DoubleStream =
@@ -157,8 +157,8 @@ private[stream] class ReferencePipeline[T](previous: AbstractPipeline, setFlags:
     val f = mapper.asInstanceOf[BiConsumer[Any, DoubleConsumer]]
     new DoublePipeline(this, 0, NotSortedDistinctOrSized, down =>
       new Sink.Chained(down):
-        override def begin(size: Long): Unit = downstream.begin(-1)
-        override def accept(t: Any): Unit = f.accept(t, downstream)
+        override def begin(size: Long): Unit = down.begin(-1)
+        override def accept(t: Any): Unit = f.accept(t, down)
     )
 
   def peek(action: Consumer[? >: T]): Stream[T] =
@@ -168,7 +168,7 @@ private[stream] class ReferencePipeline[T](previous: AbstractPipeline, setFlags:
       new Sink.Chained(down):
         override def accept(t: Any): Unit =
           a.accept(t)
-          downstream.accept(t)
+          down.accept(t)
     )
 
   override def takeWhile(pred: Predicate[? >: T]): Stream[T] =
@@ -177,12 +177,12 @@ private[stream] class ReferencePipeline[T](previous: AbstractPipeline, setFlags:
     op[T](ShortCircuit, Spliterator.SIZED)(down =>
       new Sink.Chained(down):
         private var taking = true
-        override def begin(size: Long): Unit = downstream.begin(-1)
+        override def begin(size: Long): Unit = down.begin(-1)
         override def accept(t: Any): Unit =
           if taking then
             taking = p.test(t)
-            if taking then downstream.accept(t)
-        override def cancellationRequested(): Boolean = !taking || downstream.cancellationRequested()
+            if taking then down.accept(t)
+        override def cancellationRequested(): Boolean = !taking || down.cancellationRequested()
     )
 
   override def dropWhile(pred: Predicate[? >: T]): Stream[T] =
@@ -191,10 +191,10 @@ private[stream] class ReferencePipeline[T](previous: AbstractPipeline, setFlags:
     op[T](0, Spliterator.SIZED)(down =>
       new Sink.Chained(down):
         private var taking = false
-        override def begin(size: Long): Unit = downstream.begin(-1)
+        override def begin(size: Long): Unit = down.begin(-1)
         override def accept(t: Any): Unit =
           if !taking then taking = !p.test(t)
-          if taking then downstream.accept(t)
+          if taking then down.accept(t)
     )
 
   // ---- Stateful operations ----------------------------------------------------------------------
@@ -230,7 +230,7 @@ private[stream] class ReferencePipeline[T](previous: AbstractPipeline, setFlags:
   private def slice(toSkip: Long, maxSize: Long): Stream[T] =
     new ReferencePipeline[T](this, sliceFlags(maxSize), 0, down =>
       new SliceSink(down, toSkip, maxSize):
-        override def accept(t: Any): Unit = if take() then downstream.accept(t)
+        override def accept(t: Any): Unit = if take() then down.accept(t)
     ):
       override private[stream] def exactOutputSize(previousSize: Long): Long = sliceSize(previousSize, toSkip, maxSize)
 

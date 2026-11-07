@@ -51,15 +51,15 @@ private[stream] class IntPipeline(previous: AbstractPipeline, setFlags: Int, cle
     Objects.requireNonNull(pred)
     op(0, Spliterator.SIZED)(down =>
       new Sink.Chained(down):
-        override def begin(size: Long): Unit = downstream.begin(-1)
-        override def accept(v: Int): Unit = if pred.test(v) then downstream.accept(v)
+        override def begin(size: Long): Unit = down.begin(-1)
+        override def accept(v: Int): Unit = if pred.test(v) then down.accept(v)
     )
 
   def map(mapper: IntUnaryOperator): IntStream =
     Objects.requireNonNull(mapper)
     op(0, NotSortedOrDistinct)(down =>
       new Sink.Chained(down):
-        override def accept(v: Int): Unit = downstream.accept(mapper.applyAsInt(v))
+        override def accept(v: Int): Unit = down.accept(mapper.applyAsInt(v))
     )
 
   def mapToObj[U](mapper: IntFunction[? <: U]): Stream[U] =
@@ -69,7 +69,7 @@ private[stream] class IntPipeline(previous: AbstractPipeline, setFlags: Int, cle
   private def mapToObj[U](mapper: IntFunction[? <: U], clearFlags: Int): Stream[U] =
     new ReferencePipeline[U](this, 0, clearFlags, down =>
       new Sink.Chained(down):
-        override def accept(v: Int): Unit = downstream.accept(mapper.apply(v): Any)
+        override def accept(v: Int): Unit = down.accept(mapper.apply(v): Any)
     )
 
   def boxed(): Stream[Integer] = mapToObj[Integer](v => Integer.valueOf(v), 0)
@@ -78,26 +78,26 @@ private[stream] class IntPipeline(previous: AbstractPipeline, setFlags: Int, cle
     Objects.requireNonNull(mapper)
     new LongPipeline(this, 0, NotSortedOrDistinct, down =>
       new Sink.Chained(down):
-        override def accept(v: Int): Unit = downstream.accept(mapper.applyAsLong(v))
+        override def accept(v: Int): Unit = down.accept(mapper.applyAsLong(v))
     )
 
   def mapToDouble(mapper: IntToDoubleFunction): DoubleStream =
     Objects.requireNonNull(mapper)
     new DoublePipeline(this, 0, NotSortedOrDistinct, down =>
       new Sink.Chained(down):
-        override def accept(v: Int): Unit = downstream.accept(mapper.applyAsDouble(v))
+        override def accept(v: Int): Unit = down.accept(mapper.applyAsDouble(v))
     )
 
   def asLongStream(): LongStream =
     new LongPipeline(this, 0, 0, down =>
       new Sink.Chained(down):
-        override def accept(v: Int): Unit = downstream.accept(v.toLong)
+        override def accept(v: Int): Unit = down.accept(v.toLong)
     )
 
   def asDoubleStream(): DoubleStream =
     new DoublePipeline(this, 0, 0, down =>
       new Sink.Chained(down):
-        override def accept(v: Int): Unit = downstream.accept(v.toDouble)
+        override def accept(v: Int): Unit = down.accept(v.toDouble)
     )
 
   def flatMap(mapper: IntFunction[? <: IntStream]): IntStream =
@@ -111,8 +111,8 @@ private[stream] class IntPipeline(previous: AbstractPipeline, setFlags: Int, cle
     Objects.requireNonNull(mapper)
     op(0, NotSortedDistinctOrSized)(down =>
       new Sink.Chained(down):
-        override def begin(size: Long): Unit = downstream.begin(-1)
-        override def accept(v: Int): Unit = mapper.accept(v, downstream)
+        override def begin(size: Long): Unit = down.begin(-1)
+        override def accept(v: Int): Unit = mapper.accept(v, down)
     )
 
   def peek(action: IntConsumer): IntStream =
@@ -121,7 +121,7 @@ private[stream] class IntPipeline(previous: AbstractPipeline, setFlags: Int, cle
       new Sink.Chained(down):
         override def accept(v: Int): Unit =
           action.accept(v)
-          downstream.accept(v)
+          down.accept(v)
     )
 
   override def takeWhile(pred: IntPredicate): IntStream =
@@ -129,12 +129,12 @@ private[stream] class IntPipeline(previous: AbstractPipeline, setFlags: Int, cle
     op(ShortCircuit, Spliterator.SIZED)(down =>
       new Sink.Chained(down):
         private var taking = true
-        override def begin(size: Long): Unit = downstream.begin(-1)
+        override def begin(size: Long): Unit = down.begin(-1)
         override def accept(v: Int): Unit =
           if taking then
             taking = pred.test(v)
-            if taking then downstream.accept(v)
-        override def cancellationRequested(): Boolean = !taking || downstream.cancellationRequested()
+            if taking then down.accept(v)
+        override def cancellationRequested(): Boolean = !taking || down.cancellationRequested()
     )
 
   override def dropWhile(pred: IntPredicate): IntStream =
@@ -142,10 +142,10 @@ private[stream] class IntPipeline(previous: AbstractPipeline, setFlags: Int, cle
     op(0, Spliterator.SIZED)(down =>
       new Sink.Chained(down):
         private var taking = false
-        override def begin(size: Long): Unit = downstream.begin(-1)
+        override def begin(size: Long): Unit = down.begin(-1)
         override def accept(v: Int): Unit =
           if !taking then taking = !pred.test(v)
-          if taking then downstream.accept(v)
+          if taking then down.accept(v)
     )
 
   // ---- Stateful operations ----------------------------------------------------------------------
@@ -174,7 +174,7 @@ private[stream] class IntPipeline(previous: AbstractPipeline, setFlags: Int, cle
   private def slice(toSkip: Long, maxSize: Long): IntStream =
     new IntPipeline(this, sliceFlags(maxSize), 0, down =>
       new SliceSink(down, toSkip, maxSize):
-        override def accept(v: Int): Unit = if take() then downstream.accept(v)
+        override def accept(v: Int): Unit = if take() then down.accept(v)
     ):
       override private[stream] def exactOutputSize(previousSize: Long): Long = sliceSize(previousSize, toSkip, maxSize)
 
