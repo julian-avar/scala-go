@@ -1,0 +1,25 @@
+initial: 0 null
+main: 42 main
+t1:1 t2:2 t3:3 t4:4 t5:5 t6:6 t7:7 t8:8
+main unchanged: 42 main
+after remove: 0 null
+many: 8417
+inherited: parent+child, parent+child+child parent still parent
+not inherited: null
+dynamic in child: 2
+dynamic: 2
+dynamic after: 1
+withOut: captured
+pool: 20
+factory names: worker-1 worker-2 daemon=true
+virtual: virtual true true TERMINATED
+startVirtualThread: true false
+state: NEW
+parked: WAITING
+terminated: TERMINATED TERMINATED false
+holdsLock: false true
+sleep interrupted
+join(Duration): true false
+processors: true
+memory: true true true
+shutdown hook ran

@@ -1,0 +1,41 @@
+42
+6
+List(1, 4, 9, 16, 25, 36, 49, 64, 81, 100)
+Vector(1, 2, 3)
+5050
+120
+Failure(IllegalStateException: boom)
+-1
+-2
+-3
+boom
+6
+recovered boom
+Failure(: Future.filter predicate is not satisfied)
+Failure(: Future.collect partial function is not defined at: 1)
+Success((10,x))
+Success(5)
+Failure(IllegalStateException: boom)
+Failure(ArithmeticException: div)
+Success(done)
+Success(tried)
+PROMISED
+false
+true
+Failure(RuntimeException: broken promise)
+fast
+Some(7)
+callbacks: 6
+foreach: 7
+timeout: java.util.concurrent.TimeoutException
+true
+None
+Some(Success(3))
+blocking: 1378 ()
+chain: 10000
+flatMap chain: 500500
+parallel: 50005000
+custom ec: true
+reported failure
+shutdown: true
+2
