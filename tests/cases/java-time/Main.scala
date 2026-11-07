@@ -39,6 +39,10 @@ object Main {
     println(s"${LocalDate.of(-1, 12, 31)} ${LocalDate.of(10000, 1, 1)} ${LocalDate.of(-10000, 1, 1)}")
     println((-70 to 70 by 13).map(n => LocalDate.of(2024, 1, 31).plusDays(n)).mkString(" "))
     println(Seq(27L, 28L, 29L, 30L, 58L, 59L, 60L, 365L, -1L).map(LocalDate.of(2023, 12, 3).plusDays(_)).mkString(" "))
+    val toList = java.util.stream.Collectors.toList[LocalDate]()
+    println(LocalDate.of(2024, 2, 27).datesUntil(LocalDate.of(2024, 3, 2)).collect(toList))
+    println(LocalDate.of(2024, 1, 31).datesUntil(LocalDate.of(2024, 6, 1), Period.ofMonths(1)).collect(toList))
+    println(LocalDate.of(2024, 3, 1).datesUntil(LocalDate.of(2024, 2, 20), Period.ofDays(-4)).collect(toList))
 
     println("-- Period, DayOfWeek, Month, Year, YearMonth, MonthDay")
     val p = Period.of(1, 14, 40)
@@ -192,5 +196,7 @@ object Main {
     attempt("duration")(Duration.parse("1 hour"))
     attempt("arith")(LocalDate.MAX.plusDays(1))
     attempt("from")(LocalDate.from(LocalTime.NOON))
+    attempt("datesUntil")(LocalDate.of(2024, 3, 1).datesUntil(LocalDate.of(2024, 2, 1)))
+    attempt("datesUntil2")(LocalDate.of(2024, 3, 1).datesUntil(LocalDate.of(2024, 4, 1), Period.of(0, 1, -1)))
   }
 }

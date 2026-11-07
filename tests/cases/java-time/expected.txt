@@ -14,6 +14,9 @@ P1Y4M6D P1Y4M6D P-1Y-4M-5D 20273 1970-01-01
 -0001-12-31 +10000-01-01 -10000-01-01
 2023-11-22 2023-12-05 2023-12-18 2023-12-31 2024-01-13 2024-01-26 2024-02-08 2024-02-21 2024-03-05 2024-03-18 2024-03-31
 2023-12-30 2023-12-31 2024-01-01 2024-01-02 2024-01-30 2024-01-31 2024-02-01 2024-12-02 2023-12-02
+[2024-02-27, 2024-02-28, 2024-02-29, 2024-03-01]
+[2024-01-31, 2024-02-29, 2024-03-31, 2024-04-30, 2024-05-31]
+[2024-03-01, 2024-02-26, 2024-02-22]
 -- Period, DayOfWeek, Month, Year, YearMonth, MonthDay
 P1Y14M40D P2Y2M40D 26 P21D P0D P1Y2M8D P-1Y-14M-40D P2Y28M80D
 2026-06-07 2023-01-28
@@ -137,3 +140,5 @@ overflow: java.time.DateTimeException: Instant exceeds minimum or maximum instan
 duration: java.time.format.DateTimeParseException: Text cannot be parsed to a Duration
 arith: java.time.DateTimeException: Invalid value for Year (valid values -999999999 - 999999999): 1000000000
 from: java.time.DateTimeException: Unable to obtain LocalDate from TemporalAccessor: 12:00 of type java.time.LocalTime
+datesUntil: java.lang.IllegalArgumentException: 2024-02-01 < 2024-03-01
+datesUntil2: java.lang.IllegalArgumentException: period months and days are of opposite sign

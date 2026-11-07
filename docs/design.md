@@ -437,7 +437,7 @@ users to add a dependency for part of the JDK. As source, it is part of javalib 
   the database has none ("+03"), as the JDK writes zones it has no name for.
 - Caches that threads would race on are synchronized or built once; JDK 9 to 18 methods that
   the backport lacks are added (`LocalDate.ofInstant`, `Duration.truncatedTo`, `toXxxPart`,
-  `dividedBy(Duration)`, `Instant.until(Instant)`, `Clock.tickMillis`, ...); exception messages
+  `dividedBy(Duration)`, `Instant.until(Instant)`, `LocalDate.datesUntil`, ...); exception messages
   are the JDK's; `LocalDate.plusDays` stays within the month when it can, as the JDK does.
 - `java.util.Date` (an instant in milliseconds, `toString` in the default zone), `TimeZone` on
   java.time's zones, and the base classes of `java.text` that the API mentions (`Format`,
@@ -450,7 +450,7 @@ the zoneinfo files say, so in zones that use negative DST (Europe/Dublin's winte
 standard offset can differ from the JDK's; `ZoneId.getAvailableZoneIds` lists the system's
 zoneinfo (it is empty where there is none, though every zone can still be loaded);
 `DateTimeFormatter`s parsing zone names (`z`) choose among the zones sharing an abbreviation
-arbitrarily; `LocalDate.datesUntil` (java.util.stream), the deprecated calendar methods of `Date`,
+arbitrarily; the deprecated calendar methods of `Date`,
 `Calendar` and `SimpleDateFormat` are not implemented.
 
 ## Exports and library builds

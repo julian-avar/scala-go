@@ -1574,6 +1574,40 @@ final class LocalDate private (private val year: Int, monthOfYear: Int, dayOfMon
   }
 
   /**
+   * The dates from this date (inclusive) to {@code endExclusive}, one day apart (scala-go: from
+   * the JDK).
+   * @since 9
+   */
+  def datesUntil(endExclusive: LocalDate): java.util.stream.Stream[LocalDate] = {
+    val start = toEpochDay
+    val end   = endExclusive.toEpochDay
+    if (end < start) throw new IllegalArgumentException(s"$endExclusive < $this")
+    java.util.stream.LongStream.range(start, end).mapToObj(day => LocalDate.ofEpochDay(day))
+  }
+
+  /**
+   * The dates from this date (inclusive) towards {@code endExclusive} (exclusive), {@code step}
+   * apart: the n-th is this date plus n times the step's months, then n times its days
+   * (scala-go: from the JDK).
+   * @since 9
+   */
+  def datesUntil(endExclusive: LocalDate, step: Period): java.util.stream.Stream[LocalDate] = {
+    val months = step.toTotalMonths
+    val days   = step.getDays.toLong
+    if ((months < 0 && days > 0) || (months > 0 && days < 0))
+      throw new IllegalArgumentException("period months and days are of opposite sign")
+    if (months == 0 && days == 0) throw new IllegalArgumentException("step is zero")
+    val forward = months > 0 || days > 0
+    val cmp     = Integer.signum(endExclusive.compareTo(this))
+    if ((forward && cmp < 0) || (!forward && cmp > 0))
+      throw new IllegalArgumentException(s"$endExclusive${if (forward) " < " else " > "}$this")
+    java.util.stream.LongStream
+      .iterate(0L, n => n + 1)
+      .mapToObj(n => plusMonths(months * n).plusDays(days * n))
+      .takeWhile(date => if (forward) date.isBefore(endExclusive) else date.isAfter(endExclusive))
+  }
+
+  /**
    * Converts this date to seconds since the epoch, at the given time and offset (scala-go: from
    * the JDK).
    * @since 9
