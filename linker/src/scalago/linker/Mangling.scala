@@ -22,6 +22,7 @@ import scalago.ir.*
  *  InstanceOf_<class>        type test for classes that strings or boxed values may belong to
  *  SL_<n>                    interned string literal
  *  CL_<n>                    `classOf` constant (a *rt.Class)
+ *  As_<class>, Is_<class>    cast and type test to C_<class>, from `any`
  *  }}}
  *  Methods on structs: `M_<method>` (virtual methods, exported so the runtime can call
  *  `toString` and friends), `A_<class>` (returns the struct of an ancestor class) and
@@ -81,3 +82,5 @@ object Mangling:
   def moduleInitLock(cls: ClassName): String = s"modLock_${escape(cls)}"
   def dispatcher(m: MethodName): String = s"Disp_${method(m)}"
   def instanceTest(cls: ClassName): String = s"InstanceOf_${escape(cls)}"
+  def ifaceCast(cls: ClassName): String = s"As_${escape(cls)}"
+  def ifaceTest(cls: ClassName): String = s"Is_${escape(cls)}"

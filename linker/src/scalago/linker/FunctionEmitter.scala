@@ -351,7 +351,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
         thisStructs += cls
         Mangling.thisStruct(cls)
       case _ if qualGoType != Mangling.iface(cls) && qualGoType == "any" =>
-        s"rt.Cast[${Mangling.iface(cls)}]($q).${Mangling.accessor(cls)}()"
+        s"${ctx.ifaceCast(cls, q)}.${Mangling.accessor(cls)}()"
       case _ => s"$q.${Mangling.accessor(cls)}()"
 
   /** Triggers the static initializer of `cls` (unless we are in `cls` itself). */
@@ -532,7 +532,9 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     if expr.isEmpty || target.isEmpty || to.isPrimitive then expr
     else if target == "any" then if source.startsWith("*") && expr != "nil" then s"rt.AnyRef($expr)" else expr
     else if source != "any" then expr
-    else s"rt.Cast[$target]($expr)"
+    else to match
+      case Type.Class(c) if target == Mangling.iface(c) => ctx.ifaceCast(c, expr)
+      case _                                            => s"rt.Cast[$target]($expr)"
 
   private def isPure(tree: Tree): Boolean = tree match
     case _: BooleanLiteral | _: CharLiteral | _: ByteLiteral | _: ShortLiteral | _: IntLiteral | _: LongLiteral |

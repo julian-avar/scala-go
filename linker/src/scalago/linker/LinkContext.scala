@@ -84,7 +84,7 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
       if Hijacked.subclassesOf(c).nonEmpty then
         instanceTests += c
         s"${Mangling.instanceTest(c)}($e)"
-      else if declared(c) then s"rt.Is[${Mangling.iface(c)}]($e)"
+      else if declared(c) then ifaceTest(c, e)
       else s"rt.Never($e)"
     case Type.Array(elem) => s"rt.Is[*rt.Array[${goArrayElemType(elem)}]]($e)"
     case _                => "false"
@@ -107,4 +107,24 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
           if source == "any" then e
           else if source.startsWith("*") then s"rt.AnyRef($e)" // a nil pointer becomes a nil `any`
           else s"any($e)"
-    else s"rt.Cast[$target]($e)"
+    else to match
+      case Type.Class(c) if target == Mangling.iface(c) => ifaceCast(c, e)
+      case _                                            => s"rt.Cast[$target]($e)"
+
+  // ---- Casts and type tests to class interfaces --------------------------------------------------
+
+  /** Classes whose interface (`C_<class>`) is the target of casts or type tests. Each gets plain
+   *  Go helpers in support.go: a type assertion in a generic function such as `rt.Cast[T]` is
+   *  about three times slower than in a plain one, which has a per-site cache.
+   */
+  val ifaceCasts = mutable.LinkedHashSet.empty[ClassName]
+  val ifaceTests = mutable.LinkedHashSet.empty[ClassName]
+
+  /** Casts `e` (an `any`) to the interface of `cls`; null stays null. */
+  def ifaceCast(cls: ClassName, e: String): String =
+    ifaceCasts += cls
+    s"${Mangling.ifaceCast(cls)}($e)"
+
+  def ifaceTest(cls: ClassName, e: String): String =
+    ifaceTests += cls
+    s"${Mangling.ifaceTest(cls)}($e)"
