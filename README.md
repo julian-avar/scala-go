@@ -5,7 +5,9 @@ intermediate representation (`.goir`) next to the `.class` files. A whole-progra
 the program's IR into a Go module that `go build` compiles, together with IR for the Scala
 standard library (recompiled from its TASTy) and a Java standard library written in Scala.
 
-See [docs/design.md](docs/design.md) for the architecture, object model, status and roadmap.
+See [docs/guide.md](docs/guide.md) for using it (setup, dependencies, JVM differences, link
+errors, performance, shipping binaries) and [docs/design.md](docs/design.md) for the
+architecture, object model, status and roadmap.
 
 **Status:** early, but real programs work. Classes, traits, objects, exceptions, pattern
 matching, lambdas, `lazy val`, the standard collections and `java.util` (collections, `Arrays`,
