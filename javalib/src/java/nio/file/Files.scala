@@ -253,6 +253,13 @@ object Files:
   @static def newOutputStream(path: Path, options: Array[OpenOption]): OutputStream =
     new FileOutputStream(open(path, writeMode(options)))
 
+  @static def newByteChannel(path: Path, options: java.util.Set[? <: OpenOption], attrs: Array[FileAttribute[?]])
+      : java.nio.channels.SeekableByteChannel =
+    java.nio.channels.FileChannel.open(path, options, attrs)
+
+  @static def newByteChannel(path: Path, options: Array[OpenOption]): java.nio.channels.SeekableByteChannel =
+    java.nio.channels.FileChannel.open(path, options)
+
   private def decoder(cs: Charset) =
     cs.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT)
 

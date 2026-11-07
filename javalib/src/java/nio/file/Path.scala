@@ -10,6 +10,7 @@ import scalago.runtime.OS
  *  systems are not supported.
  */
 trait Path extends Comparable[Path] with java.lang.Iterable[Path]:
+  def getFileSystem(): FileSystem
   def compareTo(other: Path): Int
   def getFileName(): Path
   def getParent(): Path
@@ -57,6 +58,8 @@ object Paths:
  */
 private[java] final class UnixPath(input: String) extends Path:
   private val path: String = UnixPath.normalize(input)
+
+  def getFileSystem(): FileSystem = UnixFileSystem
 
   /** Start offsets of the name elements. */
   private lazy val offsets: Array[Int] =

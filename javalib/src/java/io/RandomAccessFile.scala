@@ -8,20 +8,30 @@ import scalago.runtime.OS
 
 // scala-go: on the native layer's handles (scalago.runtime.OS) instead of
 // file channels.
-class RandomAccessFile private (fd: FileDescriptor, flush: Boolean)
+class RandomAccessFile private (fd: FileDescriptor, flush: Boolean, writable: Boolean)
     extends DataOutput
     with DataInput
     with Closeable {
   def this(file: File, mode: String) =
-    this(RandomAccessFile.open(file, mode), mode == "rws" || mode == "rwd")
+    this(RandomAccessFile.open(file, mode), mode == "rws" || mode == "rwd", mode != "r")
   def this(name: String, mode: String) = this(new File(name), mode)
 
   // Unbuffered, so that the file pointer is the stream's position.
   private val in = new DataInputStream(new FileInputStream(fd))
   private val out = new DataOutputStream(new FileOutputStream(fd))
 
-  override def close(): Unit =
-    fd.close()
+  private var channel: java.nio.channels.FileChannel = null
+
+  /** The channel sharing this file and its file pointer. */
+  final def getChannel(): java.nio.channels.FileChannel = synchronized {
+    if (channel == null) channel = new java.nio.channels.FileChannelImpl(fd, true, writable, false)
+    channel
+  }
+
+  override def close(): Unit = {
+    val c = synchronized(channel)
+    if (c != null) c.close() else fd.close()
+  }
 
   def getFD(): FileDescriptor =
     fd

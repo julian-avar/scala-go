@@ -143,6 +143,50 @@ func fileOf(handle any) *os.File {
 	return f
 }
 
+// OSReadAt reads up to n bytes at position pos of the file into b[off:], without moving the
+// file position: the count, or -1 at the end of the file.
+func OSReadAt(handle any, b *Array[int8], off, n int32, pos int64) int32 {
+	if n == 0 {
+		return 0
+	}
+	count, err := fileOf(handle).ReadAt(Reinterpret[int8, byte](b.Data[off:off+n]), pos)
+	if count > 0 {
+		return int32(count)
+	}
+	if err == io.EOF {
+		return -1
+	}
+	if err != nil {
+		ioFailure(err)
+	}
+	return 0
+}
+
+// OSWriteAt writes b[off:off+n] at position pos of the file, without moving the file position.
+func OSWriteAt(handle any, b *Array[int8], off, n int32, pos int64) {
+	if _, err := fileOf(handle).WriteAt(Reinterpret[int8, byte](b.Data[off:off+n]), pos); err != nil {
+		ioFailure(err)
+	}
+}
+
+// OSLock locks size bytes of the file from position (to the end of the file and beyond if size
+// is Long.MAX_VALUE), shared or exclusive, as the JDK does with fcntl. If wait is false and
+// another process holds a conflicting lock, it returns false instead of waiting.
+func OSLock(handle any, position, size int64, shared, wait bool) bool {
+	ok, err := lockFile(fileOf(handle), position, size, shared, wait)
+	if err != nil {
+		ioFailure(err)
+	}
+	return ok
+}
+
+// OSUnlock releases a lock that OSLock acquired.
+func OSUnlock(handle any, position, size int64) {
+	if err := unlockFile(fileOf(handle), position, size); err != nil {
+		ioFailure(err)
+	}
+}
+
 // OSSeek moves the file position (whence: 0 start, 1 current, 2 end) and returns the new one.
 func OSSeek(handle any, offset int64, whence int32) int64 {
 	pos, err := fileOf(handle).Seek(offset, int(whence))

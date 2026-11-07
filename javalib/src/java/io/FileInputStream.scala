@@ -33,4 +33,14 @@ class FileInputStream(fd: FileDescriptor) extends InputStream:
 
   override def available(): Int = OS.available(fd.openHandle())
 
-  override def close(): Unit = fd.close()
+  private var channel: java.nio.channels.FileChannel = null
+
+  /** The channel sharing this stream's file and position. */
+  def getChannel(): java.nio.channels.FileChannel = synchronized {
+    if channel == null then channel = new java.nio.channels.FileChannelImpl(fd, true, false, false)
+    channel
+  }
+
+  override def close(): Unit =
+    val c = synchronized(channel)
+    if c != null then c.close() else fd.close()
