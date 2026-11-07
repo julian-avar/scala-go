@@ -1,7 +1,7 @@
 /** Small CPU benchmarks covering what typical Scala code spends its time on: allocation and
  *  pattern matching, numeric loops, immutable and mutable collections, strings, virtual
- *  dispatch, closures, exceptions, monitors and java.util.stream. Each prints its time and a
- *  checksum (which must agree between the JVM and Go).
+ *  dispatch, closures, exceptions, monitors, java.util.stream and java.time. Each prints its
+ *  time and a checksum (which must agree between the JVM and Go).
  */
 import scala.collection.mutable
 
@@ -133,6 +133,33 @@ object Main:
       acc += groups.size + groups.get(k) + joined.length
     acc
 
+  def localDates(): Long =
+    var d = java.time.LocalDate.of(2000, 1, 1)
+    var acc = 0L
+    for i <- 0 until 3000000 do
+      d = d.plusDays(1 + i % 3)
+      acc += d.getDayOfMonth + d.getDayOfWeek.getValue
+    acc + d.toEpochDay
+
+  def instants(): Long =
+    var t = java.time.Instant.EPOCH
+    val step = java.time.Duration.ofMillis(1234)
+    var total = java.time.Duration.ZERO
+    for i <- 0 until 3000000 do
+      t = t.plus(step)
+      if i % 1000 == 0 then total = total.plus(java.time.Duration.between(java.time.Instant.EPOCH, t))
+    t.getEpochSecond + total.getSeconds
+
+  def dateFormat(): Long =
+    val f = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    var dt = java.time.LocalDateTime.of(2024, 1, 1, 0, 0)
+    var acc = 0L
+    for i <- 0 until 100000 do
+      val s = dt.format(f)
+      acc += java.time.LocalDateTime.parse(s, f).getMinute + s.length
+      dt = dt.plusMinutes(7)
+    acc
+
   def time[A](name: String)(f: => A): Unit =
     val t0 = System.nanoTime()
     val r = f
@@ -155,3 +182,6 @@ object Main:
       time("streams")(streams())
       time("intStreams")(intStreams())
       time("collectors")(collectors())
+      time("localDates")(localDates())
+      time("instants")(instants())
+      time("dateFormat")(dateFormat())

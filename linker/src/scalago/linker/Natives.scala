@@ -405,6 +405,16 @@ object Natives:
     m("multiplyExact(II)I")(as => s"rt.IntMultiplyExact(${as(0)}, ${as(1)})")
     m("addExact(JJ)J")(as => s"rt.LongAddExact(${as(0)}, ${as(1)})")
     m("multiplyExact(JJ)J")(as => s"rt.LongMultiplyExact(${as(0)}, ${as(1)})")
+    m("multiplyExact(JI)J")(as => s"rt.LongMultiplyExact(${as(0)}, int64(${as(1)}))")
+    m("subtractExact(II)I")(as => s"rt.IntSubtractExact(${as(0)}, ${as(1)})")
+    m("subtractExact(JJ)J")(as => s"rt.LongSubtractExact(${as(0)}, ${as(1)})")
+    m("negateExact(I)I")(as => s"rt.IntNegateExact(${as.head})")
+    m("negateExact(J)J")(as => s"rt.LongNegateExact(${as.head})")
+    m("incrementExact(I)I")(as => s"rt.IntAddExact(${as.head}, 1)")
+    m("incrementExact(J)J")(as => s"rt.LongAddExact(${as.head}, 1)")
+    m("decrementExact(I)I")(as => s"rt.IntSubtractExact(${as.head}, 1)")
+    m("decrementExact(J)J")(as => s"rt.LongSubtractExact(${as.head}, 1)")
+    m("toIntExact(J)I")(as => s"rt.ToIntExact(${as.head})")
     m("clamp(JII)I")(as => s"rt.MathClamp(${as(0)}, ${as(1)}, ${as(2)})")
     m("clamp(JJJ)J")(as => s"rt.MathClamp(${as(0)}, ${as(1)}, ${as(2)})")
 
@@ -783,6 +793,21 @@ object Natives:
       s"errorReason($JO)$JS" -> "rt.OSErrorReason"
     )
   do staticFn(OS, desc, fn)
+
+  // java.time's native side (javalib/src/scalago/runtime/Time.scala).
+  private val Time = "scalago.runtime.Time$"
+  /** Loads a time zone: programs that can reach it embed Go's tz database (see `Linker`). */
+  val TimeZoneLoad: (ClassName, MethodName) = (Time, parseMethod(s"zone($JS)$JO"))
+  for (desc, fn) <- List(
+      "nowNanos()J" -> "rt.TimeNowNanos",
+      s"zone($JS)$JO" -> "rt.TimeZone",
+      s"offset(${JO}J)I" -> "rt.TimeOffset",
+      s"period(${JO}J)[J" -> "rt.TimePeriod",
+      s"abbreviation(${JO}J)$JS" -> "rt.TimeAbbreviation",
+      s"systemZoneId()$JS" -> "rt.TimeSystemZoneID",
+      s"zoneIds()[$JS" -> "rt.TimeZoneIDs"
+    )
+  do staticFn(Time, desc, fn)
 
   // ---- scalago.go: Go strings (library/) --------------------------------------------------------
 

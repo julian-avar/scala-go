@@ -10,7 +10,7 @@ object DumpIR:
     val prefix = args.lift(1).getOrElse("")
     for c <- IRLoader.load(classpath) if c.name.startsWith(prefix) do
       println(s"${c.kind} ${c.name} extends ${(c.superClass.toList ++ c.interfaces).mkString(", ")}${c.goFacade.fold("")(f => s" go=$f")}")
-      for f <- c.fields do println(s"  field ${f.name}: ${f.tpe}")
+      for f <- c.fields do println(s"  ${if f.isStatic then "static " else ""}field ${f.name}: ${f.tpe}")
       for m <- c.methods do
-        println(s"  method ${m.name}${m.goMember.fold("")(g => s" go=$g")}")
+        println(s"  ${if m.isStatic then "static " else ""}method ${m.name}${m.goMember.fold("")(g => s" go=$g")}")
         m.body.foreach(b => println(s"    $b"))

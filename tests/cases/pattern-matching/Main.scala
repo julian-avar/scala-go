@@ -58,5 +58,9 @@ object Main {
       case Some(v) => println("some " + v)
       case None    => println("none")
     }
+    // Tuples of primitives: Scala 3 uses the JVM library's specialized classes (Tuple2$mcJD$sp).
+    val (count, mean) = if (opt.isEmpty) (0L, 0.0) else (opt.get.toLong, 2.5)
+    val pair = (r.width, 'c')
+    println(s"$count $mean ${pair._1 + 1} ${pair._2} ${Tuple1(7)._1 + 1}")
   }
 }

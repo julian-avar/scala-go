@@ -120,11 +120,15 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
     yield mirror
 
   /** The JVM backend's rules (`BCodeHelpers.addForwarders`): public concrete methods, except
-   *  `Object`'s and those whose name a member of the companion class has.
+   *  `Object`'s and those that a method of the companion class has. The JVM backend also leaves
+   *  out methods whose *name* a member of the companion class has, but JDK classes overload
+   *  static and instance methods (`Year.isLeap(long)` and `isLeap()`), so here only methods with
+   *  the same signature conflict.
    */
   private def staticForwarders(moduleClass: ClassSymbol, companion: Symbol): List[ir.MethodDef] =
-    val conflicting: Set[Name] =
-      if companion.exists then companion.info.allMembers.iterator.map(_.name).filter(_.isTermName).toSet else Set.empty
+    val conflicting: Set[ir.MethodName] =
+      if !companion.exists then Set.empty
+      else companion.info.allMembers.iterator.map(_.symbol).filter(_.is(Method)).map(methodName).toSet
     val module = className(moduleClass)
     val pos = moduleClass.defTree match
       case EmptyTree => ir.Position.NoPosition
@@ -134,7 +138,7 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
     members.toList.sortBy(_.name.toString).flatMap { m0 =>
       val m = if m0.is(Bridge) then m0.nextOverriddenSymbol else m0
       val skip = !m.exists || m.isType || m.is(Deferred) || m.owner == defn.ObjectClass || m.owner == defn.AnyClass ||
-        m.isConstructor || m.name.is(ExpandedName) || conflicting(m.name) ||
+        m.isConstructor || m.name.is(ExpandedName) || conflicting(methodName(m)) ||
         (m.accessBoundary(defn.RootClass) ne defn.RootClass)
       if skip then None
       else
@@ -647,7 +651,12 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
     val code = primitives.getPrimitive(tree, receiver.tpe)
     val args = tree.args
 
-    if isArithmeticOp(code) || isLogicalOp(code) || isComparisonOp(code) then
+    if (code == EQ || code == NE) && args.size == 1 && (isJavaEnum(receiver.tpe) || isJavaEnum(args.head.tpe)) then
+      // `==` on a Java enum (Scala 3 enums extending java.lang.Enum, such as java.time's) is
+      // identity: Enum.equals is final.
+      G.Binary(if code == EQ then ir.BinaryOp.RefEq else ir.BinaryOp.RefNe, ir.Type.Object, genExpr(receiver),
+        genExpr(args.head))(pos)
+    else if isArithmeticOp(code) || isLogicalOp(code) || isComparisonOp(code) then
       args match
         case Nil        => genUnaryOp(code, genExpr(receiver), toIRType(tree.tpe), pos)
         case arg :: Nil => genBinaryOp(code, genExpr(receiver), genExpr(arg), toIRType(tree.tpe), pos)
@@ -663,6 +672,10 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
       G.ApplyStatic("scala.runtime.Statics", ir.MethodName("anyHash", List(ir.Type.Object), ir.Type.Int), List(boxed),
         ir.Type.Int)(pos)
     else unsupported(tree, s"primitive operation `${tree.fun.symbol.showFullName}`")
+
+  private def isJavaEnum(tpe: Type): Boolean =
+    val cls = tpe.widenDealias.classSymbol
+    cls.exists && cls.derivesFrom(defn.JavaEnumClass)
 
   /** `lock.synchronized(body)`: the lock's monitor is held while the body runs, and released
    *  however the body completes.

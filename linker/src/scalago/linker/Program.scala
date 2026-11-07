@@ -19,6 +19,7 @@ final class Program(irClasses: Seq[ClassDef]):
   def classes: Iterable[ClassDef] = byName.values
   def get(name: ClassName): Option[ClassDef] = byName.get(name)
   def contains(name: ClassName): Boolean = byName.contains(name)
+  def isModuleClass(name: ClassName): Boolean = get(name).exists(_.kind == ClassKind.ModuleClass)
 
   def facade(name: ClassName): Option[ClassDef] = facadesByName.get(name)
   def isFacade(name: ClassName): Boolean = facadesByName.contains(name)

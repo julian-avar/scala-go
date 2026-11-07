@@ -246,6 +246,8 @@ func LongFloorMod(a, b int64) int64 { return a - LongFloorDiv(a, b)*b }
 
 func overflow() { ThrowKind(Arithmetic, "integer overflow") }
 
+func longOverflow() { ThrowKind(Arithmetic, "long overflow") }
+
 func IntAddExact(a, b int32) int32 {
 	r := a + b
 	if (a^r)&(b^r) < 0 {
@@ -262,19 +264,57 @@ func IntMultiplyExact(a, b int32) int32 {
 	return int32(r)
 }
 
-func LongAddExact(a, b int64) int64 {
-	r := a + b
-	if (a^r)&(b^r) < 0 {
+func IntSubtractExact(a, b int32) int32 {
+	r := a - b
+	if (a^b)&(a^r) < 0 {
 		overflow()
 	}
 	return r
+}
+
+func IntNegateExact(a int32) int32 {
+	if a == math.MinInt32 {
+		overflow()
+	}
+	return -a
+}
+
+func LongAddExact(a, b int64) int64 {
+	r := a + b
+	if (a^r)&(b^r) < 0 {
+		longOverflow()
+	}
+	return r
+}
+
+func LongSubtractExact(a, b int64) int64 {
+	r := a - b
+	if (a^b)&(a^r) < 0 {
+		longOverflow()
+	}
+	return r
+}
+
+func LongNegateExact(a int64) int64 {
+	if a == math.MinInt64 {
+		longOverflow()
+	}
+	return -a
+}
+
+// ToIntExact implements Math.toIntExact.
+func ToIntExact(a int64) int32 {
+	if int64(int32(a)) != a {
+		overflow()
+	}
+	return int32(a)
 }
 
 func LongMultiplyExact(a, b int64) int64 {
 	hi, lo := bits.Mul64(uint64(absInt64(a)), uint64(absInt64(b)))
 	r := a * b
 	if hi != 0 || lo > math.MaxInt64+1 || (a != 0 && r/a != b) {
-		overflow()
+		longOverflow()
 	}
 	return r
 }

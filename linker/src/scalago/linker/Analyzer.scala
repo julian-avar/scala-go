@@ -26,6 +26,8 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
   val reachedMethods = mutable.LinkedHashSet.empty[(ClassName, MethodName)]
   val staticInit = mutable.LinkedHashSet.empty[ClassName]
   val usedStaticFields = mutable.LinkedHashSet.empty[(ClassName, String)]
+  /** Natives called by reachable code (only those of objects' methods, which the linker asks about). */
+  val usedNatives = mutable.HashSet.empty[(ClassName, MethodName)]
   /** Go facades used by reachable code: their packages' APIs are loaded for code generation. */
   val usedFacades = mutable.LinkedHashSet.empty[ClassName]
   private val bodies = mutable.HashMap.empty[(ClassName, MethodName), Tree]
@@ -177,7 +179,8 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
       case Apply(receiver, decl, m, args, _) =>
         Natives.calledBy(decl, m).foreach(callVirtual)
         Natives.lookup(decl, m) match
-          case Some(Natives.Native.Static(_)) => () // module method: the receiver is not evaluated
+          case Some(Natives.Native.Static(_)) => // module method: the receiver is not evaluated
+            usedNatives += ((decl, m))
           case Some(_)                        => scan(receiver)
           case None =>
             scan(receiver)
@@ -217,6 +220,8 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
           if program.get(cls).exists(_.fields.exists(f => f.isStatic && f.name == field)) then
             usedStaticFields += ((cls, field))
             initializeStatics(cls)
+            // The static fields of an object (Scala 3's enum cases) are set by its constructor.
+            if program.isModuleClass(cls) then loadModule(tree, cls)
           else program.staticFieldViaCompanion(sel) match
             case Some(read) => scan(read)
             case None       => missing(tree, Analyzer.MissingKind.Field, s"static field $cls.$field is not available")

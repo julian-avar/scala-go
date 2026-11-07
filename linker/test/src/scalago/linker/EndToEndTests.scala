@@ -136,16 +136,20 @@ class EndToEndTests extends munit.FunSuite:
     runGo(goDir, expected, race, io)
 
   /** What the program reads on standard input (the case's `stdin.txt`; otherwise standard input
-   *  is closed), and the exit status it must end with (`exit-status.txt`; otherwise 0).
+   *  is closed), the exit status it must end with (`exit-status.txt`; otherwise 0), and the
+   *  environment variables it runs with (`NAME=value` lines of `env.txt`, such as a fixed `TZ`).
    */
-  private final case class ProgramIO(stdin: Option[Path], exitStatus: Int)
+  private final case class ProgramIO(stdin: Option[Path], exitStatus: Int, env: Map[String, String] = Map.empty)
 
   private def programIO(dir: Path): ProgramIO =
     val stdin = dir.resolve("stdin.txt")
     val status = dir.resolve("exit-status.txt")
+    val env = dir.resolve("env.txt")
     ProgramIO(
       Option.when(Files.exists(stdin))(stdin),
-      if Files.exists(status) then Files.readString(status, UTF_8).trim.toInt else 0)
+      if Files.exists(status) then Files.readString(status, UTF_8).trim.toInt else 0,
+      if !Files.exists(env) then Map.empty
+      else Files.readAllLines(env, UTF_8).asScala.toSeq.collect { case s"$name=$value" => name.trim -> value.trim }.toMap)
 
   /** A case with a `race.txt` also runs under Go's race detector, which must report no data race,
    *  except in the generated Go functions that its `allow-race: <function>` lines name (races in
@@ -223,7 +227,7 @@ class EndToEndTests extends munit.FunSuite:
   private def run(command: Seq[String], cwd: Path, env: Map[String, String] = Map.empty,
       io: ProgramIO = ProgramIO(None, 0)): String =
     val builder = ProcessBuilder(command.asJava).directory(cwd.toFile).redirectErrorStream(true)
-    builder.environment.putAll(env.asJava)
+    builder.environment.putAll((io.env ++ env).asJava)
     io.stdin.foreach(f => builder.redirectInput(f.toFile))
     val process = builder.start()
     if io.stdin.isEmpty then process.getOutputStream.close()
