@@ -301,6 +301,16 @@ object Main:
     val inner = Stream.of(1, 2).flatMap(i => Stream.of(i, i * 10).onClose(() => log.add(s"closed $i"))).iterator()
     println(s"${iter.next()} ${inner.next()} $log")
     println(s"${inner.next()} ${inner.next()} $log")
+    // Pulling from infinite and stateful pipelines.
+    println(Stream.iterate(1, (i: Int) => i + 1).filter(_ % 2 == 0).limit(3).iterator().asScala.toList)
+    val sortedIt = IntStream.of(3, 1, 2).sorted().iterator()
+    show(sortedIt.nextInt(), sortedIt.nextInt(), sortedIt.nextInt(), sortedIt.hasNext)
+    val pulled = Stream.of("x", "y", "z").map(_.toUpperCase).spliterator()
+    pulled.tryAdvance(s => print(s"first $s; "))
+    pulled.forEachRemaining(s => print(s"then $s; "))
+    println()
+    val par = Stream.of("b", "c", "a").parallel()
+    show(par.isParallel, par.sorted().collect(Collectors.toList()))
     // A list modified during traversal fails fast.
     val list = new ju.ArrayList[Integer](ju.List.of[Integer](1, 2, 3))
     attempt("concurrent modification")(list.stream().forEach(i => if i == 2 then list.add(9)))

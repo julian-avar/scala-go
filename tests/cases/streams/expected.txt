@@ -194,6 +194,10 @@ a [a]
 b true [a, b, c]
 c 1 [closed 1]
 10 2 [closed 1, closed 2]
+List(2, 4, 6)
+1 2 3 false
+first X; then Y; then Z; 
+true [a, b, c]
 concurrent modification: threw java.util.ConcurrentModificationException: null
 [1, 2, 3]
 == closing
