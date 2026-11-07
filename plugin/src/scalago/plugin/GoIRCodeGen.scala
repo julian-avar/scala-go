@@ -30,9 +30,11 @@ import scalago.ir.Tree as G
 final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
   private val primitives = ScalaPrimitives(genCtx)
   private val lenient = options.lenient
+  private val enumerationNames = EnumerationNames()
 
   // Per-class / per-method state
   private var currentClass: ClassSymbol = uninitialized
+  private var inEnumeration = false // currentClass extends scala.Enumeration
   private var locals: LocalNames = uninitialized
 
   private def uninitialized[A]: A = null.asInstanceOf[A]
@@ -62,6 +64,7 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
   private def genClass(td: TypeDef): ir.ClassDef =
     val sym = td.symbol.asClass
     currentClass = sym
+    inEnumeration = enumerationNames.isEnumeration(sym)
     val impl = td.rhs.asInstanceOf[Template]
     goFacadeOf(sym) match
       case Some(facade) => genFacadeClass(td, impl, facade)
@@ -386,7 +389,16 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
           case id: Ident if locals.contains(id.symbol) => genExpr(id)
           case id: Ident                               => genExpr(desugarIdent(id))
           case _                                       => genExpr(lhs)
-        G.Assign(genLhs, genExpr(rhs))(pos)
+        val assign = G.Assign(genLhs, genExpr(rhs))(pos)
+        // A `val` of an Enumeration: register the name the JVM would find by reflection.
+        val valName = if inEnumeration then enumerationNames.valName(currentClass, lhs.symbol) else None
+        valName match
+          case Some(name) =>
+            val register = G.ApplyStatically(G.This(toIRType(currentClass.typeRef))(pos),
+              enumerationNames.enumerationClassName, enumerationNames.registerName,
+              List(genLhs, G.StringLiteral(name)(pos)), ir.Type.Void)(pos)
+            G.Block(List(assign), register)(pos)
+          case None => assign
 
       case app: Apply =>
         genApply(app)

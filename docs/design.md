@@ -39,7 +39,7 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
 4. **javalib** (`javalib/`). JDK classes written in Scala: exceptions, `StringBuilder`,
    `System.out`, `java.util.Arrays`, `MathContext` and `RoundingMode`, references, and so on. It also replaces the
    few Java-written classes of the Scala library (`*Ref`, `LazyVals`, `JProcedureN`,
-   `ScalaNumber`). Packages other than `java.lang` are compiled under their own names
+   `ScalaNumber`), and `Enumeration`, which uses reflection (see below). Packages other than `java.lang` are compiled under their own names
    (`package java.util`): a class compiled from source takes precedence over the JDK's, so
    javalib and the JDK class files it is type-checked against agree on one symbol per class.
    The Scala compiler refuses to redefine core `java.lang` classes, so those sources live in
@@ -390,6 +390,17 @@ the race detector). `gears-go-context` cancels gears code with a Go deadline.
 - **Equality and strings:** `==` is null-safe and numerically cooperative (`rt.Equals`). `##`
   matches `Statics.anyHash`. `toString` matches the JDK, including `Double.toString`. String
   `hashCode` and `compareTo` work on UTF-16.
+- **`Enumeration` names.** On the JVM, an `Enumeration` value created without a name
+  (`val Mon, Tue = Value`) is named after the public `val` holding it, which `Enumeration` finds
+  by reflection. Scala.js's compiler rewrites such `Value` calls into `Value(name)`; scala-go's
+  plugin instead follows the assignment of each such field in a subclass of `Enumeration`
+  (`EnumerationNames`) with a call registering the name, `scalago$registerName`, which javalib's
+  `Enumeration` (the Scala library's, without reflection) records. So, as on the JVM, every value
+  held by a public `val` gets its name, also values made with `new Val` or a subclass of it
+  (`case class PlanetVal(...) extends Val`), an explicit name or `nextName` still wins, and other
+  values print `<Invalid enum: no field for #i>`. This happens in `genGoIR`, after the fields are
+  assigned in constructors, so the JVM bytecode is unchanged, and it also applies to libraries
+  compiled from TASTy (`BigDecimal.RoundingMode`). Values held by `val`s of traits are not named.
 - **`BigDecimal`** (`rt/bigdecimal.go`) is written in Go to the JDK's specification, like the
   JDK with a `long` fast path: money-like values need no `math/big` and one allocation per
   operation. Results, scales, string forms, exception messages (down to `"/ by zero"` versus
@@ -425,7 +436,8 @@ Supported and covered by end-to-end tests:
 - regular expressions: `scala.util.matching.Regex`, `java.util.regex` and the regex `String`
   methods, on Go's `regexp` (RE2), with Java's UTF-16 offsets and replacement syntax
 - `java.math.BigDecimal` (the whole API, with `MathContext` and `RoundingMode`) and
-  `scala.math.BigDecimal`
+  `scala.math.BigDecimal`, with its rounding modes and ranges
+- `scala.Enumeration`: names, `values`, `withName`, `ValueSet`s, ordering, `Val` subclasses
 - concurrency: threads, `synchronized`, `wait`/`notify`, volatile fields, atomics, interrupts,
   and concurrent first use of modules and lazy vals (also under Go's race detector)
 
@@ -439,7 +451,6 @@ Known gaps:
 - Concurrency: `java.util.concurrent` beyond what gears needs (executors, concurrent maps,
   `CompletableFuture`), `ThreadLocal`, thread groups. `scala.concurrent.Future` needs an
   `ExecutionContext` on `java.util.concurrent`; gears is the supported API.
-- `Enumeration` (it uses reflection).
 - Stack traces: exceptions carry none. `SCALAGO_TRACE=1` prints the Go stack where a Go runtime
   error (a nil dereference, ...) becomes a Java exception.
 
