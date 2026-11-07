@@ -9,12 +9,14 @@ class ScalaGoPlugin extends StandardPlugin:
 
   override val optionsHelp: Option[String] = Some(
     """  -P:scala-go:lenient          emit `Unsupported` IR for untranslatable code instead of failing (for libraries)
-      |  -P:scala-go:rename:a.b:c.d  emit classes of package a.b (and subpackages) under package c.d""".stripMargin
+      |  -P:scala-go:rename:a.b:c.d  emit classes of package a.b (and subpackages) under package c.d
+      |  -P:scala-go:static-forwarders  add static forwarders for static objects' methods, as on the JVM (javalib)""".stripMargin
   )
 
   override def initialize(options: List[String])(using Context): List[PluginPhase] =
     val renames = options.collect { case s"rename:$from:$to" => (from + ".", to + ".") }
-    List(GenGoIR(GoIRCodeGen.Options(lenient = options.contains("lenient"), renames)))
+    List(GenGoIR(GoIRCodeGen.Options(lenient = options.contains("lenient"), renames,
+      staticForwarders = options.contains("static-forwarders"))))
 
 /** Runs after all tree transformations (the trees are erased, flattened, with constructors
  *  and lambdas lifted) and just before the JVM backend, which still runs as usual.
