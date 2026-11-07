@@ -348,3 +348,49 @@ func Clone(x any) any {
 	}
 	return clone
 }
+
+// ---- Identifier characters (Character.isJavaIdentifierStart, ...) --------------------------
+
+func CharIsIdentifierIgnorable(c int32) bool {
+	return (c >= 0 && c <= 8) || (c >= 0x0e && c <= 0x1b) || (c >= 0x7f && c <= 0x9f) || unicode.Is(unicode.Cf, rune(c))
+}
+
+func CharIsUnicodeIdentifierStart(c int32) bool {
+	r := rune(c)
+	return unicode.IsLetter(r) || unicode.In(r, unicode.Nl, unicode.Other_ID_Start)
+}
+
+func CharIsUnicodeIdentifierPart(c int32) bool {
+	r := rune(c)
+	return CharIsUnicodeIdentifierStart(c) || unicode.In(r, unicode.Pc, unicode.Nd, unicode.Mc, unicode.Mn, unicode.Other_ID_Continue) ||
+		CharIsIdentifierIgnorable(c)
+}
+
+func CharIsJavaIdentifierStart(c int32) bool {
+	r := rune(c)
+	return unicode.IsLetter(r) || unicode.In(r, unicode.Nl, unicode.Sc, unicode.Pc)
+}
+
+func CharIsJavaIdentifierPart(c int32) bool {
+	r := rune(c)
+	return CharIsJavaIdentifierStart(c) || unicode.In(r, unicode.Nd, unicode.Mc, unicode.Mn) || CharIsIdentifierIgnorable(c)
+}
+
+// ---- Unsigned decimal strings ----------------------------------------------------------------
+
+func IntToUnsignedDecimal(x int32) *String  { return Str(strconv.FormatUint(uint64(uint32(x)), 10)) }
+func LongToUnsignedDecimal(x int64) *String { return Str(strconv.FormatUint(uint64(x), 10)) }
+
+// WriteFloatingChars writes Java's Double.toString (bits 64) or Float.toString (bits 32) of d into
+// buf at off, and returns the offset after it. It implements ujson's FloatToDecimalChar and
+// DoubleToDecimalChar, Java classes (so without TASTy) that port the JDK's algorithm.
+func WriteFloatingChars(buf *Array[uint16], off int32, d float64, bits int) int32 {
+	s := formatFloating(d, bits)
+	if int(off)+len(s) > len(buf.Data) {
+		ThrowKind(ArrayIndexOutOfBounds, "Index "+itoa(off+int32(len(s))-1)+" out of bounds for length "+itoa(int32(len(buf.Data))))
+	}
+	for i := 0; i < len(s); i++ {
+		buf.Data[int(off)+i] = uint16(s[i])
+	}
+	return off + int32(len(s))
+}
