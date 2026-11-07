@@ -218,9 +218,11 @@ object Natives:
         instance(box, s"${name}Value()${target.descriptor}")((r, _) => convert(unboxed(r), prim, target))
     if prim == Type.Boolean then instance(box, "booleanValue()Z")((r, _) => unboxed(r))
     if prim == Type.Char then instance(box, "charValue()C")((r, _) => unboxed(r))
+    // Byte.compare, Short.compare and Character.compare return x - y, the others -1, 0 or 1.
     val compare = prim match
       case Type.Boolean              => "rt.BoolCompare"
       case Type.Char                 => "rt.CharCompare"
+      case Type.Byte | Type.Short    => "rt.SmallIntCompare"
       case Type.Long                 => "rt.LongCompare"
       case Type.Float | Type.Double  => "rt.DoubleCompare"
       case _                         => "rt.IntCompare"
