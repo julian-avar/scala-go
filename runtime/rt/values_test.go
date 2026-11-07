@@ -31,6 +31,9 @@ func TestToStringMatchesJava(t *testing.T) {
 		{math.SmallestNonzeroFloat64, "4.9E-324"},
 		{float32(math.SmallestNonzeroFloat32), "1.4E-45"},
 		{2e-323, "2.0E-323"},
+		{1e23, "1.0E23"},
+		{2 * math.SmallestNonzeroFloat64, "9.9E-324"},
+		{float32(3 * math.SmallestNonzeroFloat32), "4.2E-45"},
 	}
 	for _, c := range cases {
 		if got := ToGoString(c.in); got != c.want {

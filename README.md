@@ -12,7 +12,7 @@ matching, lambdas, `lazy val`, the standard collections and `java.util` (collect
 `Collections`, `Optional`, `Random`, ...) all run, and Scala code can call Go
 packages, and Go code can call Scala libraries. Threads run on goroutines, with `synchronized`,
 `wait`/`notify`, volatiles and atomics, and gears runs on them. The generated code is safe to
-call from any goroutine. `BigDecimal`, `java.util.stream`, reflection and most of
+call from any goroutine. `BigDecimal` and `BigInt` match the JDK. `java.util.stream`, reflection and most of
 `java.util.concurrent` don't work yet.
 
 ## Using it with Mill

@@ -2,35 +2,20 @@ package java.math
 
 import scala.annotation.static
 
-/** java.math.RoundingMode (a Java enum). */
-final class RoundingMode private (private val modeName: String, private val modeOrdinal: Int)
-    extends Object
-    with java.io.Serializable:
-  def ordinal(): Int = modeOrdinal
-  def name(): String = modeName
-  override def toString(): String = modeName
+/** java.math.MathContext: precision and rounding mode for BigDecimal arithmetic. */
+final class MathContext(precision: Int, roundingMode: RoundingMode) extends Object with java.io.Serializable:
+  if precision < 0 then throw new java.lang.IllegalArgumentException("Digits < 0")
+  if roundingMode == null then throw new java.lang.NullPointerException("null RoundingMode")
 
-object RoundingMode:
-  @static val UP: RoundingMode = new RoundingMode("UP", 0)
-  @static val DOWN: RoundingMode = new RoundingMode("DOWN", 1)
-  @static val CEILING: RoundingMode = new RoundingMode("CEILING", 2)
-  @static val FLOOR: RoundingMode = new RoundingMode("FLOOR", 3)
-  @static val HALF_UP: RoundingMode = new RoundingMode("HALF_UP", 4)
-  @static val HALF_DOWN: RoundingMode = new RoundingMode("HALF_DOWN", 5)
-  @static val HALF_EVEN: RoundingMode = new RoundingMode("HALF_EVEN", 6)
-  @static val UNNECESSARY: RoundingMode = new RoundingMode("UNNECESSARY", 7)
-
-  @static def values(): Array[RoundingMode] =
-    Array(UP, DOWN, CEILING, FLOOR, HALF_UP, HALF_DOWN, HALF_EVEN, UNNECESSARY)
-
-/** java.math.MathContext: precision and rounding mode for decimal arithmetic. */
-final class MathContext(private val precision: Int, private val roundingMode: RoundingMode)
-    extends Object
-    with java.io.Serializable:
   def this(precision: Int) = this(precision, RoundingMode.HALF_UP)
+
+  def this(s: String) = this(MathContext.parsePrecision(s), MathContext.parseRoundingMode(s))
 
   def getPrecision(): Int = precision
   def getRoundingMode(): RoundingMode = roundingMode
+
+  /** The settings, packed for BigDecimal's natives (see `Natives.scala`). */
+  private[math] def goBits(): Long = (precision.toLong << 3) | roundingMode.ordinal()
 
   override def equals(other: Any): Boolean = other match
     case mc: MathContext => mc.getPrecision() == precision && (mc.getRoundingMode() eq roundingMode)
@@ -44,3 +29,21 @@ object MathContext:
   @static val DECIMAL32: MathContext = new MathContext(7, RoundingMode.HALF_EVEN)
   @static val DECIMAL64: MathContext = new MathContext(16, RoundingMode.HALF_EVEN)
   @static val DECIMAL128: MathContext = new MathContext(34, RoundingMode.HALF_EVEN)
+
+  // "precision=<digits> roundingMode=<mode>", as toString writes it.
+  private def badFormat(): Nothing = throw new java.lang.IllegalArgumentException("bad string format")
+
+  private def fence(s: String): Int =
+    if s == null then throw new java.lang.NullPointerException("null String")
+    val fence = s.indexOf(' ')
+    if !s.startsWith("precision=") || fence < 0 || !s.startsWith("roundingMode=", fence + 1) then badFormat()
+    fence
+
+  private def parsePrecision(s: String): Int =
+    val digits = s.substring(10, fence(s))
+    try Integer.parseInt(digits)
+    catch case _: NumberFormatException => badFormat()
+
+  private def parseRoundingMode(s: String): RoundingMode =
+    try RoundingMode.valueOf(s.substring(fence(s) + 14))
+    catch case _: IllegalArgumentException => badFormat()
