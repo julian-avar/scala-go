@@ -299,7 +299,9 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
         emit("panic(\"unreachable\")")
       else emit(s"return ${adapt(expr, tpe, method.name.result)}")
     case Dest.AssignTo(v, target) =>
-      if expr.nonEmpty then emit(s"$v = ${adapt(expr, tpe, target)}")
+      // A call of a method returning Nothing has no Go result: it never completes normally.
+      if expr.nonEmpty then
+        if tpe == Type.Nothing then emit(expr) else emit(s"$v = ${adapt(expr, tpe, target)}")
 
   private def genAssign(lhs: Tree, rhs: Tree): Unit = lhs match
     case VarRef(name, tpe) =>
@@ -508,11 +510,16 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
 
   /** Converts a Go value of IR type `from` for a location of IR type `to`. Scala upcasts need no
    *  conversion in the IR, but a class that is never instantiated has Go type `any`, which Go does
-   *  not implicitly convert to the interface type of its (instantiated) supertypes.
+   *  not implicitly convert to the interface type of its (instantiated) supertypes. And a null
+   *  reference of a pointer type (`*rt.String`, arrays, ...) must become a nil `any`, not an `any`
+   *  holding a nil pointer.
    */
   private def adapt(expr: String, from: Type, to: Type): String =
     val target = ctx.goType(to)
-    if expr.isEmpty || target.isEmpty || target == "any" || to.isPrimitive || ctx.goType(from) != "any" then expr
+    val source = ctx.goType(from)
+    if expr.isEmpty || target.isEmpty || to.isPrimitive then expr
+    else if target == "any" then if source.startsWith("*") && expr != "nil" then s"rt.AnyRef($expr)" else expr
+    else if source != "any" then expr
     else s"rt.Cast[$target]($expr)"
 
   private def isPure(tree: Tree): Boolean = tree match
@@ -594,6 +601,21 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   // ---------------------------------------------------------------------------------------------
 
   private def genBinary(tree: Binary): String =
+    if tree.op == BinaryOp.StringConcat then genStringConcat(tree) else genArithmetic(tree)
+
+  /** A chain of string concatenations, as one: like the JVM's (`StringConcatFactory`), it evaluates
+   *  all the operands before converting any to a string, which matters when evaluating an operand
+   *  changes an earlier one (`s"$list ${list.remove(0)}"`).
+   */
+  private def genStringConcat(tree: Binary): String =
+    def operands(t: Tree): List[Tree] = t match
+      case Binary(BinaryOp.StringConcat, _, l, r) => operands(l) ++ operands(r)
+      case other                                  => List(other)
+    genExprs(operands(tree)) match
+      case List(a, b) => s"rt.Concat($a, $b)"
+      case parts      => s"rt.ConcatAll(${parts.mkString(", ")})"
+
+  private def genArithmetic(tree: Binary): String =
     import BinaryOp.*
     val Binary(op, opType, lhs, rhs) = tree
     val List(a, b) = genExprs(List(lhs, rhs)): @unchecked

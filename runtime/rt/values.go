@@ -100,7 +100,9 @@ func formatFloating(d float64, bits int) string {
 	s := strconv.FormatFloat(d, 'E', -1, bits) // e.g. "1.2345E+07"
 	mantissa, exponent, _ := strings.Cut(s, "E")
 	if !strings.Contains(mantissa, ".") {
-		mantissa += ".0"
+		// The shortest form has one digit: Java picks the closest decimal of one or two digits
+		// (4.9E-324 for Double.MIN_VALUE, where the shortest is 5E-324).
+		mantissa, exponent, _ = strings.Cut(strconv.FormatFloat(d, 'E', 1, bits), "E")
 	}
 	exp, _ := strconv.Atoi(exponent)
 	return mantissa + "E" + strconv.Itoa(exp)
@@ -208,9 +210,9 @@ func HashCode(x any) int32 {
 	case int64:
 		return int32(v ^ int64(uint64(v)>>32))
 	case float32:
-		return int32(math.Float32bits(v))
+		return FloatToIntBits(v) // NaNs hash alike, as on the JVM
 	case float64:
-		b := math.Float64bits(v)
+		b := uint64(DoubleToLongBits(v))
 		return int32(b ^ (b >> 32))
 	case scalaHashCode:
 		return v.M_hashCode_p_rI()
