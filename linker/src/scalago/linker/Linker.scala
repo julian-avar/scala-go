@@ -273,14 +273,17 @@ object Linker:
       val args = params.map(_._1)
       line(s"func ${Mangling.dispatcher(m)}(r any${params.map((n, t) => s", $n $t").mkString})${if result.isEmpty then "" else s" $result"} {")
       line("\tswitch v := r.(type) {")
-      for (h, goType) <- Hijacked.instanceGoType.toList.sortBy(_._1); native <- Natives.lookup(h, m) do
-        val call = native match
-          case Natives.Native.Instance(gen) => gen("v", args)
-          case Natives.Native.Static(gen)   => gen(args)
-          case Natives.Native.NullResult    => "nil"
-        line(s"\tcase $goType:")
-        line(s"\t\t$ret$call")
-        if result.isEmpty then line("\t\treturn")
+      for (h, goType) <- Hijacked.instanceGoType.toList.sortBy(_._1) do
+        val call = Natives.lookup(h, m) match
+          case Some(Natives.Native.Instance(gen)) => Some(gen("v", args))
+          case Some(Natives.Native.Static(gen))   => Some(gen(args))
+          case Some(Natives.Native.NullResult)    => Some("nil")
+          // An interface's default method (see Program.hijackedDefault).
+          case None => ctx.program.hijackedDefault(h, m).map(i => s"${Mangling.impl(i, m)}(${("v" :: args).mkString(", ")})")
+        for call <- call do
+          line(s"\tcase $goType:")
+          line(s"\t\t$ret$call")
+          if result.isEmpty then line("\t\treturn")
       line(s"\tcase interface{ ${Mangling.virtualMethod(m)}(${params.map(_._2).mkString(", ")})${if result.isEmpty then "" else s" $result"} }:")
       line(s"\t\t${ret}v.${Mangling.virtualMethod(m)}(${args.mkString(", ")})")
       if result.isEmpty then line("\t\treturn")
