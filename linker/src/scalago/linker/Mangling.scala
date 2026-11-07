@@ -58,7 +58,11 @@ object Mangling:
     case Type.Double      => "D"
     case Type.Nothing     => "N"
     case Type.Null        => "0"
-    case Type.Class(name) => s"L${escape(name)}_e"
+    // The two most common class types get one-letter codes (unused by other codes, so the
+    // encoding stays prefix-free): they are a tenth of the generated code otherwise.
+    case Type.Class(ClassName.Object)   => "O"
+    case Type.Class("java.lang.String") => "T"
+    case Type.Class(name)               => s"L${escape(name)}_e"
     case Type.Array(elem) => s"A${typeCode(elem)}"
 
   /** Constructors are named `_init` (escaped names never start with `_i`). The simple name ends at
