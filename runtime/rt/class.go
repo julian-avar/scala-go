@@ -122,7 +122,9 @@ func ClassGetSimpleName(c *Class) *String {
 	}
 	name = name[strings.LastIndex(name, ".")+1:]
 	if i := strings.LastIndex(strings.TrimSuffix(name, "$"), "$"); i >= 0 {
-		name = name[i+1:]
+		// As on the JVM, an anonymous class (Outer$1) has an empty simple name, and a local
+		// class (Outer$1Local) loses its digits.
+		name = strings.TrimLeft(name[i+1:], "0123456789")
 	}
 	return Str(name)
 }
