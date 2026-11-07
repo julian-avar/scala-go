@@ -16,14 +16,14 @@ class Runtime private ():
   def addShutdownHook(hook: Thread): Unit =
     if hook == null then throw new java.lang.NullPointerException()
     if hook.wasStarted then throw new java.lang.IllegalArgumentException("Hook already running")
-    Process.addShutdownHook(hook) match
+    Process.addShutdownHook(hook.native) match
       case 1 => throw new java.lang.IllegalArgumentException("Hook previously registered")
       case 2 => throw new java.lang.IllegalStateException("Shutdown in progress")
       case _ => ()
 
   def removeShutdownHook(hook: Thread): scala.Boolean =
     if hook == null then throw new java.lang.NullPointerException()
-    Process.removeShutdownHook(hook) match
+    Process.removeShutdownHook(hook.native) match
       case 0 => true
       case 2 => throw new java.lang.IllegalStateException("Shutdown in progress")
       case _ => false

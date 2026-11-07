@@ -1,0 +1,1 @@
+Locks and synchronizers must be free of data races.

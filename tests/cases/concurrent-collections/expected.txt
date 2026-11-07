@@ -1,0 +1,53 @@
+{the=3, over=1, quick=1, lazy=1, and=1, cat=1, jumps=1, brown=1, dog=1, fox=1}
+keys: [the, over, quick, lazy, and, cat, jumps, brown, dog, fox]
+values sum: 12
+get/containsKey: 3 true true
+putIfAbsent: 3 null
+compute: 11
+computeIfAbsent: 3 null
+replace: true 5 false true
+getOrDefault: -1
+size: 10 10
+merge from 16 threads: 100 160000 1600
+concurrent puts: 40000 true
+concurrent removes: 20000
+forEach: 400000000
+reduce: 400000000
+search: 39999
+newKeySet: 50
+[0, 147, 21, 168, 42, 189, 63, 210, 84, 105, 126]
+LongAdder: 80000 80000
+LongAccumulator: 79999
+DoubleAdder: 40000.0
+AtomicIntegerArray: [8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000]
+AtomicLongArray: [40000, 40000, 40000, 40000]
+AtomicReferenceArray: Vector(true, true, true)
+AtomicInteger: 5 11 33 33 1
+AtomicLong: 1099511627776 1099511627778 1099511627778 7
+AtomicReference: 1000
+AtomicStampedReference: true false b 1
+AtomicMarkableReference: true true
+LinkedBlockingQueue: 2002000
+ArrayBlockingQueue: true true true true false 0
+poll with timeout: 1 true [2, 3, 4, 9] null
+drainTo: [2, 3, 4, 9] true
+PriorityBlockingQueue: 100 sorted=true first=List(0, 3, 3, 3, 3)
+ConcurrentLinkedQueue: 8000 true 0
+ConcurrentLinkedQueue ops: [a, c] a true
+ConcurrentLinkedDeque: 2000
+LinkedBlockingDeque: [b] c a
+SynchronousQueue: handed off false
+transferred: transfer
+DelayQueue: null sooner later
+CopyOnWriteArrayList: snapshot=1000 now=0
+addIfAbsent: false true [a, b, c, d] 2 [b, c]
+remove while iterating: [a, c, d]
+CopyOnWriteArraySet: 5 true
+ConcurrentSkipListMap: 100 0 99 50 null 98=v98
+headMap: {0=v0, 1=v1, 2=v2, 3=v3, 4=v4} tailMap: {97=v97, 98=v98, 99=v99} desc: {99=v99, 98=v98}
+subMap keys: [10, 11, 12, 13, 14]
+removed while iterating: 50 1=v1 3
+ConcurrentSkipListSet: 26 a z [a, b, c] z
+ThreadLocalRandom: true 5
+groupingByConcurrent: {1=[a], 2=[bb, cc], 3=[ddd]} true
+toConcurrentMap: {yy=2, x=1, zzz=3}

@@ -39,7 +39,8 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
 4. **javalib** (`javalib/`). JDK classes written in Scala: exceptions, `StringBuilder`,
    `System`, `java.io`, `java.nio.file` and `java.nio.charset` (see [I/O](#io)), `java.util`
    (collections, `Arrays`, `Collections`, `Optional`, `Random`, `UUID`,
-   `java.util.function`, `java.util.stream`, ...), `java.time` (see [java.time](#javatime)),
+   `java.util.function`, `java.util.stream`, ...), `java.util.concurrent` (see
+   [Concurrency](#concurrency-and-the-memory-model)), `java.time` (see [java.time](#javatime)),
    `MathContext` and `RoundingMode`, references, and so on. It also replaces the
    few Java-written classes of the Scala library (`*Ref`, `LazyVals`, `JProcedureN`,
    `ScalaNumber`), and `Enumeration`, which uses reflection (see below). Packages other than `java.lang` are compiled under their own names
@@ -56,7 +57,8 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
    must not be on a compile or run classpath. When a class appears more than once on the link
    classpath, the first occurrence wins, so javalib must come before the stdlib IR.
 
-   Much of `java.util` and of `java.io` is adapted from Scala Native's javalib (Apache-2.0,
+   Much of `java.util`, `java.util.concurrent` and `java.io` is adapted from Scala Native's
+   javalib (Apache-2.0,
    `javalib/LICENSE-scala-native.md`; each such file says so), changed where programs can
    observe a difference from the JDK: `HashMap` lays out its table as the JDK does (capacities,
    growth, order within buckets), so iteration orders match (except in buckets of more than 8
@@ -96,7 +98,7 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
    - **Natives** (`Natives.scala`): Go implementations of JDK methods (`String`, boxes, `Math`,
      `System`, `Character`, `BigInteger`, `BigDecimal`, `Arrays`, ...). They take precedence over IR.
      They also implement the `scalago.runtime` objects through which javalib reaches the Go
-     runtime (`Threads`, `Locks`, `Regexes`, `Console`, `OS`, `Process`): Scala objects whose
+     runtime (`Threads`, `AtomicArrays`, `Regexes`, `Console`, `OS`, `Process`): Scala objects whose
      methods throw on the JVM and become Go calls when linked.
    - **Static constants of javalib objects.** Java's static fields (`Collections.EMPTY_LIST`,
      `Attributes.Name.MAIN_CLASS`) are usually members of the companion object in javalib's
@@ -134,7 +136,7 @@ published with the full Scala version as suffix.
 | virtual method                   | forwarding method on each instantiated struct                   |
 | `object O`                       | singleton `Mod_O_S()`, constructed on first use under an `rt.InitLock` |
 | `@static` fields, `<clinit>`     | package variables, plus `Clinit_C()`, run once under an `rt.InitLock` |
-| `@volatile` field                | `rt.Volatile[T]` (atomic loads, stores, compare-and-set)        |
+| `@volatile` field                | `sync/atomic` value (`rt.VolatileInt32`, ...) or `rt.Volatile[T]` for references |
 
 - **Calls through `this` stay virtual.** Method bodies take `this` as an interface, so calls on it
   stay virtual even in inherited code. Go's struct embedding alone cannot do that.
@@ -528,19 +530,83 @@ generated code are goroutine-safe, with the JVM's guarantees where Scala code re
   several goroutines), which costs about 4 ns. If the offset is not found (a future Go version
   laying the structure out differently, or another architecture), it falls back to parsing
   `runtime.Stack` (about 3.5 µs); a runtime unit test fails in that case on amd64 and arm64.
-- **Volatile fields** (`@volatile`, and the state field of each `lazy val`) are `rt.Volatile[T]`:
-  sequentially consistent, which is what the JMM requires of volatiles. javalib's
-  `java.util.concurrent.atomic` classes (`AtomicInteger`, `AtomicLong`, `AtomicBoolean`,
-  `AtomicReference`) are volatile fields plus the `scalago.runtime.Intrinsics.compareAndSet`
-  intrinsic, which becomes IR `CompareAndSet`.
+- **Volatile fields** (`@volatile`, and the state field of each `lazy val`) are sequentially
+  consistent, which is what the JMM requires of volatiles. Fields of primitive types are
+  `sync/atomic` values (`rt.VolatileInt32`, `rt.VolatileInt64`, `rt.VolatileBool`, ...), which
+  never allocate. Go cannot access an interface atomically, so a field of a reference type is an
+  `rt.Volatile[T]`, an atomic pointer to an immutable box holding the value: a store allocates a
+  box, except for null and when it stores the object it stored last (a lock's owner alternating
+  between a thread and null), whose box it reuses.
+- **Atomic intrinsics.** javalib's atomics and concurrent classes do atomic read-modify-write
+  operations on volatile fields through `scalago.runtime.Intrinsics`: `compareAndSet`,
+  `getAndSet` and `getAndAdd` (the first argument must be the field, or its getter), which the
+  plugin turns into IR `CompareAndSet`, `GetAndSet` and `GetAndAdd`, and the linker into the
+  `sync/atomic` operations (`CompareAndSwap`, `Swap`, `Add`). Rarer operations (`getAndBitwiseOr`,
+  ...) are compare-and-set loops. Array elements are accessed atomically through
+  `scalago.runtime.AtomicArrays`: `Int` and `Long` arrays in place, arrays of references as Go
+  slices of atomic pointers (`scalago.runtime.VolatileArray`).
+- **Benign races.** The JDK's concurrent classes read some plain reference fields racily, which
+  the JMM makes safe but Go does not (a torn read). In the ported classes such fields are
+  volatile: the tables of `ConcurrentHashMap` and the cells of `LongAdder` are `VolatileArray`s,
+  and fields such as a lock's owner thread, the waiters of `AbstractQueuedSynchronizer` and the
+  actions of `CompletableFuture`'s stages are `@volatile`. All of `java.util.concurrent` is
+  exercised under the race detector by the test cases.
 - **Lazy vals** follow Scala 3's scheme: compare-and-set on the volatile field, and goroutines
   that find the value being computed wait on a `Waiting` marker (a monitor).
 - **Threads.** `java.lang.Thread` runs on a goroutine. `start`, `join` (with timeouts),
-  `sleep`, `interrupt`, `currentThread`, names, daemon status and uncaught-exception handlers
-  work. A goroutine that did not start as a `Thread` (the main goroutine, or one started by Go
-  code) gets a `Thread` object the first time it asks for one. As on the JVM, `Main()` waits for
-  the non-daemon threads before returning, and an exception in a thread is reported
+  `sleep`, `interrupt`, `currentThread`, names, daemon status, priorities, thread groups (names
+  and handlers), `getState`, `holdsLock`, builders (`Thread.ofPlatform()`, `Thread.ofVirtual()`)
+  and uncaught-exception handlers work. Every thread is goroutine-backed, so virtual threads are
+  threads like the others (daemons, unnamed by default, `isVirtual`), and Go's scheduler
+  multiplexes all of them. A goroutine that did not start as a `Thread` (the main goroutine, or
+  one started by Go code) gets a `Thread` object the first time it asks for one; that object
+  stays registered as long as the program runs. `Thread.currentThread` is a lookup by goroutine
+  id, through a direct-mapped cache (an atomic load and a comparison). As on the JVM, `Main()`
+  waits for the non-daemon threads before returning, and an exception in a thread is reported
   (`Exception in thread "name" ...`) without ending the program.
+- **Thread locals.** As in the JDK, each `Thread` holds a table of its `ThreadLocal` values, and
+  a new thread copies its creator's `InheritableThreadLocal`s (through `childValue`). Tables
+  hold their keys strongly, so a value lives until `remove` or the end of its thread.
+- **Parking** (`LockSupport`), the basis of `java.util.concurrent`'s synchronizers: each thread
+  has a permit, a one-slot Go channel. `park` takes it or blocks until `unpark` gives it, the
+  thread is interrupted (which leaves the interrupt status set, as on the JVM) or the timeout
+  expires. Parked threads report `WAITING`/`TIMED_WAITING` from `getState`.
+- **`java.util.concurrent`** is Scala Native's port of JSR-166 (Doug Lea's public-domain code),
+  adapted to the intrinsics above: `AbstractQueuedSynchronizer` and the locks and synchronizers
+  built on it (`ReentrantLock` and its conditions, `ReentrantReadWriteLock`, `Semaphore`,
+  `CountDownLatch`, `CyclicBarrier`, `Phaser`, `Exchanger`), `StampedLock`, the atomics and
+  adders, executors (`ThreadPoolExecutor`, `ScheduledThreadPoolExecutor`, `Executors`,
+  `FutureTask`), `CompletableFuture`, `ConcurrentHashMap` (with the JDK's table layout, so the
+  same iteration order), and the concurrent queues and deques. Three classes are written for
+  scala-go instead: `CopyOnWriteArrayList`/`CopyOnWriteArraySet` (Scala Native's are
+  single-threaded), `ConcurrentSkipListMap`/`Set` (a `TreeMap` under a lock shared by all its
+  views, with snapshot iterators that never throw `ConcurrentModificationException`, rather
+  than a lock-free skip list), and `ForkJoinPool`.
+- **`ForkJoinPool`.** The JDK's pool is a large lock-free design for platform threads; Go's
+  scheduler already does much of its work. scala-go's keeps its API and behavior on a simpler
+  structure: workers are goroutine-backed `ForkJoinWorkerThread`s (from the pool's factory, so
+  Scala's global `ExecutionContext` installs its `BlockContext` as on the JVM), each with a deque
+  under a spin lock (`fork()` pushes there; the owner takes LIFO, or FIFO in async mode; idle
+  workers steal FIFO), plus a lock-free queue for submissions from other threads. Workers are
+  started on demand up to the parallelism, park when idle (registering first, then scanning
+  once more, so that no wake-up is lost) and exit after the keep-alive time. Blocking is
+  compensated: a worker in `managedBlock` (Scala's `blocking {}`) or blocked in `join` does not
+  count against the parallelism, so another worker runs the queued tasks. `join` helps: it runs
+  the joined task if it is still queued, then other local or stolen tasks, before blocking.
+  `ForkJoinTask`, `RecursiveTask`, `RecursiveAction` and `CountedCompleter` are Scala Native's.
+  `ForkJoinPool.commonPool()` has `availableProcessors() - 1` workers, as on the JVM.
+- **`scala.concurrent`** runs unchanged on these: `ExecutionContext.global` is a
+  `ForkJoinPool`, `Await` uses `AbstractQueuedSynchronizer`, and `blocking {}` is a managed
+  block.
+- **`Runtime`.** `availableProcessors` is `GOMAXPROCS`.
+- **Performance** (24 cores, warm JVM 25 for comparison; a loaded machine, so ranges): an
+  uncontended `ReentrantLock` lock/unlock takes about 95 ns (JVM 20–30), `synchronized` about
+  50 ns, `AtomicInteger.incrementAndGet` about 10 ns (as the JVM). A chain of 10⁵
+  `Future.map`s runs at 0.7–1.1 µs per step (JVM 0.4–0.7), `Future(x + 1)` chained through
+  `flatMap` at 2.3–3.9 µs (JVM 0.6–2.1), `Future.sequence` of 10⁵ futures at 3–4.7 µs per future
+  (JVM 2–3.8). `ConcurrentHashMap.merge` from 8 threads on 1,000 keys takes about 120 ns (JVM
+  55–75), `get` 13–16 ns (JVM 5–25). `LongAdder` from 8 threads is the weak spot, 45–120 ns
+  (JVM about 10).
 - **Runtime state.** The stdout buffer (one lock per write, so lines do not interleave), string
   interning, the `Class` table and `String.hashCode`'s cache are goroutine-safe.
 
@@ -561,9 +627,9 @@ implementation runs each `Future` on a virtual thread and suspends by blocking i
 - gears is compiled from its TASTy like any dependency. The `scalago-gears` module overrides
   `gears.async.VThreadScheduler`, the one class that needs `Thread.ofVirtual` and a `VarHandle`.
   `import gears.async.default.given` works unchanged.
-- javalib provides what gears uses: `ReentrantLock` and `Condition` (a monitor and its wait
-  sets, `rt/sync.go`), atomics, `ConcurrentLinkedQueue`, `TimeUnit`, and the
-  `java.util.concurrent` exceptions. Cancellation interrupts the thread (`Thread.interrupt`),
+- javalib's `java.util.concurrent` provides what gears uses: `ReentrantLock` and `Condition`
+  (on `AbstractQueuedSynchronizer` and parking), atomics, `ConcurrentLinkedQueue` and
+  `TimeUnit`. Cancellation interrupts the thread (`Thread.interrupt`),
   which wakes sleeps, waits, conditions and blocked Go channel operations.
 - Go integration (`scalago.gears`): `GoChan.awaitReceive`/`awaitSend` are cancellable channel
   operations in gears code, and `withGoContext(ctx)(body)` cancels `body` when a Go
@@ -656,7 +722,12 @@ Supported and covered by end-to-end tests:
   (`StdIn`, `System.in`, end of input), `Console.withOut`, `System.setOut`, `scala.io.Source`,
   `scala.util.Using`, system properties, environment, exit statuses and shutdown hooks
 - concurrency: threads, `synchronized`, `wait`/`notify`, volatile fields, atomics, interrupts,
-  and concurrent first use of modules and lazy vals (also under Go's race detector)
+  and concurrent first use of modules and lazy vals; thread locals, thread builders and virtual
+  threads; `scala.concurrent` (futures, promises, `Await`, `blocking`, the global
+  `ExecutionContext` and ones on executors); `java.util.concurrent`: executors and scheduled
+  executors, `ForkJoinPool` with recursive tasks, `CompletableFuture`, locks and synchronizers,
+  concurrent maps, queues and copy-on-write collections, atomics and adders (all also under
+  Go's race detector)
 
 Known gaps:
 - Regular expressions that RE2
@@ -681,9 +752,10 @@ Known gaps:
   x)` uses a `.`).
 - Reflection: `getClass` and `Class` names work; nothing else.
 - `BigInteger` and `BigDecimal` cannot be subclassed (they are Go values).
-- Concurrency: `java.util.concurrent` beyond what gears needs (executors, concurrent maps,
-  `CompletableFuture`), thread groups. `scala.concurrent.Future` needs an
-  `ExecutionContext` on `java.util.concurrent`; gears is the supported API.
+- Concurrency: the atomic field updaters (`AtomicIntegerFieldUpdater`, ... need reflection),
+  `SubmissionPublisher`, thread groups beyond names and handlers (`activeCount`, `enumerate`),
+  `Thread.getAllStackTraces`. Goroutines started by Go code that ask for their `Thread` (directly,
+  or through a lock or a thread local) keep it registered after they end.
 
 When reachable code uses something missing, linking fails with a "called from" chain naming
 the API. Reachability over-approximates what runs (virtual calls are resolved by name), so a
@@ -744,11 +816,11 @@ earlier has to be redone:
    APIs (`goapi`), with the step 3 types. `ScalaGoModule.goFacadePackages` generates facades for
    any Go package, and `scalago-gostd` publishes those of 21 standard library packages.
 7. **Library coverage** and **publishing**, in parallel with the steps above. Done so far:
-   regular expressions on Go's `regexp` (`java.util.regex`, Scala's `Regex`), the
-   `java.util.concurrent` subset gears needs, `java.util` (collections and utilities), Scala
+   regular expressions on Go's `regexp` (`java.util.regex`, Scala's `Regex`),
+   `java.util.concurrent` and `scala.concurrent`, `java.util` (collections and utilities), Scala
    library dependencies compiled from TASTy, `BigDecimal`, I/O (files, streams, charsets,
-   stdin), JVM-like stack traces, `java.util.stream` and `java.time`. Still to do:
-   `java.util.concurrent` beyond gears' subset, and publishing (organization `io.github.scalago` is a
+   stdin), JVM-like stack traces, `java.util.stream` and `java.time`. Still to do: publishing
+   (organization `io.github.scalago` is a
    placeholder).
 
 ## Open questions

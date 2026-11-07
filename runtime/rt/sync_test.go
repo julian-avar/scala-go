@@ -163,7 +163,7 @@ func TestWaitNotify(t *testing.T) {
 }
 
 func TestInterruptSleep(t *testing.T) {
-	thread := &Object{}
+	thread := NewThreadState(&Object{})
 	result := make(chan any)
 	StartThread(thread, true, func(any) {
 		result <- Try(func() { Sleep(5000, 0) })

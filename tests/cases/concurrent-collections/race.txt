@@ -1,0 +1,1 @@
+Concurrent collections and atomics are used from many threads: they must be free of data races.
