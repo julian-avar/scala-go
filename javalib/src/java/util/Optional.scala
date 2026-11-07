@@ -5,6 +5,7 @@ package java.util
 // stream() method added for Scala Native
 
 import java.util.function._
+import java.util.{stream => jus}
 
 final class Optional[T] private (value: T) {
   import Optional._
@@ -63,6 +64,11 @@ final class Optional[T] private (value: T) {
   def orElseThrow[X <: Throwable](exceptionSupplier: Supplier[? <: X]): T =
     if (isPresent()) value
     else throw exceptionSupplier.get()
+
+  // Since: Java 9
+  def stream(): jus.Stream[T] =
+    if (isPresent()) jus.Stream.of[T](value.asInstanceOf[Object])
+    else jus.Stream.empty[T]()
 
   override def equals(obj: Any): Boolean = {
     obj match {

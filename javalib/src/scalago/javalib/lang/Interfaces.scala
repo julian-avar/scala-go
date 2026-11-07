@@ -17,6 +17,72 @@ trait CharSequence:
       dst(dstBegin + i - srcBegin) = charAt(i)
       i += 1
 
+  /** The chars, zero-extended to ints. Late-binding, as the JDK's: the length is read when the
+   *  terminal operation starts. Strings use this too (the linker calls interfaces' default
+   *  methods for strings when there is no native).
+   */
+  def chars(): java.util.stream.IntStream =
+    java.util.stream.StreamSupport.intStream(
+      () => new CharSequence.CharsSpliterator(this),
+      java.util.Spliterator.ORDERED | java.util.Spliterator.SIZED | java.util.Spliterator.SUBSIZED,
+      false)
+
+  /** The code points: surrogate pairs combined, unpaired surrogates as they are. */
+  def codePoints(): java.util.stream.IntStream =
+    java.util.stream.StreamSupport.intStream(
+      () => new CharSequence.CodePointsSpliterator(this),
+      java.util.Spliterator.ORDERED,
+      false)
+
+object CharSequence:
+  private final class CharsSpliterator(cs: CharSequence) extends java.util.Spliterator.OfInt:
+    private var index = 0
+    private val fence = cs.length()
+
+    def tryAdvance(action: java.util.function.IntConsumer): Boolean =
+      java.util.Objects.requireNonNull(action)
+      if index < fence then
+        action.accept(cs.charAt(index))
+        index += 1
+        true
+      else false
+
+    override def forEachRemaining(action: java.util.function.IntConsumer): Unit =
+      java.util.Objects.requireNonNull(action)
+      var i = index
+      index = fence
+      while i < fence do
+        action.accept(cs.charAt(i))
+        i += 1
+
+    def trySplit(): java.util.Spliterator.OfInt = null
+    def estimateSize(): scala.Long = fence - index
+    def characteristics(): Int =
+      java.util.Spliterator.ORDERED | java.util.Spliterator.SIZED | java.util.Spliterator.SUBSIZED
+
+  private final class CodePointsSpliterator(cs: CharSequence) extends java.util.Spliterator.OfInt:
+    private var index = 0
+    private val fence = cs.length()
+
+    def tryAdvance(action: java.util.function.IntConsumer): Boolean =
+      java.util.Objects.requireNonNull(action)
+      if index < fence then
+        val c = cs.charAt(index)
+        index += 1
+        if java.lang.Character.isHighSurrogate(c) && index < fence then
+          val d = cs.charAt(index)
+          if java.lang.Character.isLowSurrogate(d) then
+            index += 1
+            action.accept(java.lang.Character.toCodePoint(c, d))
+          else action.accept(c)
+        else action.accept(c)
+        true
+      else false
+
+    def trySplit(): java.util.Spliterator.OfInt = null
+    def estimateSize(): scala.Long = fence - index
+    def characteristics(): Int = java.util.Spliterator.ORDERED
+
 trait Comparable[T]:
   def compareTo(o: T): Int
 

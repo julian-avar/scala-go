@@ -126,6 +126,17 @@ final class Program(irClasses: Seq[ClassDef]):
   def findMethod(cls: ClassName, m: MethodName): Option[MethodDef] =
     get(cls).flatMap(_.methods.find(_.name == m))
 
+  /** The interface whose default method implements `m` for instances of the hijacked class `h`
+   *  when no native does (`CharSequence.chars()` for strings), as for a JVM class that inherits
+   *  the default. The class has no IR, so its interfaces with IR are searched.
+   */
+  def hijackedDefault(h: ClassName, m: MethodName): Option[ClassName] =
+    if Natives.lookup(h, m).isDefined then None
+    else
+      Hijacked.ancestors.getOrElse(h, Set.empty).toList.sorted.iterator
+        .flatMap(i => resolveImplementation(i, m).filter(isInterface))
+        .find(i => findMethod(i, m).exists(d => !d.isAbstract && !d.isStatic))
+
   /** A read of static field `cls.field` (of type `tpe`) that `cls` does not have, as a call of the
    *  getter of the same name on its companion object, if that object has one. javalib's classes
    *  are Scala, where Java's static constants are usually members of the companion object

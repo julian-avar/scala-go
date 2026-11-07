@@ -274,17 +274,47 @@ class ArrayList[E] private (private var elems: Array[AnyRef], private var _size:
     AbstractList.checkPositionIndex(index, _size)
     new ListItr(index)
 
-  override def spliterator(): Spliterator[E] =
-    new Spliterators.AbstractSpliterator[E](_size, Spliterator.SIZED | Spliterator.SUBSIZED | Spliterator.ORDERED):
-      private var cursor = 0
-      private lazy val limit = _size // late binding
+  override def spliterator(): Spliterator[E] = new Splitr
 
-      def tryAdvance(action: Consumer[? >: E]): Boolean =
-        if cursor >= limit then false
-        else
-          action.accept(elems(cursor).asInstanceOf[E])
-          cursor += 1
-          true
+  /** As the JDK's: late-binding (the size and `modCount` are read on first use) and fail-fast. */
+  private final class Splitr extends Spliterator[E]:
+    private var cursor = 0
+    private var fence = -1
+    private var expectedModCount = 0
+
+    private def getFence(): Int =
+      if fence < 0 then
+        fence = _size
+        expectedModCount = modCount
+      fence
+
+    def tryAdvance(action: Consumer[? >: E]): Boolean =
+      Objects.requireNonNull(action)
+      val hi = getFence()
+      val i = cursor
+      if i < hi then
+        cursor = i + 1
+        action.accept(elems(i).asInstanceOf[E])
+        if modCount != expectedModCount then throw new ConcurrentModificationException()
+        true
+      else false
+
+    override def forEachRemaining(action: Consumer[? >: E]): Unit =
+      Objects.requireNonNull(action)
+      val hi = getFence()
+      val a = elems
+      var i = cursor
+      cursor = hi
+      while i < hi do
+        action.accept(a(i).asInstanceOf[E])
+        i += 1
+      if modCount != expectedModCount then throw new ConcurrentModificationException()
+
+    def trySplit(): Spliterator[E] = null
+
+    def estimateSize(): Long = getFence() - cursor
+
+    def characteristics(): Int = Spliterator.ORDERED | Spliterator.SIZED | Spliterator.SUBSIZED
 
   /** The iterator, on the array directly. */
   private class Itr extends Iterator[E]:

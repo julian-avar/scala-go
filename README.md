@@ -9,13 +9,12 @@ See [docs/design.md](docs/design.md) for the architecture, object model, status 
 
 **Status:** early, but real programs work. Classes, traits, objects, exceptions, pattern
 matching, lambdas, `lazy val`, the standard collections and `java.util` (collections, `Arrays`,
-`Collections`, `Optional`, `Random`, ...) all run, and Scala code can call Go
+`Collections`, `Optional`, `Random`, streams, ...) all run, and Scala code can call Go
 packages, and Go code can call Scala libraries. Threads run on goroutines, with `synchronized`,
 `wait`/`notify`, volatiles and atomics, and gears runs on them. The generated code is safe to
 call from any goroutine. `BigDecimal` and `BigInt` match the JDK. Programs read and write files
 (`java.io`, `java.nio.file`, `scala.io.Source`) and standard input. `java.time` works, with time
-zones from Go's tz database. `java.util.stream`, reflection and most of `java.util.concurrent`
-don't work yet.
+zones from Go's tz database. Reflection and most of `java.util.concurrent` don't work yet.
 
 ## Using it with Mill
 
@@ -176,7 +175,9 @@ runs it on the JVM. It then links it to Go, runs `go vet` and `go build`, and ru
 Both outputs must equal `expected.txt`. The work directory of a failing case is kept under
 `/tmp/scalago-<case>-*` for inspection. Set `SCALAGO_KEEP_WORK=1` to keep passing ones too.
 Cases run concurrently; `SCALAGO_TEST_PARALLELISM` sets how many at once, and
-`SCALAGO_TEST_ONLY=regex,traits` runs only the named cases.
+`SCALAGO_TEST_ONLY=regex,traits` runs only the named cases. A `missing-apis.txt` case is linked
+with `--missing-apis throw`. The tests use their own Go build cache
+(`~/.cache/scalago-tests/go-build`), pruned of entries unused for a day when they start.
 
 The generated Go code carries line directives, so Go reports Scala positions, also in
 compiler errors. `SCALAGO_LINE_DIRECTIVES=false` (the linker's `--line-directives false`)

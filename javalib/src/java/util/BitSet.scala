@@ -1,6 +1,6 @@
 // Adapted from Scala Native's javalib (Apache-2.0, see javalib/LICENSE-scala-native.md).
 // Ported from Scala.js commit: c0be6b6 dated: 2021-12-22
-// stream() is left out: java.util.stream is not implemented.
+// stream() method added for Scala Native
 
 package java.util
 
@@ -8,6 +8,8 @@ import java.io.Serializable
 import java.lang.Long.bitCount
 import java.nio.{ByteBuffer, LongBuffer}
 import java.util
+import java.util.function.IntConsumer
+import java.util.stream.{IntStream, StreamSupport}
 
 private object BitSet {
   private final val AddressBitsPerWord = 6 // Int Based 2^6 = 64
@@ -281,6 +283,33 @@ class BitSet private (private var bits: Array[Long])
       new BitSet(newbits)
     }
     // scalastyle:on return
+  }
+
+  /** The indices of the set bits, in order. As the JDK's, the stream is SIZED (by the
+   *  cardinality when it is created), DISTINCT, SORTED and ORDERED.
+   */
+  def stream(): IntStream = {
+    val characteristics =
+      Spliterator.DISTINCT | Spliterator.SORTED | Spliterator.ORDERED | Spliterator.SIZED
+
+    val spliter = new Spliterators.AbstractIntSpliterator(cardinality(), characteristics) {
+      private var fromIndex = 0
+
+      def tryAdvance(action: IntConsumer): Boolean = {
+        Objects.requireNonNull(action)
+        val nextSet = if (fromIndex < 0) -1 else nextSetBit(fromIndex)
+        if (nextSet < 0) false
+        else {
+          fromIndex = nextSet + 1 // Int.MinValue past the last index: done
+          action.accept(nextSet)
+          true
+        }
+      }
+
+      override def getComparator(): Comparator[? >: Integer] = null
+    }
+
+    StreamSupport.intStream(spliter, false)
   }
 
   def nextSetBit(fromIndex: Int): Int = {

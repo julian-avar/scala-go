@@ -93,7 +93,10 @@ class EndToEndTests extends munit.FunSuite:
       goReplaces = goModules,
       library = isLibrary,
       // SCALAGO_LINE_DIRECTIVES=false: Go positions in Go error messages, for debugging the linker.
-      lineDirectives = !sys.env.get("SCALAGO_LINE_DIRECTIVES").contains("false")
+      lineDirectives = !sys.env.get("SCALAGO_LINE_DIRECTIVES").contains("false"),
+      // `missing-apis.txt`: linked with --missing-apis throw (the file says why).
+      missingApis =
+        if Files.exists(dir.resolve("missing-apis.txt")) then Analyzer.MissingApis.Throw else Analyzer.MissingApis.Error
     )
     val goDir = work.resolve("go")
     val classpath = (classes +: Path.of(userLibrary) +: extraIR) ++ libraryIR
@@ -159,11 +162,26 @@ class EndToEndTests extends munit.FunSuite:
     Option.when(Files.exists(file))(RaceCheck(
       Files.readAllLines(file, UTF_8).asScala.toSeq.collect { case s"allow-race: $function" => function.trim }))
 
-  /** Each case builds in a new temporary directory. Without `-trimpath` the directory is part of
-   *  every Go build cache key, so each run would add the whole generated package to the cache
-   *  again (tens of MB per case); with it, unchanged generated code is a cache hit.
+  /** The tests' own Go build cache. Every change to the linker, javalib or the runtime gives each
+   *  case a new generated package, tens of MB in the cache (more with the race detector), and Go
+   *  only trims entries unused for five days: a day of development added tens of GB to the user's
+   *  cache. This one is pruned of entries unused for a day when the tests start (Go refreshes an
+   *  entry's modification time when it uses it).
    */
-  private val goEnv = Map("GOFLAGS" -> "-trimpath")
+  private val goCache: Path =
+    val dir = Path.of(sys.props("user.home"), ".cache", "scalago-tests", "go-build")
+    Files.createDirectories(dir)
+    val cutoff = java.time.Instant.now().minus(java.time.Duration.ofDays(1))
+    Using.resource(Files.walk(dir)) { paths =>
+      for p <- paths.iterator.asScala if Files.isRegularFile(p) && Files.getLastModifiedTime(p).toInstant.isBefore(cutoff) do
+        Files.deleteIfExists(p)
+    }
+    dir
+
+  /** Each case builds in a new temporary directory. Without `-trimpath` the directory is part of
+   *  every Go build cache key, so unchanged generated code would not be a cache hit.
+   */
+  private val goEnv = Map("GOFLAGS" -> "-trimpath", "GOCACHE" -> goCache.toString)
 
   private val raceReport = raw"(?s)==================\nWARNING: DATA RACE\n.*?==================\n".r
 

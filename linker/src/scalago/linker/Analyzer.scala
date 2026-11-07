@@ -13,7 +13,7 @@ import scalago.ir.Tree.*
  *  implementation of `m` in every instantiated class is reachable (an over-approximation, as in
  *  Scala.js's analyzer).
  */
-final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
+final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missingApis: Analyzer.MissingApis = Analyzer.MissingApis.Error):
   val instantiated = mutable.LinkedHashSet.empty[ClassName]
   val calledNames = mutable.LinkedHashSet.empty[MethodName]
   /** Virtual calls on receivers whose static type is a class, as (class, method). */
@@ -62,6 +62,7 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
   private def reachVirtual(m: MethodName): Unit =
     if calledNames.add(m) then
       for c <- instantiated.toList; impl <- program.vtable(c).get(m) do reach(impl, m)
+      for h <- Hijacked.instanceGoType.keys; impl <- program.hijackedDefault(h, m) do reach(impl, m)
 
   def reach(cls: ClassName, m: MethodName): Unit =
     program.findMethod(cls, m).filterNot(_.isAbstract).foreach { _ =>
@@ -87,6 +88,23 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
 
   private def error(tree: Tree, msg: String): Unit =
     errors.add(tree.pos, s"$msg\n${reachabilityChain(current)}")
+
+  /** Reachable uses of APIs that have no implementation, with the exception they throw instead
+   *  (`MissingApis.Throw`). Compared by identity: the emitter looks up the same trees.
+   */
+  private val missingUses = java.util.IdentityHashMap[Tree, Analyzer.MissingUse]()
+
+  def missingUse(tree: Tree): Option[Analyzer.MissingUse] = Option(missingUses.get(tree))
+
+  /** A reachable use of something that has no implementation: a link error, or (with
+   *  `MissingApis.Throw`) a warning and a `LinkageError` thrown if the code runs, as on the JVM.
+   */
+  private def missing(tree: Tree, kind: Analyzer.MissingKind, msg: String): Unit =
+    missingApis match
+      case Analyzer.MissingApis.Error => error(tree, msg)
+      case Analyzer.MissingApis.Throw =>
+        missingUses.put(tree, Analyzer.MissingUse(kind, msg))
+        errors.warn(tree.pos, s"$msg (throws ${kind.exception} if reached)\n${reachabilityChain(current)}")
 
   /** "called from" lines explaining why a method is reachable, innermost first. */
   private def reachabilityChain(start: Option[(ClassName, MethodName)]): String =
@@ -152,7 +170,7 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
               reach(cls, ctor)
               initializeStatics(cls)
             case Some(_) => error(tree, s"cannot instantiate $cls with constructor $ctor")
-            case None    => error(tree, s"class $cls is not available (no IR)")
+            case None    => missing(tree, Analyzer.MissingKind.Class, s"class $cls is not available (no IR)")
         scanAll(args)
 
       case LoadModule(cls) =>
@@ -174,9 +192,9 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
             if Natives.objectMethod(m).isEmpty then
               receiver.tpe match
                 case Type.Class(c) if program.contains(c) && !program.vtable(c).contains(m) && !Hijacked.hijackedAncestors(c) =>
-                  error(tree, s"method $m not found in $c")
+                  missing(tree, Analyzer.MissingKind.Method, s"method $m not found in $c")
                 case Type.Class(c) if !program.contains(c) && !Hijacked.hijackedAncestors(c) && !Hijacked.isHijacked(c) =>
-                  error(tree, s"method $c.$m is not available (no IR and no native implementation)")
+                  missing(tree, Analyzer.MissingKind.Method, s"method $c.$m is not available (no IR and no native implementation)")
                 case _ => ()
         scanAll(args)
 
@@ -184,7 +202,7 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
         if Natives.lookup(cls, m).isEmpty && !Natives.isNoOpConstructor(cls, m) then
           program.resolveImplementation(cls, m) match
             case Some(impl) => reach(impl, m)
-            case None       => error(tree, s"method $cls.$m is not available")
+            case None       => missing(tree, Analyzer.MissingKind.Method, s"method $cls.$m is not available")
         scan(receiver)
         scanAll(args)
 
@@ -194,7 +212,7 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
           if program.findMethod(cls, m).exists(d => d.isStatic && !d.isAbstract) then
             reach(cls, m)
             initializeStatics(cls)
-          else error(tree, s"static method $cls.$m is not available")
+          else missing(tree, Analyzer.MissingKind.Method, s"static method $cls.$m is not available")
         scanAll(args)
 
       case sel @ SelectStatic(cls, field, _) =>
@@ -206,10 +224,10 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
             if program.isModuleClass(cls) then loadModule(tree, cls)
           else program.staticFieldViaCompanion(sel) match
             case Some(read) => scan(read)
-            case None       => error(tree, s"static field $cls.$field is not available")
+            case None       => missing(tree, Analyzer.MissingKind.Field, s"static field $cls.$field is not available")
 
       case Unsupported(msg, _) =>
-        error(tree, msg)
+        missing(tree, Analyzer.MissingKind.Unsupported, msg)
 
       case _ =>
         Traversal.children(tree).foreach(scan)
@@ -284,10 +302,29 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors):
       instantiate(cls)
       reach(cls, ctor)
       initializeStatics(cls)
-    else error(tree, s"module $cls is not available (no IR)")
+    else missing(tree, Analyzer.MissingKind.Class, s"module $cls is not available (no IR)")
 end Analyzer
 
 object Analyzer:
+  /** What reachable uses of APIs without an implementation do (`--missing-apis`). */
+  enum MissingApis:
+    /** Fail linking (the default): nothing is left to fail at run time. */
+    case Error
+    /** Warn, and throw if the use is reached at run time, as the JVM does for missing classes and
+     *  members: for programs whose reachable code over-approximates what runs.
+     */
+    case Throw
+
+  /** The kind of missing API, and the exception (`rt.ExceptionKind`) a use of it throws. */
+  enum MissingKind(val goKind: String, val exception: String):
+    case Class extends MissingKind("NoClassDefFound", "java.lang.NoClassDefFoundError")
+    case Method extends MissingKind("NoSuchMethod", "java.lang.NoSuchMethodError")
+    case Field extends MissingKind("NoSuchField", "java.lang.NoSuchFieldError")
+    /** Code the compiler plugin could not translate (`-P:scala-go:lenient`). */
+    case Unsupported extends MissingKind("UnsupportedOperation", "java.lang.UnsupportedOperationException")
+
+  final case class MissingUse(kind: MissingKind, message: String)
+
   /** Methods the runtime calls dynamically: java.lang.Object's (`rt.ToString`, `rt.Equals`, ...)
    *  and `Throwable.printStackTrace()` (`rt.ReportUncaught`).
    */

@@ -63,7 +63,12 @@ trait ScalaGoModule extends ScalaModule {
     val jars = classpath.filter(p => os.isFile(p) && p.ext == "jar" && !isStdlib(p) && TastyIR.needsIR(p))
     jars.map { jar =>
       val out = Task.dest / "ir" / jar.baseName
-      TastyIR.compile(jar, classpath, out, Task.dest / "work" / jar.baseName,
+      // Compile-only dependencies are not on the run classpath, but compiling the TASTy needs them.
+      val provided = TastyIR.providedDependencies(jar)
+      val providedJars =
+        if (provided.isEmpty) Seq.empty[os.Path]
+        else defaultResolver().classpath(provided.map(d => Dep.parse(d))).map(_.path)
+      TastyIR.compile(jar, classpath ++ providedJars, out, Task.dest / "work" / jar.baseName,
         scalaGoCompilerClasspath().map(_.path), scalaGoPlugin().path)
       PathRef(out)
     }
@@ -103,6 +108,13 @@ trait ScalaGoModule extends ScalaModule {
    *  Go compiler messages give Scala positions. Turn off to see positions in the generated Go code.
    */
   def goLineDirectives: T[Boolean] = Task { true }
+
+  /** What reachable uses of APIs scala-go does not implement do: `"error"` (the default) fails
+   *  linking; `"throw"` makes them warnings, and they throw the JVM's linkage errors
+   *  (`NoClassDefFoundError`, `NoSuchMethodError`, ...) if they run. Reachability
+   *  over-approximates, so code that never runs can need APIs that do not exist.
+   */
+  def goMissingApis: T[String] = Task { "error" }
 
   /** Directories of local Go modules (each with its own `go.mod`) that the program's Go facades
    *  import, e.g. `Task.Sources(moduleDir / "go" / "mylib")`.
@@ -165,6 +177,7 @@ trait ScalaGoModule extends ScalaModule {
       if (goLibrary()) Seq("--library", "true") else Seq("--main", scalaGoMainObject()),
       if (goPackageName().nonEmpty) Seq("--package", goPackageName()) else Seq.empty[String],
       if (goLineDirectives()) Seq.empty[String] else Seq("--line-directives", "false"),
+      Seq("--missing-apis", goMissingApis()),
       "--go-module", goModulePath(),
       goModuleArgs()
     ).call(stdout = os.Inherit, stderr = os.Inherit, check = false)

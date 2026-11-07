@@ -1,0 +1,234 @@
+== sources
+[delta, alpha, charlie, bravo, echo, alpha, foxtrot, golf, hotel, india]
+true
+a,b,c
+[one]
+0
+0 1
+[1, 3, 9, 27, 81, 243]
+[1, 2, 4, 8, 16, 32, 64]
+[g1, g2, g3]
+[1, 2, 3, 4]
+[x, y, z]
+builder reuse: threw java.lang.IllegalStateException: null
+[q, r]
+17
+OptionalLong[9]
+OptionalDouble[2.0]
+[opt] 0
+7 0 0.5
+[1, 3, 7, 64, 200] 5
+{four=4, one=1, two=2, three=3, five=5}
+[five, four, one, three, two]
+15
+[alpha, bravo, charlie, delta, echo, foxtrot, golf, hotel, india]
+[golf, hotel, india]
+[delta, alpha, bravo, alpha, hotel, india]
+Optional[alpha]
+10
+[0, 1, 2, 3, 4] [-2, -1, 0, 1, 2]
+0 2
+15 3
+[-9223372036854775808, -9223372036854775807] OptionalLong[-9223372036854775801]
+[4, 2, 4] 9
+[1, 2, 4, 8, 16]
+[0, 3, 6, 9]
+[1, 10, 100, 1000]
+[1.0, 0.5, 0.25, 0.125]
+21
+[1, 2, 10, 11]
+6
+[1.5, 3.0] 0
+== intermediate
+[alpha, alpha]
+[DELTA, ALPHA, CHARLIE, BRAVO, ECHO, ALPHA, FOXTROT, GOLF, HOTEL, INDIA]
+9
+[alpha, alpha, bravo, charlie, delta, echo, foxtrot, golf, hotel, india]
+[india, hotel, golf, foxtrot, echo, delta, charlie, bravo, alpha, alpha]
+[echo, golf, alpha, alpha, bravo, delta, hotel, india, charlie, foxtrot]
+[Eve, Ann, Zed, Mia, Dan, Bob, Cat]
+[bravo, echo, alpha, foxtrot]
+0 0
+[delta, alpha, charlie, bravo]
+[echo, alpha, foxtrot, golf, hotel, india]
+[a, b, c, , d, e, f]
+6
+[1, 10, 2, 10]
+[1.0, -1.0, 2.0, -2.0]
+[1.1, 2.1, 2.2, 3.1, 3.2, 3.3]
+[97, 98, 99]
+[5, 5, 7, 5, 4, 5, 7, 4, 5, 5]
+52000000000
+[1.25, 1.25, 1.75, 1.25, 1.0, 1.25, 1.75, 1.0, 1.25, 1.25]
+[b, a, c]
+2
+[1, 2, 3]
+[d, a, c, b, e, a, f, g, h, i]
+== terminal
+delta;alpha;charlie;
+delta;alpha;charlie;
+true true
+true false
+true true
+Optional[delta] Optional.empty
+Optional[alpha] Optional[india]
+Optional[bb]
+Optional[bb]
+10
+dacbeafghi
+Optional[india6]
+Optional.empty
+52
+[delta, alpha, charlie]
+[echo,golf]
+5575457455
+atled ahpla eilrahc ovarb ahpla tortxof letoh aidni 
+advanced hotel
+remaining india
+[a, null] 2
+toList add: threw java.lang.UnsupportedOperationException: null
+== primitives
+4950 5000050000
+-2147483648
+[0, 3, 6, 9]
+[0, 1, 4, 9, 16]
+[, #, ##, ###]
+[0, 3000000000, 6000000000, 9000000000]
+[0.0, 0.125, 0.25, 0.375]
+[0.0, 1.0, 2.0, 3.0]
+[3, 1, 2] [1, 2, 3]
+[0, 0, 1]
+[0, 0, 1, -1, 2, -2]
+[0, 1, 2, 3] [7, 8, 9]
+[2, 3, 4]
+OptionalInt[2] OptionalInt[9] OptionalInt.empty
+OptionalDouble[1.5] OptionalDouble.empty
+IntSummaryStatistics{count=6, sum=108, min=4, average=18.000000, max=42}
+60 OptionalInt[-4]
+true true true
+OptionalInt[10] OptionalInt.empty
+[0, 7, 14, 21, 28, 35, 42, 49]
+[0, 2, 4, 6, 8]
+100 101 102 
+int 7
+1
+-9223372036854775808 OptionalDouble[3.5] LongSummaryStatistics{count=3, sum=60, min=10, average=20.000000, max=30}
+[0, 1, 4, 9, 16, 25] [L1, L2] 5.0
+[1, 2, 3] 1
+0.6 OptionalDouble[0.19999999999999998]
+0.0 Infinity
+OptionalDouble[NaN] OptionalDouble[-0.0] OptionalDouble[0.0]
+DoubleSummaryStatistics{count=3, sum=8.750000, min=-1.000000, average=2.916667, max=7.250000}
+[-2.0, -0.0, 0.0, 3.0, NaN]
+4
+3 8 [<0.25>]
+2.0
+== collectors
+ArrayList
+[bravo, golf, foxtrot, alpha, delta, hotel, echo, india, charlie]
+[alpha, bravo, charlie, delta, echo, foxtrot, golf, hotel, india]
+[delta, alpha, charlie, bravo, echo, alpha, foxtrot, golf, hotel, india]
+toUnmodifiableList null: threw java.lang.NullPointerException: null
+[alpha, bravo, charlie, delta, echo, foxtrot, golf, hotel, india]
+deltaalphacharliebravoechoalphafoxtrotgolfhotelindia
+<delta | alpha | charlie>
+[]
+10
+242
+697000
+30.1
+34.57142857142857
+99571.42857142857
+4.3
+0.0
+IntSummaryStatistics{count=7, sum=242, min=23, average=34.571429, max=52}
+LongSummaryStatistics{count=7, sum=697000, min=61000, average=99571.428571, max=135000}
+DoubleSummaryStatistics{count=7, sum=30.100000, min=3.900000, average=4.300000, max=4.900000}
+Optional[Ann]
+Optional[Zed]
+242
+Optional[52]
+697000
+Mia/Ann/Bob/Zed/Cat/Dan/Eve
+4
+[97, 98, 99, 100, 101]
+10
+7 people, 242 years
+{bravo=5, golf=4, foxtrot=7, alpha=5, delta=5, hotel=5, echo=4, india=5, charlie=7}
+{4=echo+golf, 5=delta+alpha+bravo+alpha+hotel+india, 7=charlie+foxtrot}
+{a=10, b=5, c=7, d=5, e=4, f=7, g=4, h=5, i=5}
+toMap duplicate: threw java.lang.IllegalStateException: Duplicate key 5 (attempted merging values delta and alpha)
+toMap null value: threw java.lang.NullPointerException: null
+{alpha=5, bravo=5, charlie=7, delta=5, echo=4, foxtrot=7, golf=4, hotel=5, india=5}
+ihgfaebcad []
+[delta, alpha] [UNORDERED, IDENTITY_FINISH]
+List(CONCURRENT, UNORDERED, IDENTITY_FINISH) 0
+[IDENTITY_FINISH] [UNORDERED, IDENTITY_FINISH] []
+== grouping
+{ops=[Emp(Ann,ops,29,80000,3.9), Emp(Zed,ops,29,82000,4.8)], hr=[Emp(Cat,hr,52,99000,3.9), Emp(Eve,hr,23,61000,4.9)], eng=[Emp(Mia,eng,34,120000,4.5), Emp(Bob,eng,41,135000,4.1), Emp(Dan,eng,34,120000,4.0)]}
+{ops=2, hr=2, eng=3}
+{34=[Mia, Dan], 52=[Cat], 23=[Eve], 41=[Bob], 29=[Ann, Zed]}
+{eng=4.2, hr=4.4, ops=4.35}
+{ops={false=Ann+Zed}, hr={false=Eve, true=Cat}, eng={true=Mia+Bob+Dan}}
+{4=[golf, echo], 5=[bravo, alpha, delta, hotel, india], 7=[foxtrot, charlie]}
+{0=105, 1=111, 2=117, 3=123, 4=129, 5=95, 6=100}
+null key: threw java.lang.NullPointerException: element cannot be mapped to a null key
+{false=[Emp(Ann,ops,29,80000,3.9), Emp(Zed,ops,29,82000,4.8), Emp(Cat,hr,52,99000,3.9), Emp(Eve,hr,23,61000,4.9)], true=[Emp(Mia,eng,34,120000,4.5), Emp(Bob,eng,41,135000,4.1), Emp(Dan,eng,34,120000,4.0)]}
+{false=4, true=3} 3 4 true [false, true]
+{false=[], true=[]}
+{k31=2, k30=2, k33=2, k32=2, k35=2, k34=2, k37=2, k36=2, k39=2, k38=2, k0=2, k1=2, k40=2, k2=2, k42=2, k3=2, k41=2, k4=2, k44=2, k5=2, k43=2, k6=2, k7=2, k46=2, k45=2, k8=2, k48=2, k9=2, k47=2, k49=2, k51=2, k50=2, k53=2, k52=2, k55=2, k54=2, k57=2, k56=2, k59=2, k58=2, k60=2, k62=2, k61=2, k64=1, k63=2, k66=2, k65=2, k68=2, k67=2, k69=2, k71=2, k70=2, k73=2, k72=2, k75=2, k74=2, k77=2, k76=2, k79=2, k78=2, k100=2, k80=2, k82=2, k81=2, k84=2, k83=2, k86=2, k85=2, k88=2, k87=2, k89=2, k91=2, k90=2, k93=2, k92=2, k95=2, k94=2, k97=2, k96=2, k11=2, k99=2, k98=2, k10=2, k13=2, k12=2, k15=2, k14=2, k17=2, k16=2, k19=2, k18=2, k20=2, k22=2, k21=2, k24=2, k23=2, k26=2, k25=2, k28=2, k27=1, k29=2}
+== laziness
+before terminal: 0
+Optional[5]
+[peek delta, map delta]
+[1, 3]
+[in 5, in 3, in 8, in 1, out 1, out 3]
+10 0
+3 0
+10 10
+[1, 2, 3] [f1, f2]
+true [0, 1, 2]
+Optional[a] [a]
+OptionalInt[0] 1
+[1, 2, 3] [3, 1, 2, s1, s2, s3]
+a [a]
+b true [a, b, c]
+c 1 [closed 1]
+10 2 [closed 1, closed 2]
+List(2, 4, 6)
+1 2 3 false
+first X; then Y; then Z; 
+true [a, b, c]
+concurrent modification: threw java.util.ConcurrentModificationException: null
+[1, 2, 3]
+== closing
+[2, 4, 6] []
+[first, second]
+[first, second]
+one suppressed List(two)
+[a, b] []
+[close a, close b]
+[2, 3] [inner 1, inner 2]
+3 [using]
+== errors
+terminal twice: threw java.lang.IllegalStateException: stream has already been operated upon or closed
+linked twice: threw java.lang.IllegalStateException: stream has already been operated upon or closed
+after close: threw java.lang.IllegalStateException: stream has already been operated upon or closed
+negative limit: threw java.lang.IllegalArgumentException: -1
+negative skip: threw java.lang.IllegalArgumentException: -2
+findFirst null: threw java.lang.NullPointerException: null
+reduce null: threw java.lang.NullPointerException: null
+max null: b
+onClose after use: threw java.lang.IllegalStateException: stream has already been operated upon or closed
+iterator exhausted: threw java.util.NoSuchElementException: null
+map throws: threw java.lang.NumberFormatException: For input string: "x"
+== converters
+[2, 4, 6]
+a-b
+List(x, y, z)
+Vector(0, 1, 2, 3)
+7
+15
+4.0
+List(p, q)
+List(m, n)

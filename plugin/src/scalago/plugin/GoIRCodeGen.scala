@@ -593,7 +593,15 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
         G.New(base, ctor, args.map(genExpr).map(a => if a.tpe.isPrimitive then G.Box(a)(pos) else a))(pos)
 
       case Select(New(tpt), nme.CONSTRUCTOR) =>
-        G.New(className(tpt.tpe.classSymbol), methodName(sym), args.map(genExpr))(pos)
+        val cls = className(tpt.tpe.classSymbol)
+        SpecializedTuples.generic(cls) match
+          case Some(tuple) =>
+            val elems = args.map { a =>
+              val e = genExpr(a)
+              if e.tpe.isPrimitive then G.Box(e)(pos) else e
+            }
+            G.New(tuple, SpecializedTuples.constructor(args.size), elems)(pos)
+          case None => G.New(cls, methodName(sym), args.map(genExpr))(pos)
 
       case Select(qual, name) if SpecializedTupleAccessor.matches(name.toString) && specializedTuple(sym.owner).isDefined =>
         val base = specializedTuple(sym.owner).get
@@ -608,6 +616,12 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
 
       case _ if Erasure.Boxing.isUnbox(sym) =>
         G.Unbox(genExpr(args.head), toIRType(tree.tpe))(pos)
+
+      case _ if args.isEmpty && SpecializedTuples.isTuple(genericClassName(sym.owner)) &&
+          SpecializedTuples.accessor(sym.name.mangledString).isDefined =>
+        val Some((accessor, prim)) = SpecializedTuples.accessor(sym.name.mangledString): @unchecked
+        val tuple = genericClassName(sym.owner)
+        G.Unbox(G.Apply(genExpr(receiverOf(tree.fun)), tuple, accessor, Nil, ir.Type.Object)(pos), prim)(pos)
 
       case _ =>
         val name = methodName(sym)
@@ -802,6 +816,13 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
     val name = sym.javaClassName
     options.renames.collectFirst { case (from, to) if name.startsWith(from) => to + name.stripPrefix(from) }.getOrElse(name)
 
+  /** The class name, with specialized tuple classes replaced by the generic ones (see
+   *  [[SpecializedTuples]]).
+   */
+  private def genericClassName(sym: Symbol): ir.ClassName =
+    val name = className(sym)
+    SpecializedTuples.generic(name).getOrElse(name)
+
   private def fieldName(sym: Symbol): String = sym.name.mangledString
 
   private def methodName(sym: Symbol): ir.MethodName =
@@ -828,7 +849,7 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
         else if sym == defn.NullClass then ir.Type.Null
         else if !sym.exists || sym == defn.AnyClass || sym == defn.AnyRefAlias then ir.Type.Object
         else
-          className(sym) match
+          genericClassName(sym) match
             case "scala.runtime.Nothing$" => ir.Type.Nothing
             case "scala.runtime.Null$"    => ir.Type.Null
             case name                     => ir.Type.Class(name)

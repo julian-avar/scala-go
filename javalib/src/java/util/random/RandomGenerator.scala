@@ -97,8 +97,11 @@ package java.util.random
  *     need not be qualified.
  */
 
-// scala-go: the methods returning streams, and the generator factories, are left out:
-// java.util.stream is not implemented.
+// scala-go: the generator factories are left out.
+
+import java.util.Spliterator
+import java.util.function.{DoubleConsumer, IntConsumer, LongConsumer}
+import java.util.stream.{DoubleStream, IntStream, LongStream, StreamSupport}
 
 trait RandomGenerator {
 
@@ -500,9 +503,137 @@ trait RandomGenerator {
 
   def nextGaussian(mean: scala.Double, stddev: scala.Double): scala.Double =
     mean + (stddev * nextGaussian())
+
+  /* Streams, as the JDK's: each element is nextInt() (nextLong(), nextDouble()) or, with bounds,
+   * nextInt(origin, bound) (...), drawn as the element is needed.
+   */
+
+  def ints(): IntStream = RandomGenerator.ints(this, Long.MaxValue, 0, 0, bounded = false)
+
+  def ints(streamSize: scala.Long): IntStream = {
+    RandomGenerator.checkStreamSize(streamSize)
+    RandomGenerator.ints(this, streamSize, 0, 0, bounded = false)
+  }
+
+  def ints(randomNumberOrigin: Int, randomNumberBound: Int): IntStream = {
+    RandomGenerator.checkRange(randomNumberOrigin < randomNumberBound)
+    RandomGenerator.ints(this, Long.MaxValue, randomNumberOrigin, randomNumberBound, bounded = true)
+  }
+
+  def ints(streamSize: scala.Long, randomNumberOrigin: Int, randomNumberBound: Int): IntStream = {
+    RandomGenerator.checkStreamSize(streamSize)
+    RandomGenerator.checkRange(randomNumberOrigin < randomNumberBound)
+    RandomGenerator.ints(this, streamSize, randomNumberOrigin, randomNumberBound, bounded = true)
+  }
+
+  def longs(): LongStream = RandomGenerator.longs(this, Long.MaxValue, 0L, 0L, bounded = false)
+
+  def longs(streamSize: scala.Long): LongStream = {
+    RandomGenerator.checkStreamSize(streamSize)
+    RandomGenerator.longs(this, streamSize, 0L, 0L, bounded = false)
+  }
+
+  def longs(randomNumberOrigin: scala.Long, randomNumberBound: scala.Long): LongStream = {
+    RandomGenerator.checkRange(randomNumberOrigin < randomNumberBound)
+    RandomGenerator.longs(this, Long.MaxValue, randomNumberOrigin, randomNumberBound, bounded = true)
+  }
+
+  def longs(streamSize: scala.Long, randomNumberOrigin: scala.Long, randomNumberBound: scala.Long): LongStream = {
+    RandomGenerator.checkStreamSize(streamSize)
+    RandomGenerator.checkRange(randomNumberOrigin < randomNumberBound)
+    RandomGenerator.longs(this, streamSize, randomNumberOrigin, randomNumberBound, bounded = true)
+  }
+
+  def doubles(): DoubleStream = RandomGenerator.doubles(this, Long.MaxValue, 0.0, 0.0, bounded = false)
+
+  def doubles(streamSize: scala.Long): DoubleStream = {
+    RandomGenerator.checkStreamSize(streamSize)
+    RandomGenerator.doubles(this, streamSize, 0.0, 0.0, bounded = false)
+  }
+
+  def doubles(randomNumberOrigin: scala.Double, randomNumberBound: scala.Double): DoubleStream = {
+    RandomGenerator.checkRange(randomNumberOrigin, randomNumberBound)
+    RandomGenerator.doubles(this, Long.MaxValue, randomNumberOrigin, randomNumberBound, bounded = true)
+  }
+
+  def doubles(
+      streamSize: scala.Long,
+      randomNumberOrigin: scala.Double,
+      randomNumberBound: scala.Double
+  ): DoubleStream = {
+    RandomGenerator.checkStreamSize(streamSize)
+    RandomGenerator.checkRange(randomNumberOrigin, randomNumberBound)
+    RandomGenerator.doubles(this, streamSize, randomNumberOrigin, randomNumberBound, bounded = true)
+  }
 }
 
 object RandomGenerator {
+  private def checkStreamSize(streamSize: scala.Long): Unit =
+    if (streamSize < 0L) throw new IllegalArgumentException("size must be non-negative")
+
+  private def checkRange(ok: Boolean): Unit =
+    if (!ok) throw new IllegalArgumentException("bound must be greater than origin")
+
+  private def checkRange(origin: scala.Double, bound: scala.Double): Unit =
+    checkRange(Double.NegativeInfinity < origin && origin < bound && bound < Double.PositiveInfinity)
+
+  private final val StreamCharacteristics =
+    Spliterator.SIZED | Spliterator.SUBSIZED | Spliterator.NONNULL | Spliterator.IMMUTABLE
+
+  /** `size` random numbers, generated as they are needed. */
+  private abstract class RandomSpliterator(size: scala.Long) {
+    protected var index = 0L
+    def estimateSize(): scala.Long = size - index
+    def characteristics(): Int = StreamCharacteristics
+  }
+
+  private def ints(rng: RandomGenerator, size: scala.Long, origin: Int, bound: Int, bounded: Boolean): IntStream = {
+    val spl = new RandomSpliterator(size) with Spliterator.OfInt {
+      def trySplit(): Spliterator.OfInt = null
+      def tryAdvance(action: IntConsumer): Boolean = {
+        java.util.Objects.requireNonNull(action)
+        if (index < size) {
+          action.accept(if (bounded) rng.nextInt(origin, bound) else rng.nextInt())
+          index += 1
+          true
+        } else false
+      }
+    }
+    StreamSupport.intStream(spl, false)
+  }
+
+  private def longs(rng: RandomGenerator, size: scala.Long, origin: scala.Long, bound: scala.Long,
+      bounded: Boolean): LongStream = {
+    val spl = new RandomSpliterator(size) with Spliterator.OfLong {
+      def trySplit(): Spliterator.OfLong = null
+      def tryAdvance(action: LongConsumer): Boolean = {
+        java.util.Objects.requireNonNull(action)
+        if (index < size) {
+          action.accept(if (bounded) rng.nextLong(origin, bound) else rng.nextLong())
+          index += 1
+          true
+        } else false
+      }
+    }
+    StreamSupport.longStream(spl, false)
+  }
+
+  private def doubles(rng: RandomGenerator, size: scala.Long, origin: scala.Double, bound: scala.Double,
+      bounded: Boolean): DoubleStream = {
+    val spl = new RandomSpliterator(size) with Spliterator.OfDouble {
+      def trySplit(): Spliterator.OfDouble = null
+      def tryAdvance(action: DoubleConsumer): Boolean = {
+        java.util.Objects.requireNonNull(action)
+        if (index < size) {
+          action.accept(if (bounded) rng.nextDouble(origin, bound) else rng.nextDouble())
+          index += 1
+          true
+        } else false
+      }
+    }
+    StreamSupport.doubleStream(spl, false)
+  }
+
   trait SplittableGenerator extends RandomGenerator {
     def split(): RandomGenerator.SplittableGenerator
 
