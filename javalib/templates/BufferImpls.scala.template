@@ -1,0 +1,58 @@
+// Generated from javalib/templates/BufferImpls.scala.template by javalib.generatedSources.
+package java.nio
+
+/** A $B$ on an array: `hb(offset)` is element 0. */
+private[nio] class Heap$B$(cap: Int, hb: Array[$T$], offset: Int) extends $B$(cap):
+  def isReadOnly(): Boolean = false
+  def isDirect(): Boolean = false
+  def order(): ByteOrder = ByteOrder.nativeOrder()
+  private[nio] final def load(i: Int): $T$ = hb(offset + i)
+  private[nio] final def store(i: Int, x: $T$): Unit = hb(offset + i) = x
+  private[nio] final def backing: Array[$T$] = hb
+  private[nio] final def backingOffset: Int = offset
+  private[nio] def sliceAt(index: Int, cap: Int): $B$ = new Heap$B$(cap, hb, offset + index)
+  private[nio] final def readOnlyView(): $B$ = new Heap$B$R(capacity(), hb, offset)
+
+private[nio] final class Heap$B$R(cap: Int, hb: Array[$T$], offset: Int) extends Heap$B$(cap, hb, offset):
+  override def isReadOnly(): Boolean = true
+  override private[nio] def sliceAt(index: Int, cap: Int): $B$ = new Heap$B$R(cap, backing, backingOffset + index)
+
+/** A view of a byte array (`ByteBuffer.as$B$`): element `i` is the $Size$ bytes at
+ *  `bytes(byteOffset + $Size$ * i)`. Subclasses fix the byte order and whether it is read-only,
+ *  as the JDK's classes, whose names `toString` shows.
+ */
+private[nio] abstract class ByteBufferAs$B$(cap: Int, bytes: Array[Byte], byteOffset: Int, bigEndian: Boolean)
+    extends $B$(cap):
+  def isDirect(): Boolean = false
+  def order(): ByteOrder = if bigEndian then ByteOrder.BIG_ENDIAN else ByteOrder.LITTLE_ENDIAN
+  private[nio] final def load(i: Int): $T$ = Bits.get$T$(bytes, byteOffset + $Size$ * i, bigEndian)
+  private[nio] final def store(i: Int, x: $T$): Unit = Bits.put$T$(bytes, byteOffset + $Size$ * i, x, bigEndian)
+  private[nio] final def backing: Array[$T$] = null
+  private[nio] final def backingOffset: Int = 0
+  private[nio] final def sliceAt(index: Int, cap: Int): $B$ =
+    ByteBufferAs$B$(bytes, byteOffset + $Size$ * index, cap, isReadOnly(), bigEndian)
+  private[nio] final def readOnlyView(): $B$ = ByteBufferAs$B$(bytes, byteOffset, capacity(), true, bigEndian)
+
+private[nio] object ByteBufferAs$B$:
+  def apply(bytes: Array[Byte], byteOffset: Int, cap: Int, readOnly: Boolean, bigEndian: Boolean): $B$ =
+    if readOnly then
+      if bigEndian then new ByteBufferAs$B$RB(cap, bytes, byteOffset)
+      else new ByteBufferAs$B$RL(cap, bytes, byteOffset)
+    else if bigEndian then new ByteBufferAs$B$B(cap, bytes, byteOffset)
+    else new ByteBufferAs$B$L(cap, bytes, byteOffset)
+
+private[nio] final class ByteBufferAs$B$B(cap: Int, bytes: Array[Byte], byteOffset: Int)
+    extends ByteBufferAs$B$(cap, bytes, byteOffset, true):
+  def isReadOnly(): Boolean = false
+
+private[nio] final class ByteBufferAs$B$L(cap: Int, bytes: Array[Byte], byteOffset: Int)
+    extends ByteBufferAs$B$(cap, bytes, byteOffset, false):
+  def isReadOnly(): Boolean = false
+
+private[nio] final class ByteBufferAs$B$RB(cap: Int, bytes: Array[Byte], byteOffset: Int)
+    extends ByteBufferAs$B$(cap, bytes, byteOffset, true):
+  def isReadOnly(): Boolean = true
+
+private[nio] final class ByteBufferAs$B$RL(cap: Int, bytes: Array[Byte], byteOffset: Int)
+    extends ByteBufferAs$B$(cap, bytes, byteOffset, false):
+  def isReadOnly(): Boolean = true

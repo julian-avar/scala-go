@@ -3,7 +3,7 @@ package java.nio.charset
 import scala.annotation.static
 
 /** java.nio.charset.Charset. The supported charsets are UTF-8 (the default), ISO-8859-1 and
- *  US-ASCII. Without java.nio buffers, their coders work on arrays (see [[CharsetDecoder]]).
+ *  US-ASCII.
  */
 abstract class Charset protected (canonicalName: String, aliasNames: Array[String])
     extends Object
@@ -15,6 +15,16 @@ abstract class Charset protected (canonicalName: String, aliasNames: Array[Strin
   def contains(cs: Charset): Boolean
   def newDecoder(): CharsetDecoder
   def newEncoder(): CharsetEncoder
+
+  /** Encodes, replacing what cannot be encoded. */
+  final def encode(cb: java.nio.CharBuffer): java.nio.ByteBuffer =
+    newEncoder().onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE).encode(cb)
+
+  final def encode(str: String): java.nio.ByteBuffer = encode(java.nio.CharBuffer.wrap(str))
+
+  /** Decodes, replacing malformed input. */
+  final def decode(bb: java.nio.ByteBuffer): java.nio.CharBuffer =
+    newDecoder().onMalformedInput(CodingErrorAction.REPLACE).onUnmappableCharacter(CodingErrorAction.REPLACE).decode(bb)
 
   final def aliases(): java.util.Set[String] =
     val set = new java.util.HashSet[String]()

@@ -81,8 +81,37 @@ object javalib extends WithPlugin with Published {
   // previous run lose against the JDK's classes of the same names.
   def zincIncrementalCompilation = false
 
-  /** scala.runtime.function.JProcedure0..22: Java interfaces in the Scala library. */
+  def bufferTemplates = Task.Source(moduleDir / "templates")
+
+  /** scala.runtime.function.JProcedure0..22: Java interfaces in the Scala library; and the
+   *  java.nio buffers of each element type but bytes, from `templates/` (`CharBuffer` itself is
+   *  written by hand, but its implementations are generated).
+   */
   def generatedSources = Task {
+    val templates = bufferTemplates().path
+    val typed = os.read(templates / "TypedBuffer.scala.template")
+    val impls = os.read(templates / "BufferImpls.scala.template")
+    def floating(box: String) = Seq(
+      "$same$" -> s"x == y || (java.lang.$box.isNaN(x) && java.lang.$box.isNaN(y))",
+      "$compare$" -> s"if x < y then -1 else if x > y then 1 else if x == y then 0 else if java.lang.$box.isNaN(x) then (if java.lang.$box.isNaN(y) then 0 else 1) else -1"
+    )
+    def integral(box: String) = Seq("$same$" -> "x == y", "$compare$" -> s"java.lang.$box.compare(x, y)")
+    val types = Seq(
+      ("Char", 2, integral("Character")),
+      ("Short", 2, integral("Short")),
+      ("Int", 4, integral("Integer")),
+      ("Long", 8, integral("Long")),
+      ("Float", 4, floating("Float")),
+      ("Double", 8, floating("Double"))
+    )
+    for ((t, size, ops) <- types) {
+      def expand(template: String) =
+        (Seq("$T$" -> t, "$B$" -> s"${t}Buffer", "$Size$" -> size.toString) ++ ops)
+          .foldLeft(template) { case (s, (k, v)) => s.replace(k, v) }
+      if (t != "Char") os.write(Task.dest / s"${t}Buffer.scala", expand(typed))
+      os.write(Task.dest / s"${t}BufferImpls.scala", expand(impls))
+    }
+
     val sb = new StringBuilder("package scalago.scalalib.runtime.function\n\n")
     for (n <- 0 to 22) {
       val tparams = (1 to n).map(i => s"T$i")

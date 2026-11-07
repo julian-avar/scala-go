@@ -9,8 +9,7 @@ import java.util.Objects
 
 import scala.annotation.tailrec
 
-// scala-go: not Readable, and no read(CharBuffer): java.nio buffers are not implemented.
-abstract class Reader() extends Closeable {
+abstract class Reader() extends Readable with Closeable {
   protected var lock: Object = this
 
   protected def this(lock: Object) = {
@@ -28,6 +27,23 @@ abstract class Reader() extends Closeable {
 
   def read(cbuf: Array[Char]): Int =
     read(cbuf, 0, cbuf.length)
+
+  // scala-go: as the JDK's.
+  def read(target: java.nio.CharBuffer): Int = {
+    if (target.isReadOnly())
+      throw new java.nio.ReadOnlyBufferException()
+    if (target.hasArray()) {
+      val pos = target.position()
+      val n = read(target.array(), target.arrayOffset() + pos, target.remaining())
+      if (n > 0) target.position(pos + n)
+      n
+    } else {
+      val chars = new Array[Char](target.remaining())
+      val n = read(chars, 0, chars.length)
+      if (n > 0) target.put(chars, 0, n)
+      n
+    }
+  }
 
   def read(cbuf: Array[Char], off: Int, len: Int): Int
 

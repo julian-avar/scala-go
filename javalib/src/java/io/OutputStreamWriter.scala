@@ -1,6 +1,6 @@
 package java.io
 
-import java.nio.charset.{Charset, CharsetEncoder, CodingErrorAction}
+import java.nio.charset.{Charset, CharsetEncoder, Coding, CodingErrorAction}
 
 /** Encodes chars with a charset's encoder into an OutputStream, buffering the bytes (see
  *  `CharsetEncoder.encode`). As in the JDK, unencodable chars are replaced ('?') unless the
@@ -78,8 +78,10 @@ class OutputStreamWriter(out: OutputStream, encoder: CharsetEncoder) extends Wri
     encoder.inPos = srcPos
     while {
       encoder.outPos = count
-      val overflow = encoder.encode(src, srcEnd, bytes, bytes.length, endOfInput)
+      val status = encoder.encodeArray(src, srcEnd, bytes, bytes.length, endOfInput)
       count = encoder.outPos
+      if status == Coding.Error then Coding.result(status, encoder.errorLength, encoder.errorUnmappable).throwException()
+      val overflow = status == Coding.Overflow
       if overflow then flushBuffer()
       overflow
     } do ()
