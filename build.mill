@@ -244,18 +244,26 @@ object millplugin extends ScalaModule with Published {
   def compileMvnDeps = Seq(mvn"com.lihaoyi::mill-libs:${Versions.mill}")
 }
 
-/** An example program built with ScalaGoModule, using this build's modules instead of published
- *  artifacts: `mill example.goRun [names...]`.
- */
-object example extends UserScalaGoModule {
+/** A ScalaGoModule that uses this build's modules instead of published artifacts. */
+trait InBuildScalaGoModule extends UserScalaGoModule {
   def scalaGoPlugin = plugin.jar()
   def scalaGoLinkerClasspath = linker.runClasspath()
   def scalaGoLibraryIR = Task { Seq(javalib.compile().classes, stdlib.ir()) }
   def scalaGoLibraryDeps = Task { Seq.empty[Dep] }
-  def moduleDeps = Seq(library, gears)
+  def moduleDeps: Seq[JavaModule] = Seq(library)
+}
+
+/** An example program built with ScalaGoModule: `mill example.goRun [names...]`. */
+object example extends InBuildScalaGoModule {
+  override def moduleDeps = Seq(library, gears)
   // gears comes as a plain Scala dependency: ScalaGoModule compiles it from TASTy.
   def mvnDeps = Seq(gears.gearsDep)
   def goLocalModules = Task.Sources(moduleDir / "go" / "textstats")
   // Facades generated from Go packages: a standard library package, and the local module.
   def goFacadePackages = Seq("strconv", "example.com/textstats")
 }
+
+/** CPU benchmarks of generated code against the JVM: `mill bench.run [rounds]` on the JVM,
+ *  `mill bench.goRun [rounds]` as Go. Later rounds show warmed-up JVM performance.
+ */
+object bench extends InBuildScalaGoModule

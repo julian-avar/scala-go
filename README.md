@@ -141,6 +141,7 @@ Methods annotated with `@throws` return a Go `error`. Other exceptions are panic
 | `gostd/`             | Generated facades of Go standard library packages (`scalago-gostd`)     |
 | `mill-build/src/`    | `ScalaGoModule`/`ScalaGoLibraryModule` and `TastyIR`, published as `mill-scalago` |
 | `example/`           | A program built with `ScalaGoModule`: `mill example.goRun Ada Grace`    |
+| `bench/`             | CPU benchmarks, run on the JVM (`mill bench.run`) and as Go (`mill bench.goRun`) |
 | `tests/cases/`       | End-to-end programs with their expected output                          |
 
 The `stdlib` module produces the Scala standard library's IR (`mill stdlib.ir`).
@@ -155,6 +156,7 @@ tests on amd64 and arm64 (Linux, macOS; oldest and newest Go) and everything bel
 mill linker.test                 # end-to-end tests (compile, run on JVM and as Go, compare)
 cd runtime && go test ./...      # runtime unit tests
 mill example.goRun               # the example, through ScalaGoModule
+mill bench.run 3; mill bench.goRun 3   # CPU benchmarks on the JVM and as Go
 ```
 
 Each directory in `tests/cases/` holds a program and an `expected.txt`. Cases with a
