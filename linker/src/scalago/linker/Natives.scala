@@ -171,6 +171,9 @@ object Natives:
   static(S, "<init>([B)V")(as => s"rt.NewStringFromBytes(${as.head}, $utf8)")
   staticFn(S, "<init>([BLjava.lang.String;)V", "rt.NewStringFromBytes")
   staticFn(S, "<init>([BLjava.nio.charset.Charset;)V", "rt.NewStringFromBytes")
+  static(S, "<init>([BII)V")(as => s"rt.NewStringFromByteRange(${as.mkString(", ")}, $utf8)")
+  staticFn(S, "<init>([BIILjava.lang.String;)V", "rt.NewStringFromByteRange")
+  staticFn(S, "<init>([BIILjava.nio.charset.Charset;)V", "rt.NewStringFromByteRange")
   instance(S, "getBytes()[B")((r, _) => s"rt.StringGetBytes($r, $utf8)")
   instanceFn(S, "getBytes(Ljava.lang.String;)[B", "rt.StringGetBytes")
   instanceFn(S, "getBytes(Ljava.nio.charset.Charset;)[B", "rt.StringGetBytes")
@@ -378,6 +381,8 @@ object Natives:
     m("multiplyExact(II)I")(as => s"rt.IntMultiplyExact(${as(0)}, ${as(1)})")
     m("addExact(JJ)J")(as => s"rt.LongAddExact(${as(0)}, ${as(1)})")
     m("multiplyExact(JJ)J")(as => s"rt.LongMultiplyExact(${as(0)}, ${as(1)})")
+    m("clamp(JII)I")(as => s"rt.MathClamp(${as(0)}, ${as(1)}, ${as(2)})")
+    m("clamp(JJJ)J")(as => s"rt.MathClamp(${as(0)}, ${as(1)}, ${as(2)})")
 
   // ---- java.lang.System and reflection --------------------------------------------------------
 
@@ -440,32 +445,56 @@ object Natives:
 
   // ---- java.util ------------------------------------------------------------------------------
 
+  // javalib implements these classes as Scala objects (javalib/src/java/util): the natives replace
+  // both the static methods that programs call and the module's methods that javalib calls.
+  private def utilStatic(cls: ClassName, desc: String)(gen: List[String] => String): Unit =
+    static(cls, desc)(gen)
+    static(cls + "$", desc)(gen)
+
+  private def utilStaticFn(cls: ClassName, desc: String, goFn: String): Unit =
+    utilStatic(cls, desc)(as => s"$goFn(${as.mkString(", ")})")
+
+  // Generic Go functions over the primitive arrays (and copying, filling, comparing and hashing of
+  // object arrays); javalib's Arrays has the rest.
   private val Arrays = "java.util.Arrays"
   for elem <- List("Z", "C", "B", "S", "I", "J", "F", "D", "Ljava.lang.Object;") do
     val arr = s"[$elem"
-    staticFn(Arrays, s"copyOf($arr" + "I)" + arr, "rt.ArraysCopyOf")
-    if elem.startsWith("L") then
-      static(Arrays, s"copyOf(${arr}ILjava.lang.Class;)$arr")(as => s"rt.ArraysCopyOf(${as(0)}, ${as(1)})")
-    staticFn(Arrays, s"copyOfRange($arr" + "II)" + arr, "rt.ArraysCopyOfRange")
+    val isObject = elem.startsWith("L")
+    utilStaticFn(Arrays, s"copyOf($arr" + "I)" + arr, "rt.ArraysCopyOf")
+    utilStaticFn(Arrays, s"copyOfRange($arr" + "II)" + arr, "rt.ArraysCopyOfRange")
+    if isObject then
+      utilStatic(Arrays, s"copyOf(${arr}ILjava.lang.Class;)$arr")(as => s"rt.ArraysCopyOf(${as(0)}, ${as(1)})")
+      utilStatic(Arrays, s"copyOfRange(${arr}IILjava.lang.Class;)$arr")(as =>
+        s"rt.ArraysCopyOfRange(${as(0)}, ${as(1)}, ${as(2)})")
     // Object arrays: pass the value as `any`, or Go infers the element type from it.
-    val value = (v: String) => if elem.startsWith("L") then s"any($v)" else v
-    static(Arrays, s"fill($arr$elem)V")(as => s"rt.ArraysFill(${as(0)}, ${value(as(1))})")
-    static(Arrays, s"fill(${arr}II$elem)V")(as => s"rt.ArraysFillRange(${as(0)}, ${as(1)}, ${as(2)}, ${value(as(3))})")
-    staticFn(Arrays, s"hashCode($arr)I", "rt.ArraysHashCode")
-    staticFn(Arrays, s"equals($arr$arr)Z", if elem.startsWith("L") then "rt.ArraysEqualsObjects" else "rt.ArraysEquals")
-    if elem != "Z" && !elem.startsWith("L") then
-      static(Arrays, s"sort($arr)V")(as => s"rt.ArraysSort(${as.head}, 0, int32(len(${as.head}.Data)))")
-      staticFn(Arrays, s"sort(${arr}II)V", "rt.ArraysSort")
+    val value = (v: String) => if isObject then s"any($v)" else v
+    utilStatic(Arrays, s"fill($arr$elem)V")(as => s"rt.ArraysFill(${as(0)}, ${value(as(1))})")
+    utilStatic(Arrays, s"fill(${arr}II$elem)V")(as =>
+      s"rt.ArraysFillRange(${as(0)}, ${as(1)}, ${as(2)}, ${value(as(3))})")
+    utilStaticFn(Arrays, s"hashCode($arr)I", "rt.ArraysHashCode")
+    utilStaticFn(Arrays, s"equals($arr$arr)Z", if isObject then "rt.ArraysEqualsObjects" else "rt.ArraysEquals")
+    if !isObject then utilStaticFn(Arrays, s"toString($arr)Ljava.lang.String;", "rt.ArraysToString")
+    if elem != "Z" && !isObject then
+      utilStatic(Arrays, s"sort($arr)V")(as => s"rt.ArraysSort(${as.head}, 0, int32(len(${as.head}.Data)))")
+      utilStaticFn(Arrays, s"sort(${arr}II)V", "rt.ArraysSort")
+      utilStatic(Arrays, s"binarySearch($arr$elem)I")(as =>
+        s"rt.ArraysBinarySearch(${as(0)}, 0, int32(len(${as(0)}.Data)), ${as(1)})")
+      utilStaticFn(Arrays, s"binarySearch(${arr}II$elem)I", "rt.ArraysBinarySearch")
 
   private val Objects = "java.util.Objects"
-  staticFn(Objects, "equals(Ljava.lang.Object;Ljava.lang.Object;)Z", "rt.ObjectsEquals")
-  staticFn(Objects, "hashCode(Ljava.lang.Object;)I", "rt.ObjectsHashCode")
-  staticFn(Objects, "hash([Ljava.lang.Object;)I", "rt.ArraysHashCode")
-  staticFn(Objects, "toString(Ljava.lang.Object;)Ljava.lang.String;", "rt.ToString")
-  static(Objects, "isNull(Ljava.lang.Object;)Z")(as => s"(${as.head} == nil)")
-  static(Objects, "nonNull(Ljava.lang.Object;)Z")(as => s"(${as.head} != nil)")
-  static(Objects, "requireNonNull(Ljava.lang.Object;)Ljava.lang.Object;")(as => s"rt.RequireNonNull(${as.head}, nil)")
-  staticFn(Objects, "requireNonNull(Ljava.lang.Object;Ljava.lang.String;)Ljava.lang.Object;", "rt.RequireNonNull")
+  utilStaticFn(Objects, "equals(Ljava.lang.Object;Ljava.lang.Object;)Z", "rt.ObjectsEquals")
+  utilStaticFn(Objects, "hashCode(Ljava.lang.Object;)I", "rt.ObjectsHashCode")
+  utilStaticFn(Objects, "hash([Ljava.lang.Object;)I", "rt.ArraysHashCode")
+  utilStaticFn(Objects, "toString(Ljava.lang.Object;)Ljava.lang.String;", "rt.ToString")
+  utilStaticFn(Objects, "isNull(Ljava.lang.Object;)Z", "rt.IsNull")
+  utilStatic(Objects, "nonNull(Ljava.lang.Object;)Z")(as => s"!rt.IsNull(${as.head})")
+  utilStatic(Objects, "requireNonNull(Ljava.lang.Object;)Ljava.lang.Object;")(as => s"rt.RequireNonNull(${as.head}, nil)")
+  utilStaticFn(Objects, "requireNonNull(Ljava.lang.Object;Ljava.lang.String;)Ljava.lang.Object;", "rt.RequireNonNull")
+
+  // java.util.UUID's native side (javalib/src/scalago/runtime/Crypto.scala).
+  private val Crypto = "scalago.runtime.Crypto$"
+  staticFn(Crypto, "secureRandomBytes(I)[B", "rt.SecureRandomBytes")
+  staticFn(Crypto, "md5([B)[B", "rt.MD5")
 
   // ---- Scala library --------------------------------------------------------------------------
 

@@ -1,0 +1,80 @@
+// Adapted from Scala Native's javalib (Apache-2.0, see javalib/LICENSE-scala-native.md).
+package java.util
+
+// New work for Scala Native. Based on Scala Native Optional.scala:
+//   Ported from Scala.js commit SHA1: 9c79cb9 dated: 2022-03-18
+
+import java.util.function._
+
+final class OptionalDouble private (hasValue: Boolean, value: Double) {
+
+  def getAsDouble(): Double = {
+    if (!isPresent())
+      throw new NoSuchElementException()
+    else
+      value
+  }
+
+  @inline def isPresent(): Boolean = hasValue
+
+  // Since: Java 11
+  @inline def isEmpty(): Boolean = !hasValue
+
+  def ifPresent(action: DoubleConsumer): Unit = {
+    if (isPresent())
+      action.accept(value)
+  }
+
+  // Since: Java 9
+  def ifPresentOrElse(action: DoubleConsumer, emptyAction: Runnable): Unit = {
+    if (isPresent())
+      action.accept(value)
+    else
+      emptyAction.run()
+  }
+
+  def orElse(other: Double): Double =
+    if (isPresent()) value
+    else other
+
+  def orElseGet(supplier: DoubleSupplier): Double =
+    if (isPresent()) value
+    else supplier.getAsDouble()
+
+  // Since: Java 10
+  def orElseThrow(): Double =
+    if (isPresent()) value
+    else throw new NoSuchElementException()
+
+  def orElseThrow[X <: Throwable](exceptionSupplier: Supplier[? <: X]): Double =
+    if (isPresent()) value
+    else throw exceptionSupplier.get()
+
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case opt: OptionalDouble =>
+        (!isPresent() && !opt.isPresent()) ||
+          (isPresent() && opt
+            .isPresent() && Objects.equals(value, opt.getAsDouble()))
+      case _ => false
+    }
+  }
+
+  override def hashCode(): Int = {
+    if (!isPresent()) 0
+    else value.hashCode()
+  }
+
+  override def toString(): String = {
+    if (!isPresent()) "OptionalDouble.empty"
+    else s"OptionalDouble[$value]"
+  }
+}
+
+object OptionalDouble {
+  def empty(): OptionalDouble = new OptionalDouble(hasValue = false, Double.NaN)
+
+  def of(value: Double): OptionalDouble = {
+    new OptionalDouble(hasValue = true, value)
+  }
+}

@@ -1,0 +1,350 @@
+// Adapted from Scala Native's javalib (Apache-2.0, see javalib/LICENSE-scala-native.md).
+/* Ported from Scala.js commit: ad7d82f dated: 2020-10-05
+ *
+ * Post Java 8 Static methods on List added for Scala Native
+ */
+
+/* Some of the strange coding style, especially of specifying type
+ * parameters explicitly and not using lambdas is due to the need to
+ * support Scala versions from 2.12.19 through 3.N.
+ */
+
+/* scalafmt directive keeps List.of methods with many arguments from becoming
+ * unreadable and just plain ugly by expanding to multiple, say 10, lines.
+ */
+/* scalafmt: {
+     binPack.defnSite = always
+     binPack.callSite = always
+     newlines.configStyle.fallBack.prefer = false
+   }
+ */
+
+package java.util
+
+import java.util.function.UnaryOperator
+
+trait List[E] extends SequencedCollection[E] {
+
+  def add(index: Int, element: E): Unit
+
+  def addAll(index: Int, c: Collection[? <: E]): Boolean
+
+  override def addFirst(e: E): Unit = add(0, e)
+
+  override def addLast(e: E): Unit = add(e)
+
+  def get(index: Int): E
+
+  override def getFirst(): E = {
+    if (this.isEmpty())
+      throw new NoSuchElementException()
+    else
+      get(0)
+  }
+
+  override def getLast(): E = {
+    if (this.isEmpty())
+      throw new NoSuchElementException()
+    else
+      get(size() - 1)
+  }
+
+  def indexOf(o: Any): Int
+
+  def lastIndexOf(o: Any): Int
+
+  def listIterator(): ListIterator[E]
+
+  def listIterator(index: Int): ListIterator[E]
+
+  def remove(index: Int): E
+
+  override def removeFirst(): E = {
+    if (this.isEmpty())
+      throw new NoSuchElementException()
+    else
+      remove(0)
+  }
+
+  override def removeLast(): E = {
+    if (this.isEmpty())
+      throw new NoSuchElementException()
+    else
+      remove(size() - 1)
+  }
+
+  def replaceAll(operator: UnaryOperator[E]): Unit = {
+    val iter = listIterator()
+    while (iter.hasNext())
+      iter.set(operator.apply(iter.next()))
+  }
+
+  def reversed(): List[E] =
+    new ReverseOrderListView(this)
+
+  def set(index: Int, element: E): E
+
+  def sort(c: Comparator[? >: E]): Unit = {
+    val arrayBuf = toArray()
+    Arrays.sort[AnyRef & E](arrayBuf.asInstanceOf[Array[AnyRef & E]], c)
+
+    val len = arrayBuf.length
+
+    if (this.isInstanceOf[RandomAccess]) {
+      var i = 0
+      while (i != len) {
+        set(i, arrayBuf(i).asInstanceOf[E])
+        i += 1
+      }
+    } else {
+      var i = 0
+      val iter = listIterator()
+      while (i != len) {
+        iter.next()
+        iter.set(arrayBuf(i).asInstanceOf[E])
+        i += 1
+      }
+    }
+  }
+
+  def subList(fromIndex: Int, toIndex: Int): List[E]
+
+}
+
+object List {
+
+  private class UnmodifiableList[E](underlying: ArrayList[E])
+      extends AbstractList[E]
+      with RandomAccess {
+
+    /* Since 'set()' is not defined, various methods which try to
+     * mutate the list, such as subList#add or listIterator#remove,
+     * should all throw, as desired.
+     */
+
+    override def size(): Int =
+      underlying.size()
+
+    override def get(index: Int): E = {
+      underlying.get(index)
+    }
+
+    // As the JDK's immutable lists: they hold no null, and looking for one throws.
+    override def contains(o: Any): Boolean = indexOf(o) >= 0
+
+    override def indexOf(o: Any): Int =
+      underlying.indexOf(Objects.requireNonNull(o))
+
+    override def lastIndexOf(o: Any): Int =
+      underlying.lastIndexOf(Objects.requireNonNull(o))
+  }
+
+  // Since: Java 10
+  def copyOf[E](coll: Collection[? <: E]): List[E] = {
+    Objects.requireNonNull(coll)
+
+    /*  The JVM List.copyOf() doc _may_ be saying, obtusely, that if the
+     *  given collection is already an unmodifiable List then the original
+     *  will be returned and a copy will not be made.
+     *
+     *  Scala Native may differ here in that it always makes a copy because
+     *  the author saw no way to check for "already an unmodifiable list".
+     *  Scala Native may need to implement and use a private class
+     *  UnmodifiableList. A quick study of Collections.scala showed
+     *  no suitable candidate.
+     *
+     *  A future pass may want to correct this difference, if it exists.
+     *  Until then this code should provide some benefit in the by far
+     *  more likely 'normal' cases.
+     */
+
+    val listSize = coll.size()
+
+    val underlying = new ArrayList[E](listSize)
+
+    coll.forEach(e => {
+      Objects.requireNonNull(e)
+      underlying.add(e)
+    })
+
+    new UnmodifiableList[E](underlying)
+  }
+
+  // Since: Java 9
+  def of[E](): List[E] = {
+    val listSize = 0
+
+    val underlying = new ArrayList[E](listSize)
+
+    new UnmodifiableList[E](underlying)
+  }
+
+  private def appendListOfElement[E](e: E, al: ArrayList[E]): Unit = {
+    Objects.requireNonNull(e)
+    al.add(e)
+  }
+
+  // Since: Java 9
+  def of[E](e1: E): List[E] = {
+    val listSize = 1
+
+    val underlying = new ArrayList[E](listSize)
+    appendListOfElement[E](e1, underlying)
+
+    new UnmodifiableList[E](underlying)
+  }
+
+  // Since: Java 9
+  def of[E](elements: Array[Object]): List[E] = {
+    /* This overload handles varargs & must not conflict with single argument
+     * overload. That is the reason for 'Array[Object]' rather than 'Array[E]'.
+     */
+
+    Objects.requireNonNull(elements)
+
+    val list = new ArrayList[E](elements.length)
+    for (e <- elements)
+      list.add(Objects.requireNonNull(e).asInstanceOf[E])
+    new UnmodifiableList[E](list)
+  }
+
+  // Since: Java 9
+  def of[E](e1: E, e2: E): List[E] = {
+    val listSize = 2
+
+    val underlying = new ArrayList[E](listSize)
+    appendListOfElement[E](e1, underlying)
+    appendListOfElement[E](e2, underlying)
+
+    new UnmodifiableList[E](underlying)
+  }
+
+  // Since: Java 9
+  def of[E](e1: E, e2: E, e3: E): List[E] = {
+    val listSize = 3
+
+    val underlying = new ArrayList[E](listSize)
+    appendListOfElement[E](e1, underlying)
+    appendListOfElement[E](e2, underlying)
+    appendListOfElement[E](e3, underlying)
+
+    new UnmodifiableList[E](underlying)
+  }
+
+  // Since: Java 9
+  def of[E](e1: E, e2: E, e3: E, e4: E): List[E] = {
+    val listSize = 4
+
+    val underlying = new ArrayList[E](listSize)
+    appendListOfElement[E](e1, underlying)
+    appendListOfElement[E](e2, underlying)
+    appendListOfElement[E](e3, underlying)
+    appendListOfElement[E](e4, underlying)
+
+    new UnmodifiableList[E](underlying)
+  }
+
+  // Since: Java 9
+  def of[E](e1: E, e2: E, e3: E, e4: E, e5: E): List[E] = {
+    val listSize = 5
+
+    val underlying = new ArrayList[E](listSize)
+    appendListOfElement[E](e1, underlying)
+    appendListOfElement[E](e2, underlying)
+    appendListOfElement[E](e3, underlying)
+    appendListOfElement[E](e4, underlying)
+    appendListOfElement[E](e5, underlying)
+
+    new UnmodifiableList[E](underlying)
+  }
+
+  // Since: Java 9
+  def of[E](e1: E, e2: E, e3: E, e4: E, e5: E, e6: E): List[E] = {
+    val listSize = 6
+
+    val underlying = new ArrayList[E](listSize)
+    appendListOfElement[E](e1, underlying)
+    appendListOfElement[E](e2, underlying)
+    appendListOfElement[E](e3, underlying)
+    appendListOfElement[E](e4, underlying)
+    appendListOfElement[E](e5, underlying)
+    appendListOfElement[E](e6, underlying)
+
+    new UnmodifiableList[E](underlying)
+  }
+
+  // Since: Java 9
+  def of[E](e1: E, e2: E, e3: E, e4: E, e5: E, e6: E, e7: E): List[E] = {
+    val listSize = 7
+
+    val underlying = new ArrayList[E](listSize)
+    appendListOfElement[E](e1, underlying)
+    appendListOfElement[E](e2, underlying)
+    appendListOfElement[E](e3, underlying)
+    appendListOfElement[E](e4, underlying)
+    appendListOfElement[E](e5, underlying)
+    appendListOfElement[E](e6, underlying)
+    appendListOfElement[E](e7, underlying)
+
+    new UnmodifiableList[E](underlying)
+  }
+
+  // Since: Java 9
+  def of[E](e1: E, e2: E, e3: E, e4: E, e5: E, e6: E, e7: E, e8: E): List[E] = {
+    val listSize = 8
+
+    val underlying = new ArrayList[E](listSize)
+    appendListOfElement[E](e1, underlying)
+    appendListOfElement[E](e2, underlying)
+    appendListOfElement[E](e3, underlying)
+    appendListOfElement[E](e4, underlying)
+    appendListOfElement[E](e5, underlying)
+    appendListOfElement[E](e6, underlying)
+    appendListOfElement[E](e7, underlying)
+    appendListOfElement[E](e8, underlying)
+
+    new UnmodifiableList[E](underlying)
+  }
+
+  // Since: Java 9
+  def of[E](
+      e1: E, e2: E, e3: E, e4: E, e5: E, e6: E, e7: E, e8: E, e9: E
+  ): List[E] = {
+    val listSize = 9
+
+    val underlying = new ArrayList[E](listSize)
+    appendListOfElement[E](e1, underlying)
+    appendListOfElement[E](e2, underlying)
+    appendListOfElement[E](e3, underlying)
+    appendListOfElement[E](e4, underlying)
+    appendListOfElement[E](e5, underlying)
+    appendListOfElement[E](e6, underlying)
+    appendListOfElement[E](e7, underlying)
+    appendListOfElement[E](e8, underlying)
+    appendListOfElement[E](e9, underlying)
+
+    new UnmodifiableList[E](underlying)
+  }
+
+  // Since: Java 9
+  def of[E](
+      e1: E, e2: E, e3: E, e4: E, e5: E, e6: E, e7: E, e8: E, e9: E, e10: E
+  ): List[E] = {
+    val listSize = 10
+
+    val underlying = new ArrayList[E](listSize)
+    appendListOfElement[E](e1, underlying)
+    appendListOfElement[E](e2, underlying)
+    appendListOfElement[E](e3, underlying)
+    appendListOfElement[E](e4, underlying)
+    appendListOfElement[E](e5, underlying)
+    appendListOfElement[E](e6, underlying)
+    appendListOfElement[E](e7, underlying)
+    appendListOfElement[E](e8, underlying)
+    appendListOfElement[E](e9, underlying)
+    appendListOfElement[E](e10, underlying)
+
+    new UnmodifiableList[E](underlying)
+  }
+}
+
