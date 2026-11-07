@@ -11,10 +11,12 @@ See [docs/design.md](docs/design.md) for the architecture, object model, status 
 matching, lambdas, `lazy val`, the standard collections and `java.util` (collections, `Arrays`,
 `Collections`, `Optional`, `Random`, streams, ...) all run, and Scala code can call Go
 packages, and Go code can call Scala libraries. Threads run on goroutines, with `synchronized`,
-`wait`/`notify`, volatiles and atomics, and gears runs on them. The generated code is safe to
+`wait`/`notify`, volatiles and atomics; `java.util.concurrent` (executors, `ForkJoinPool`,
+`CompletableFuture`, locks, concurrent collections), `scala.concurrent.Future` and gears run on
+them. The generated code is safe to
 call from any goroutine. `BigDecimal` and `BigInt` match the JDK. Programs read and write files
 (`java.io`, `java.nio.file`, `scala.io.Source`) and standard input. `java.time` works, with time
-zones from Go's tz database. Reflection and most of `java.util.concurrent` don't work yet.
+zones from Go's tz database. Reflection doesn't work yet.
 
 ## Using it with Mill
 
