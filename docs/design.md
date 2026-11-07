@@ -37,16 +37,30 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
    plugin and `-P:scala-go:rename` emits replacements under the library's own names, and its IR
    comes first on the link classpath (`scalago-gears` does this for one gears class).
 4. **javalib** (`javalib/`). JDK classes written in Scala: exceptions, `StringBuilder`,
-   `System.out`, `java.util.Arrays`, `MathContext`, references, and so on. It also replaces the
+   `System.out`, `java.util` (collections, `Arrays`, `Collections`, `Optional`, `Random`, `UUID`,
+   `java.util.function`, ...), `MathContext` and `RoundingMode`, references, and so on. It also replaces the
    few Java-written classes of the Scala library (`*Ref`, `LazyVals`, `JProcedureN`,
-   `ScalaNumber`). Packages other than `java.lang` are compiled under their own names
+   `ScalaNumber`), and `Enumeration`, which uses reflection (see below). Packages other than `java.lang` are compiled under their own names
    (`package java.util`): a class compiled from source takes precedence over the JDK's, so
    javalib and the JDK class files it is type-checked against agree on one symbol per class.
    The Scala compiler refuses to redefine core `java.lang` classes, so those sources live in
    `scalago.javalib.lang` (and the Scala library's in `scalago.scalalib`), and the plugin renames
-   them in the IR. javalib is only ever linked: its jar must not be on a compile or run
-   classpath. When a class appears more than once on the link classpath, the first occurrence
-   wins, so javalib must come before the stdlib IR.
+   them in the IR. Static methods of JDK classes and interfaces are methods of Scala objects:
+   with `-P:scala-go:static-forwarders`, the plugin adds static forwarders to the companion
+   class (or a mirror class), as the JVM backend does. javalib is always compiled whole, since
+   classes of a previous compilation lose against the JDK's. It is only ever linked: its jar
+   must not be on a compile or run classpath. When a class appears more than once on the link
+   classpath, the first occurrence wins, so javalib must come before the stdlib IR.
+
+   Much of `java.util` is adapted from Scala Native's javalib (Apache-2.0,
+   `javalib/LICENSE-scala-native.md`; each such file says so), changed where programs can
+   observe a difference from the JDK: `HashMap` lays out its table as the JDK does (capacities,
+   growth, order within buckets), so iteration orders match (except in buckets of more than 8
+   colliding hash codes, which the JDK turns into trees); `HashSet`, `LinkedHashSet` and
+   `Hashtable` follow it; iterators are fail-fast (`modCount`, also for programs' subclasses of
+   `AbstractList`); `Random`, `SplittableRandom` and `Collections.shuffle` give the JDK's
+   sequences. The operations of `Arrays` on primitive arrays are natives, generic Go functions
+   standing in for Scala Native's specialization.
 5. **Linker** (`linker/`):
    - **Lambdas** (`Lambdas.scala`): `Closure` nodes become synthetic classes. Their single
      abstract method calls the lifted target method, with boxing and cast adaptation. Bridges are
@@ -55,7 +69,7 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
      resolved by name over instantiated classes, which over-approximates, as in Scala.js. Only
      reachable classes and methods are emitted. Errors carry a "called from" chain.
    - **Natives** (`Natives.scala`): Go implementations of JDK methods (`String`, boxes, `Math`,
-     `System`, `Character`, `BigInteger`, `Arrays`, ...). They take precedence over IR.
+     `System`, `Character`, `BigInteger`, `BigDecimal`, `Arrays`, ...). They take precedence over IR.
    - **Go interop** (`GoInterop.scala`, `GoApi.scala`): uses of Go facades become Go code (see
      [Go interop](#go-interop)).
 6. **Runtime** (`runtime/rt`). Go support code, bundled into the linker jar and copied into
@@ -76,6 +90,7 @@ published with the full Scala version as suffix.
 | `String`                         | `*rt.String`: UTF-16 code units, like the JVM (`nil` = null)    |
 | `scalago.go.GoString` (opt-in)   | Go `string` (UTF-8); a byte array on the JVM                    |
 | `BigInteger`                     | `*rt.BigInteger` (`math/big`)                                   |
+| `BigDecimal`                     | `*rt.BigDecimal`: an `int64` unscaled value, or a `big.Int` when it does not fit, and a scale |
 | Go facade of a struct type `T`   | `*T` inside an `any` (see [Go interop](#go-interop))            |
 | Go facade of any other Go type   | the Go value inside an `any`                                    |
 | `GoSlice[T]`, `GoMap[K, V]`, `GoChan[T]`, `GoPtr[T]` | the Go slice, map, channel or pointer inside an `any` |
@@ -97,7 +112,7 @@ published with the full Scala version as suffix.
   `java.lang.Object`'s implementation.
 - **Exact type tests.** Accessors (`A_C`) and markers (`I_T`) are unique per class, so a Go type
   assertion is an exact `isInstanceOf`.
-- **Hijacked classes.** Strings, boxes, `BoxedUnit`, `Class` and `BigInteger` are Go values, not
+- **Hijacked classes.** Strings, boxes, `BoxedUnit`, `Class`, `BigInteger` and `BigDecimal` are Go values, not
   structs, as Scala.js calls them "hijacked". So references typed by their supertypes
   (`Object`, `Comparable`, `CharSequence`, `Number`, ...) are Go `any`. Virtual calls on such
   receivers go through generated `Disp_<method>` type switches, and type tests through
@@ -373,9 +388,15 @@ generated code are goroutine-safe, with the JVM's guarantees where Scala code re
   work as on the JVM (with timeouts and interrupts). The plugin lowers `synchronized` to
   enter/exit around `try`/`finally`, so `return` and exceptions release the monitor. Scala
   objects carry their monitor in an `rt.ObjectHeader`, created on first use. Strings, boxes and
-  Go values use a global table, whose entries are never removed. Reentrancy needs the current
-  goroutine's id, which Go does not expose: the runtime parses it from `runtime.Stack`, which
-  costs about a microsecond per monitor operation.
+  Go values use a global table, whose entries are never removed. An uncontended
+  enter/exit pair costs about 55 ns.
+- **Goroutine ids.** Monitors, `Thread.currentThread` and interruptible channel operations need
+  the current goroutine's id, which Go does not expose. On amd64 and arm64 the runtime reads it
+  from the goroutine's runtime structure (`rt/goid.go`: a two-instruction assembly `getg`, and
+  the field's offset, found at startup by matching the ids that `runtime.Stack` reports for
+  several goroutines), which costs about 4 ns. If the offset is not found (a future Go version
+  laying the structure out differently, or another architecture), it falls back to parsing
+  `runtime.Stack` (about 3.5 µs); a runtime unit test fails in that case on amd64 and arm64.
 - **Volatile fields** (`@volatile`, and the state field of each `lazy val`) are `rt.Volatile[T]`:
   sequentially consistent, which is what the JMM requires of volatiles. javalib's
   `java.util.concurrent.atomic` classes (`AtomicInteger`, `AtomicLong`, `AtomicBoolean`,
@@ -428,6 +449,28 @@ the race detector). `gears-go-context` cancels gears code with a Go deadline.
 - **Equality and strings:** `==` is null-safe and numerically cooperative (`rt.Equals`). `##`
   matches `Statics.anyHash`. `toString` matches the JDK, including `Double.toString`. String
   `hashCode` and `compareTo` work on UTF-16.
+- **`Enumeration` names.** On the JVM, an `Enumeration` value created without a name
+  (`val Mon, Tue = Value`) is named after the public `val` holding it, which `Enumeration` finds
+  by reflection. Scala.js's compiler rewrites such `Value` calls into `Value(name)`; scala-go's
+  plugin instead follows the assignment of each such field in a subclass of `Enumeration`
+  (`EnumerationNames`) with a call registering the name, `scalago$registerName`, which javalib's
+  `Enumeration` (the Scala library's, without reflection) records. So, as on the JVM, every value
+  held by a public `val` gets its name, also values made with `new Val` or a subclass of it
+  (`case class PlanetVal(...) extends Val`), an explicit name or `nextName` still wins, and other
+  values print `<Invalid enum: no field for #i>`. This happens in `genGoIR`, after the fields are
+  assigned in constructors, so the JVM bytecode is unchanged, and it also applies to libraries
+  compiled from TASTy (`BigDecimal.RoundingMode`). Values held by `val`s of traits are not named.
+- **`BigDecimal`** (`rt/bigdecimal.go`) is written in Go to the JDK's specification, like the
+  JDK with a `long` fast path: money-like values need no `math/big` and one allocation per
+  operation. Results, scales, string forms, exception messages (down to `"/ by zero"` versus
+  `"BigInteger divide by zero"`, which depends on the JDK's internal representation) and
+  `hashCode` match the JDK; this was checked against JDK 25 on 700,000 random operations
+  (`MathContext` arithmetic in every rounding mode, `sqrt`, `pow`, conversions, parsing, extreme
+  scales). Where JDK versions differ, it follows the newest: `sqrt` is correctly rounded in every
+  rounding mode (JDK 21's is not for the directed modes), and `valueOf(NaN)` says `Infinite or
+  NaN`. `doubleValue`/`floatValue` round correctly, through `strconv.ParseFloat` beyond the fast
+  paths. `MathContext`s reach the natives through one generated call that packs them into an
+  `int64` (`MathContext.goBits`). `scala.math.BigDecimal` is the Scala library's, unchanged.
 
 ## Status
 
@@ -442,6 +485,12 @@ Supported and covered by end-to-end tests:
 - standard-library collections (`List`, `Vector`, `Map`, ranges, `sorted`, `groupBy`, ...),
   string interpolation, `StringBuilder`, `BigInt`
 - `scalago.go.GoString`
+- `java.util`: lists, deques, queues, hash, linked and tree maps and sets (with their iteration
+  orders, navigation, views and fail-fast iterators), `Collections`, `Arrays` for every
+  primitive type, `Objects`, `Optional*`, `Random`/`SplittableRandom` sequences, `UUID`,
+  `StringJoiner`, `StringTokenizer`, `BitSet`, `Base64`, summary statistics, `Comparator`
+  combinators, `java.util.function`, `scala.jdk.CollectionConverters` both ways, and Scala
+  classes extending `AbstractList`/`AbstractMap`
 - Go interop: handwritten and generated facades of standard-library packages and of a local Go module, Go interfaces
   implemented in Scala, errors and callbacks, Go slices, maps, channels, pointers and funcs
   shared with Go, and generic Go functions. Mismatched facades are tested as link errors.
@@ -451,19 +500,27 @@ Supported and covered by end-to-end tests:
   errors, panics, callbacks, identity, and calls from 100 goroutines under the race detector)
 - regular expressions: `scala.util.matching.Regex`, `java.util.regex` and the regex `String`
   methods, on Go's `regexp` (RE2), with Java's UTF-16 offsets and replacement syntax
+- `java.math.BigDecimal` (the whole API, with `MathContext` and `RoundingMode`) and
+  `scala.math.BigDecimal`, with its rounding modes and ranges
+- `scala.Enumeration`: names, `values`, `withName`, `ValueSet`s, ordering, `Val` subclasses
 - concurrency: threads, `synchronized`, `wait`/`notify`, volatile fields, atomics, interrupts,
   and concurrent first use of modules and lazy vals (also under Go's race detector)
 
 Known gaps:
-- `BigDecimal` (`java.math.BigDecimal` is not implemented), regular expressions that RE2
+- Regular expressions that RE2
   cannot run (lookaround, backreferences, possessive quantifiers), `String.format` beyond the
-  common conversions, `java.util` collections, `java.time`, and I/O
-  beyond stdout/stderr.
+  common conversions, `java.time`, and I/O beyond stdout/stderr.
+- `java.util`: streams (`stream()` and the `java.util.stream` package), the reversed views of
+  sequenced maps (`LinkedHashMap.reversed()`, `sequencedKeySet()`, ...), `Formatter`, `Locale`,
+  `Properties`, `Date`/`Calendar`/`Timer`, `EnumSet`/`EnumMap`, `WeakHashMap`, `ServiceLoader`,
+  `Arrays.compare`/`mismatch` and the range forms of `Arrays.equals`, `String.CASE_INSENSITIVE_ORDER`.
+  Arrays of references do not know their element type, so `toArray(new Array[String](0))` and
+  `Arrays.copyOf` return arrays whose `getClass` is `Object[]`.
 - Reflection: `getClass` and `Class` names work; nothing else.
+- `BigInteger` and `BigDecimal` cannot be subclassed (they are Go values).
 - Concurrency: `java.util.concurrent` beyond what gears needs (executors, concurrent maps,
   `CompletableFuture`), `ThreadLocal`, thread groups. `scala.concurrent.Future` needs an
   `ExecutionContext` on `java.util.concurrent`; gears is the supported API.
-- `Enumeration` (it uses reflection).
 
 When reachable code uses something missing, linking fails with a "called from" chain naming
 the API.
@@ -520,9 +577,10 @@ earlier has to be redone:
    any Go package, and `scalago-gostd` publishes those of 21 standard library packages.
 7. **Library coverage** and **publishing**, in parallel with the steps above. Done so far:
    regular expressions on Go's `regexp` (`java.util.regex`, Scala's `Regex`), the
-   `java.util.concurrent` subset gears needs, Scala library dependencies compiled from TASTy,
-   and JVM-like stack traces. Still to do: `BigDecimal`, `java.util` collections, `java.time`,
-   I/O, and publishing (organization `io.github.scalago` is a placeholder).
+   `java.util.concurrent` subset gears needs, `java.util` (collections and utilities), Scala
+   library dependencies compiled from TASTy, `BigDecimal`, and JVM-like stack traces. Still to
+   do: `java.util.stream`, `java.time`, I/O, and publishing (organization `io.github.scalago`
+   is a placeholder).
 
 ## Open questions
 

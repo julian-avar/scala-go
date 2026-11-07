@@ -26,6 +26,7 @@ import scalago.ir.*
  *  Disp_<method>             dynamic dispatch on receivers that may be strings or boxed values
  *  InstanceOf_<class>        type test for classes that strings or boxed values may belong to
  *  SL_<n>                    interned string literal
+ *  CL_<n>                    `classOf` constant (a *rt.Class)
  *  }}}
  *  Methods on structs: `M_<method>` (virtual methods, exported so the runtime can call
  *  `toString` and friends), `A_<class>` (returns the struct of an ancestor class) and
@@ -78,6 +79,8 @@ object Mangling:
   def virtualMethod(m: MethodName): String = s"M_${method(m)}"
   def field(name: String): String = s"f_${escape(name)}"
   def local(name: LocalName): String = s"l_${escape(name)}"
+  /** A method body's local holding the struct of `cls` of `this` (see FunctionEmitter). */
+  def thisStruct(cls: ClassName): String = s"self_${escape(cls)}"
   def label(name: String): String = s"L_${escape(name)}"
   def fileName(cls: ClassName): String = s"${escape(cls)}.go"
   def marker(iface: ClassName): String = s"I_${escape(iface)}"

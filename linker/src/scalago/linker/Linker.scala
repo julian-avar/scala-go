@@ -244,6 +244,12 @@ object Linker:
       line(")")
       line()
 
+    if ctx.classLiterals.nonEmpty then
+      line("var (")
+      for (name, v) <- ctx.classLiterals do line(s"\t$v = rt.ClassOf(${FunctionEmitter.goStringLiteral(name)})")
+      line(")")
+      line()
+
     for m <- ctx.dispatchers.toList.sortBy(_.descriptor) do
       val params = m.params.zipWithIndex.map((t, i) => (s"a$i", ctx.goType(t)))
       val result = ctx.goType(m.result)

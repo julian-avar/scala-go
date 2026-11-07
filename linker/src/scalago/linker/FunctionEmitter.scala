@@ -45,12 +45,20 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
 
   private val isVoidMethod = isVoidLike(method.name.result)
 
+  /** Classes whose struct field accesses on `this` reach. `this` is an interface, and getting a
+   *  struct from it (`this.A_C()`) is a call Go cannot inline, so each body does it once, in its
+   *  prelude, instead of at every field access.
+   */
+  private val thisStructs = mutable.LinkedHashSet.empty[ClassName]
+
   /** Lines of the function body, without the enclosing braces. */
   def emitBody(body: Tree): List[GoLine] =
     genTree(body, if isVoidMethod then Dest.Discard else Dest.Return)
     // Go requires a terminating statement at the end of a function with results.
     if !isVoidMethod && !alwaysReturns(body) then emitPlain("panic(\"unreachable\")")
     val prelude = List.newBuilder[GoLine]
+    for cls <- thisStructs do
+      prelude += GoLine(s"${Mangling.thisStruct(cls)} := this.${Mangling.accessor(cls)}()", Position.NoPosition)
     if usesCtl then prelude += GoLine("var ctl int", Position.NoPosition)
     if usesRet then prelude += GoLine(s"var ret ${ctx.goType(method.name.result)}", Position.NoPosition)
     prelude.result() ++ out.toList
@@ -323,7 +331,9 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
         emitPlain("panic(\"unreachable\")")
       else emitUsing(adapt(expr, tpe, method.name.result))(e => s"return $e")
     case Dest.AssignTo(v, target) =>
-      if expr.nonEmpty then emitUsing(adapt(expr, tpe, target))(e => s"$v = $e")
+      // A call of a method returning Nothing has no Go result: it never completes normally.
+      if expr.nonEmpty then
+        if tpe == Type.Nothing then emit(expr) else emitUsing(adapt(expr, tpe, target))(e => s"$v = $e")
 
   /** Emits a line that uses the value `expr`: without a position if `expr` is a variable or a
    *  literal, which cannot fail.
@@ -336,7 +346,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       emit(s"${Mangling.local(name)} = ${adapt(genExpr(rhs), rhs.tpe, tpe)}")
     case Select(qual, cls, field, tpe) =>
       val List(q, r) = genExprs(List(qual, rhs), List(qual.tpe, tpe)): @unchecked
-      emit(store(s"${fieldAccess(q, qual.tpe, cls)}.${Mangling.field(field)}", cls, field, r))
+      emit(store(s"${fieldAccess(qual, q, cls)}.${Mangling.field(field)}", cls, field, r))
     case SelectStatic(cls, field, tpe) =>
       val r = adapt(genExpr(rhs), rhs.tpe, tpe)
       initStatics(cls)
@@ -356,7 +366,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   /** The storage of the volatile field `field` refers to, for `CompareAndSet`. */
   private def volatileRef(tree: Tree, field: Tree): Option[String] = field match
     case Select(qual, cls, f, _) if ctx.isVolatile(cls, f) =>
-      Some(s"${fieldAccess(genExpr(qual), qual.tpe, cls)}.${Mangling.field(f)}")
+      Some(s"${fieldAccess(qual, genExpr(qual), cls)}.${Mangling.field(f)}")
     case SelectStatic(cls, f, _) if ctx.isVolatile(cls, f) =>
       initStatics(cls)
       Some(Mangling.staticField(cls, f))
@@ -364,11 +374,16 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       error(tree, "compareAndSet needs a @volatile field")
       None
 
-  /** Accesses the struct of `cls` holding a field, from a reference to an instance. */
-  private def fieldAccess(q: String, qualType: Type, cls: ClassName): String =
-    if ctx.goType(qualType) != Mangling.iface(cls) && ctx.goType(qualType) == "any" then
-      s"rt.Cast[${Mangling.iface(cls)}]($q).${Mangling.accessor(cls)}()"
-    else s"$q.${Mangling.accessor(cls)}()"
+  /** Accesses the struct of `cls` holding a field, from `qual` (whose Go expression is `q`). */
+  private def fieldAccess(qual: Tree, q: String, cls: ClassName): String =
+    val qualGoType = ctx.goType(qual.tpe)
+    qual match
+      case This(_) if qualGoType != "any" =>
+        thisStructs += cls
+        Mangling.thisStruct(cls)
+      case _ if qualGoType != Mangling.iface(cls) && qualGoType == "any" =>
+        s"rt.Cast[${Mangling.iface(cls)}]($q).${Mangling.accessor(cls)}()"
+      case _ => s"$q.${Mangling.accessor(cls)}()"
 
   /** Triggers the static initializer of `cls` (unless we are in `cls` itself). */
   private def initStatics(cls: ClassName): Unit =
@@ -411,7 +426,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     case DoubleLiteral(v)  => s"float64(${floatingLiteral(v, v.toString)})"
     case StringLiteral(v)  => ctx.stringLiteral(v)
     case Null()            => "nil"
-    case ClassOf(t)        => s"""rt.ClassOf("${jvmClassName(t)}")"""
+    case ClassOf(t)        => ctx.classLiteral(jvmClassName(t))
 
     case VarRef(name, _) => Mangling.local(name)
     case This(_)         => "this"
@@ -421,7 +436,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       else error(tree, s"module $cls is not available (no IR)")
 
     case Select(qual, cls, field, _) =>
-      load(s"${fieldAccess(genExpr(qual), qual.tpe, cls)}.${Mangling.field(field)}", cls, field)
+      load(s"${fieldAccess(qual, genExpr(qual), cls)}.${Mangling.field(field)}", cls, field)
 
     case SelectStatic(cls, field, _) =>
       Natives.staticField(cls, field) match
@@ -541,11 +556,16 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
 
   /** Converts a Go value of IR type `from` for a location of IR type `to`. Scala upcasts need no
    *  conversion in the IR, but a class that is never instantiated has Go type `any`, which Go does
-   *  not implicitly convert to the interface type of its (instantiated) supertypes.
+   *  not implicitly convert to the interface type of its (instantiated) supertypes. And a null
+   *  reference of a pointer type (`*rt.String`, arrays, ...) must become a nil `any`, not an `any`
+   *  holding a nil pointer.
    */
   private def adapt(expr: String, from: Type, to: Type): String =
     val target = ctx.goType(to)
-    if expr.isEmpty || target.isEmpty || target == "any" || to.isPrimitive || ctx.goType(from) != "any" then expr
+    val source = ctx.goType(from)
+    if expr.isEmpty || target.isEmpty || to.isPrimitive then expr
+    else if target == "any" then if source.startsWith("*") && expr != "nil" then s"rt.AnyRef($expr)" else expr
+    else if source != "any" then expr
     else s"rt.Cast[$target]($expr)"
 
   private def isPure(tree: Tree): Boolean = tree match
@@ -627,6 +647,21 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   // ---------------------------------------------------------------------------------------------
 
   private def genBinary(tree: Binary): String =
+    if tree.op == BinaryOp.StringConcat then genStringConcat(tree) else genArithmetic(tree)
+
+  /** A chain of string concatenations, as one: like the JVM's (`StringConcatFactory`), it evaluates
+   *  all the operands before converting any to a string, which matters when evaluating an operand
+   *  changes an earlier one (`s"$list ${list.remove(0)}"`).
+   */
+  private def genStringConcat(tree: Binary): String =
+    def operands(t: Tree): List[Tree] = t match
+      case Binary(BinaryOp.StringConcat, _, l, r) => operands(l) ++ operands(r)
+      case other                                  => List(other)
+    genExprs(operands(tree)) match
+      case List(a, b) => s"rt.Concat($a, $b)"
+      case parts      => s"rt.ConcatAll(${parts.mkString(", ")})"
+
+  private def genArithmetic(tree: Binary): String =
     import BinaryOp.*
     val Binary(op, opType, lhs, rhs) = tree
     val List(a, b) = genExprs(List(lhs, rhs)): @unchecked

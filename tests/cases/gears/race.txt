@@ -1,1 +1,5 @@
-gears' synchronization must be free of data races.
+gears' synchronization must be free of data races, apart from one in gears itself (0.3.1, and
+still on its main branch): Future's AwaitListener.complete writes `state` after resuming the
+waiting thread, which then reads it (`listener.cancelled`). Both values it can see mean "not
+cancelled", so the race is benign, on the JVM as on Go.
+allow-race: Impl_gears_dasync_dFuture_SRunnableFuture_SFutureAsync_SAwaitListener__state_p_rI

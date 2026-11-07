@@ -58,6 +58,13 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
 
   def stringLiteral(s: String): String = stringLiterals.getOrElseUpdate(s, s"SL_${stringLiterals.size}")
 
+  /** `classOf` constants by JVM class name: package variables, so that using one is a load (the
+   *  runtime interns `Class` objects by name).
+   */
+  val classLiterals = mutable.LinkedHashMap.empty[String, String]
+
+  def classLiteral(jvmName: String): String = classLiterals.getOrElseUpdate(jvmName, s"CL_${classLiterals.size}")
+
   // ---- Dynamic dispatch and type tests ----------------------------------------------------------
 
   val dispatchers = mutable.LinkedHashSet.empty[MethodName]

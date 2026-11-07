@@ -94,6 +94,7 @@ final class ClassEmitter(ctx: LinkContext, cls: ClassDef):
       line(s"func (this *$struct) ${Mangling.virtualMethod(m)}${signature(m, args)} { $body }")
     for i <- program.allInterfaces(name) do line(s"func (this *$struct) ${Mangling.marker(i)}() {}")
     line(s"func (this *$struct) ScalaClassName() string { return ${FunctionEmitter.goStringLiteral(name)} }")
+    line(s"func (this *$struct) ScalaClass() *rt.Class { return ${ctx.classLiteral(name)} }")
     ctx.interop.exportedMethods(cls, struct).foreach(line(_))
     if ctx.libraryMode then ctx.exports.structMethods(cls, struct).foreach(line(_))
     line()

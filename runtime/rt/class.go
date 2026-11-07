@@ -11,20 +11,16 @@ type Class struct {
 	name string
 }
 
-var (
-	classesMu sync.Mutex
-	classes   = map[string]*Class{}
-)
+// classes interns Class objects by name. Lookups are frequent (getClass, classOf in library
+// code) and nearly always hits, which sync.Map serves without locking.
+var classes sync.Map // string -> *Class
 
 func ClassOf(name string) *Class {
-	classesMu.Lock()
-	defer classesMu.Unlock()
-	c, ok := classes[name]
-	if !ok {
-		c = &Class{name: name}
-		classes[name] = c
+	if c, ok := classes.Load(name); ok {
+		return c.(*Class)
 	}
-	return c
+	c, _ := classes.LoadOrStore(name, &Class{name: name})
+	return c.(*Class)
 }
 
 var primitiveDescriptors = map[string]string{
@@ -32,56 +28,87 @@ var primitiveDescriptors = map[string]string{
 }
 
 // GetClass implements x.getClass().
+// Classes of the hijacked types, which GetClass returns often.
+var (
+	classjava_lang_String        = ClassOf("java.lang.String")
+	classjava_lang_Boolean       = ClassOf("java.lang.Boolean")
+	classjava_lang_Character     = ClassOf("java.lang.Character")
+	classjava_lang_Byte          = ClassOf("java.lang.Byte")
+	classjava_lang_Short         = ClassOf("java.lang.Short")
+	classjava_lang_Integer       = ClassOf("java.lang.Integer")
+	classjava_lang_Long          = ClassOf("java.lang.Long")
+	classjava_lang_Float         = ClassOf("java.lang.Float")
+	classjava_lang_Double        = ClassOf("java.lang.Double")
+	classscala_runtime_BoxedUnit = ClassOf("scala.runtime.BoxedUnit")
+	classjava_lang_Class         = ClassOf("java.lang.Class")
+	classjava_math_BigInteger    = ClassOf("java.math.BigInteger")
+	classjava_math_BigDecimal    = ClassOf("java.math.BigDecimal")
+	class_Z                      = ClassOf("[Z")
+	class_C                      = ClassOf("[C")
+	class_B                      = ClassOf("[B")
+	class_S                      = ClassOf("[S")
+	class_I                      = ClassOf("[I")
+	class_J                      = ClassOf("[J")
+	class_F                      = ClassOf("[F")
+	class_D                      = ClassOf("[D")
+	class_Ljava_lang_Object_     = ClassOf("[Ljava.lang.Object;")
+	classjava_lang_Object        = ClassOf("java.lang.Object")
+)
+
 func GetClass(x any) *Class {
 	switch v := x.(type) {
 	case nil:
 		ThrowKind(NullPointer, "")
 	case *String:
-		return ClassOf("java.lang.String")
+		return classjava_lang_String
 	case bool:
-		return ClassOf("java.lang.Boolean")
+		return classjava_lang_Boolean
 	case uint16:
-		return ClassOf("java.lang.Character")
+		return classjava_lang_Character
 	case int8:
-		return ClassOf("java.lang.Byte")
+		return classjava_lang_Byte
 	case int16:
-		return ClassOf("java.lang.Short")
+		return classjava_lang_Short
 	case int32:
-		return ClassOf("java.lang.Integer")
+		return classjava_lang_Integer
 	case int64:
-		return ClassOf("java.lang.Long")
+		return classjava_lang_Long
 	case float32:
-		return ClassOf("java.lang.Float")
+		return classjava_lang_Float
 	case float64:
-		return ClassOf("java.lang.Double")
+		return classjava_lang_Double
 	case *BoxedUnit:
-		return ClassOf("scala.runtime.BoxedUnit")
+		return classscala_runtime_BoxedUnit
 	case *Class:
-		return ClassOf("java.lang.Class")
+		return classjava_lang_Class
 	case *BigInteger:
-		return ClassOf("java.math.BigInteger")
+		return classjava_math_BigInteger
+	case *BigDecimal:
+		return classjava_math_BigDecimal
 	case *Array[bool]:
-		return ClassOf("[Z")
+		return class_Z
 	case *Array[uint16]:
-		return ClassOf("[C")
+		return class_C
 	case *Array[int8]:
-		return ClassOf("[B")
+		return class_B
 	case *Array[int16]:
-		return ClassOf("[S")
+		return class_S
 	case *Array[int32]:
-		return ClassOf("[I")
+		return class_I
 	case *Array[int64]:
-		return ClassOf("[J")
+		return class_J
 	case *Array[float32]:
-		return ClassOf("[F")
+		return class_F
 	case *Array[float64]:
-		return ClassOf("[D")
+		return class_D
 	case *Array[any]:
-		return ClassOf("[Ljava.lang.Object;")
+		return class_Ljava_lang_Object_
+	case scalaClass:
+		return v.ScalaClass()
 	case scalaClassName:
 		return ClassOf(v.ScalaClassName())
 	case *Object:
-		return ClassOf("java.lang.Object")
+		return classjava_lang_Object
 	}
 	return ClassOf(foreignClassName(x))
 }

@@ -9,7 +9,9 @@ import dotty.tools.dotc.ast.tpd.*
 import dotty.tools.dotc.core.Constants.*
 import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Flags.*
+import dotty.tools.dotc.core.NameKinds.ExpandedName
 import dotty.tools.dotc.core.NameOps.*
+import dotty.tools.dotc.core.Names.Name
 import dotty.tools.dotc.core.Phases.erasurePhase
 import dotty.tools.dotc.core.StdNames.nme
 import dotty.tools.dotc.core.Symbols.*
@@ -30,9 +32,11 @@ import scalago.ir.Tree as G
 final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
   private val primitives = ScalaPrimitives(genCtx)
   private val lenient = options.lenient
+  private val enumerationNames = EnumerationNames()
 
   // Per-class / per-method state
   private var currentClass: ClassSymbol = uninitialized
+  private var inEnumeration = false // currentClass extends scala.Enumeration
   private var locals: LocalNames = uninitialized
 
   private def uninitialized[A]: A = null.asInstanceOf[A]
@@ -43,10 +47,13 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
       case td: TypeDef if td.isClassDef => List(td)
       case _                              => Nil
 
+    val generated = mutable.LinkedHashMap.empty[ClassSymbol, ir.ClassDef]
     for td <- collectClasses(unit.tpdTree) do
       val errorsBefore = ctx.reporter.errorCount
       val classDef = genClass(td)
-      if ctx.reporter.errorCount == errorsBefore then writeIR(classDef)
+      if ctx.reporter.errorCount == errorsBefore then generated(td.symbol.asClass) = classDef
+    val mirrors = if options.staticForwarders then addStaticForwarders(generated) else Nil
+    (generated.values ++ mirrors).foreach(writeIR)
 
   private def writeIR(classDef: ir.ClassDef): Unit =
     val parts = classDef.name.split('.')
@@ -62,6 +69,7 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
   private def genClass(td: TypeDef): ir.ClassDef =
     val sym = td.symbol.asClass
     currentClass = sym
+    inEnumeration = enumerationNames.isEnumeration(sym)
     val impl = td.rhs.asInstanceOf[Template]
     goFacadeOf(sym) match
       case Some(facade) => genFacadeClass(td, impl, facade)
@@ -82,6 +90,60 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
 
     ir.ClassDef(className(sym), kind, sym.is(Abstract), superClass, interfaces, fields, methods, position(td),
       goExport = exportedType)
+
+  // -------------------------------------------------------------------------------------------
+  // Static forwarders
+  // -------------------------------------------------------------------------------------------
+
+  /** Adds static forwarders to the methods of static objects, as the JVM backend does for
+   *  top-level ones: to the companion class, or to a "mirror class" with the object's name if it
+   *  has none (returned). Java callers, here the JDK signatures that programs are compiled
+   *  against, call them as static methods, so javalib implements JDK classes' static methods
+   *  (`Arrays`, `Collections`, static methods of interfaces such as `Map.Entry`) in Scala objects.
+   */
+  private def addStaticForwarders(generated: mutable.LinkedHashMap[ClassSymbol, ir.ClassDef]): List[ir.ClassDef] =
+    for
+      (moduleClass, moduleDef) <- generated.toList
+      // Classes are flattened by now: look at the owners before `flatten`.
+      if moduleClass.is(ModuleClass) && atPhase(erasurePhase)(moduleClass.isStatic)
+      companion = atPhase(erasurePhase)(moduleClass.companionClass)
+      forwarders = staticForwarders(moduleClass, companion)
+      if forwarders.nonEmpty
+      mirror <-
+        if companion.exists then
+          val cls = companion.asClass
+          generated.get(cls).foreach(c => generated(cls) = c.copy(methods = c.methods ++ forwarders))
+          None
+        else
+          Some(ir.ClassDef(moduleDef.name.stripSuffix("$"), ir.ClassKind.Class, isAbstract = false,
+            Some(ir.ClassName.Object), Nil, Nil, forwarders, moduleDef.pos))
+    yield mirror
+
+  /** The JVM backend's rules (`BCodeHelpers.addForwarders`): public concrete methods, except
+   *  `Object`'s and those whose name a member of the companion class has.
+   */
+  private def staticForwarders(moduleClass: ClassSymbol, companion: Symbol): List[ir.MethodDef] =
+    val conflicting: Set[Name] =
+      if companion.exists then companion.info.allMembers.iterator.map(_.name).filter(_.isTermName).toSet else Set.empty
+    val module = className(moduleClass)
+    val pos = moduleClass.defTree match
+      case EmptyTree => ir.Position.NoPosition
+      case tree      => position(tree)
+    val excluded = Lifted | Protected | JavaStatic | Private | Macro
+    val members = moduleClass.info.membersBasedOnFlags(required = Method, excluded = excluded).map(_.symbol)
+    members.toList.sortBy(_.name.toString).flatMap { m0 =>
+      val m = if m0.is(Bridge) then m0.nextOverriddenSymbol else m0
+      val skip = !m.exists || m.isType || m.is(Deferred) || m.owner == defn.ObjectClass || m.owner == defn.AnyClass ||
+        m.isConstructor || m.name.is(ExpandedName) || conflicting(m.name) ||
+        (m.accessBoundary(defn.RootClass) ne defn.RootClass)
+      if skip then None
+      else
+        val name = methodName(m)
+        val params = name.params.zipWithIndex.map((t, i) => ir.ParamDef(s"x$$$i", t))
+        val args = params.map(p => G.VarRef(p.name, p.tpe)(pos))
+        val call = G.Apply(G.LoadModule(module)(pos), className(m.owner), name, args, name.result)(pos)
+        Some(ir.MethodDef(name, params, Some(call), isStatic = true, isPrivate = false, pos))
+    }.distinctBy(_.name)
 
   private def classKind(sym: ClassSymbol): ir.ClassKind =
     if sym.is(Trait) then ir.ClassKind.Interface
@@ -386,7 +448,16 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
           case id: Ident if locals.contains(id.symbol) => genExpr(id)
           case id: Ident                               => genExpr(desugarIdent(id))
           case _                                       => genExpr(lhs)
-        G.Assign(genLhs, genExpr(rhs))(pos)
+        val assign = G.Assign(genLhs, genExpr(rhs))(pos)
+        // A `val` of an Enumeration: register the name the JVM would find by reflection.
+        val valName = if inEnumeration then enumerationNames.valName(currentClass, lhs.symbol) else None
+        valName match
+          case Some(name) =>
+            val register = G.ApplyStatically(G.This(toIRType(currentClass.typeRef))(pos),
+              enumerationNames.enumerationClassName, enumerationNames.registerName,
+              List(genLhs, G.StringLiteral(name)(pos)), ir.Type.Void)(pos)
+            G.Block(List(assign), register)(pos)
+          case None => assign
 
       case app: Apply =>
         genApply(app)
@@ -766,5 +837,6 @@ end GoIRCodeGen
 object GoIRCodeGen:
   /** @param renames package prefixes (with trailing dot) to rewrite in class names: this lets the
    *    javalib define `java.lang` classes that the Scala compiler does not allow redefining.
+   *  @param staticForwarders add static forwarders for the methods of static objects (javalib)
    */
-  final case class Options(lenient: Boolean, renames: List[(String, String)])
+  final case class Options(lenient: Boolean, renames: List[(String, String)], staticForwarders: Boolean)

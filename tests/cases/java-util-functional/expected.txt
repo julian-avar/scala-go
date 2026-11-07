@@ -1,0 +1,143 @@
+== Function / BiFunction / UnaryOperator / BinaryOperator
+apply 6 andThen 12 compose 11
+chain <22>
+identity same 4
+BiFunction 7 andThen <7>
+UnaryOperator ABC identity id andThen X!
+minBy bb cc maxBy aaa cc
+BinaryOperator concat andThen 4
+== Predicate / BiPredicate
+even -4,0,2,8 pos 1,2,7,8
+and 2,8 or -4,0,1,2,7,8 negate -3,1,7
+not -4,-3,0 complex -4,1,7
+isEqual true false false null true false
+BiPredicate true false negate true and true or true
+== Supplier / Consumer / BiConsumer
+Supplier call1 call2 call3
+Consumer.andThen [1:x][2:x][1:x]
+BiConsumer.andThen [1:x][2:x][1:x](ab=2){abab}
+BooleanSupplier true
+== primitive specializations
+IntFunction ###
+IntPredicate and 1,3,5,7,9 or 1,3,5,7,9,10,11,12,13,14 negate 0,2,4,6,8,10,12,14
+IntUnaryOperator andThen 19 compose 49 identity 9
+IntBinaryOperator 42 overflow 0
+ToIntFunction 5 ToLongFunction 8589934592 ToDoubleFunction 0.75
+LongSupplier 7806831264735756412 -9049835345590740197 -6486624265480721906
+IntSupplier 42 DoubleSupplier 0.30000000000000004
+DoubleUnaryOperator -2.5 0.0 identity 1.5
+DoubleBinaryOperator 5.0
+LongBinaryOperator -1 LongUnaryOperator -9223372036854775806
+Obj*Consumer ababab|L1099511627776|D1.0E-7
+Int/Long/DoubleConsumer.andThen <21>{42}[-1][0](0.25)(0.5)
+conversions 10000000000 0.3333333333333333 8 -2 3
+To*BiFunction 1 0.125 8589934588
+Long/DoublePredicate false true true true false
+Long/DoubleFunction ffffffffffffffff 0.3333333333333333
+== Comparator
+comparing(name) Ann Bob Cat Dan Eve Mia Zed
+comparing(name, reverseOrder) Zed Mia Eve Dan Cat Bob Ann
+comparing(name, CASE_INSENSITIVE by last char) Mia Bob Zed Eve Dan Ann Cat
+comparingInt(age) Eve Ann Zed Mia Dan Bob Cat
+comparingLong(salary) Eve Ann Zed Cat Mia Dan Bob
+comparingDouble(rating) Ann Cat Dan Bob Mia Zed Eve
+dept thenComparing(cmp) Mia Dan Bob Eve Cat Ann Zed
+dept thenComparing(key) Bob Dan Mia Cat Eve Ann Zed
+dept thenComparing(key, cmp) Mia Dan Bob Eve Cat Zed Ann
+dept thenComparingInt Mia Dan Bob Eve Cat Ann Zed
+dept thenComparingLong reversed Zed Ann Cat Eve Bob Mia Dan
+dept thenComparingDouble Dan Bob Mia Cat Eve Ann Zed
+age reversed then name Cat Bob Dan Mia Ann Zed Eve
+salary desc, rating desc, name Bob Mia Dan Cat Zed Ann Eve
+naturalOrder [Banana, Fig, apple, fig, kiwi, pear]
+reverseOrder [pear, kiwi, fig, apple, Fig, Banana]
+case-insensitive then natural [apple, Banana, Fig, fig, kiwi, pear]
+naturalOrder.reversed eq-like true true
+nullsFirst [null, null, a, b, c]
+nullsLast(reverse) [c, b, a, null, null]
+nullsFirst(null) keeps order [null, null, c, b, a]
+nullsLast emps Ann Mia null
+naturalOrder with null: threw java.lang.NullPointerException
+max by rating Eve min by age then name Eve
+== default methods taking lambdas
+Iterable.forEach 1;2;3;4;5;6;7;8;9;10;
+removeIf true false -> [1, 2, 4, 5, 7, 8, 10]
+List.replaceAll [1, 4, 16, 25, 49, 64, 100]
+forEachRemaining 16 25 49 64 100 hasNext=false
+Map.forEach epsilon:7 zeta:4 eta:3 alpha:5 delta:5 theta:5 beta:4 gamma:5
+Map.replaceAll {epsilon=70, zeta=40, eta=30, alpha=5, delta=50, theta=50, beta=40, gamma=5}
+values.removeIf {zeta=40, eta=30, alpha=5, beta=40, gamma=5}
+TreeSet descending forEach zgeba
+ArrayDeque forEach xyzZYX
+entry setValue in forEach {alpha=-5, beta=-40, eta=-30, gamma=-5, zeta=-40}
+== CollectionConverters
+Seq.asJava [1, 2, 3] size=3 get=2 contains=true indexOf=2
+Seq.asJava add: threw java.lang.UnsupportedOperationException
+List.asJava [a, b] equals true hash true
+remove(int) y
+Buffer.asJava add(index, elem): threw java.lang.UnsupportedOperationException
+Buffer.asJava remove(Object): threw java.lang.UnsupportedOperationException
+Buffer.asJava writes through buf=ArrayBuffer(X, z, ins) java=[X, z, ins]
+Buffer change visible in java [X, z, ins, tail] size=4
+sort via java view ArrayBuffer(z, tail, ins, X)
+round trip identity true
+mutable.Map.asJava mm=LinkedHashMap(two -> 22, three -> 3) java={two=22, three=3} get=22 containsKey=false
+immutable Map.asJava put: threw java.lang.UnsupportedOperationException
+immutable Map.asJava {k=v} get=v
+Set.asJava size=3 contains=true false sorted=[1, 2, 3]
+mutable.Set.asJava add TreeSet(1, 2, 3, 5)
+ArrayList.asScala java=[BB, B, c, d] scala=Buffer(BB, B, c, d) length=4
+asScala ops List(BB, B, C, D) List(B, c, d) dcBBB 2
+asScala round trip true
+HashMap.asScala java={b=22, c=3} get=Some(22) None getOrElse=0 keys=List(b, c)
+asScala map ops List((b,22), (c,3)) List((bb,22), (cc,3))
+TreeMap.asScala List((1,a), (2,b), (3,c)) 1,2,3
+Iterator.asScala pp-qq-rr
+Iterator.asJava 123
+TreeSet.asScala java=[a, m] scala=List(a, m)
+Iterable.asJava 1 asJavaCollection size=3
+Enumeration.asScala List(e1, e2)
+toList List(5, 6, 7)
+== FunctionConverters
+asJavaFunction cba ZYX
+asJava IntPredicate true false true
+IntUnaryOperator.asScala 42
+Supplier.asScala supplied
+== user Comparator
+sorted [a, b, aa, bb, abc, ccc]
+reversed [ccc, abc, bb, aa, b, a]
+TreeSet with user comparator [a, b, aa, bb, zz, abc, ccc] first=a ceiling(b)=b
+thenComparing on user 0
+== user AbstractList
+[0, 1, 4, 9, 16, 25] size=6 get(3)=9 contains(16)=true contains(15)=false
+indexOf(9)=3 lastIndexOf(25)=5 indexOf(2)=-1 isEmpty=false
+equals true true hashCode 888555536 888555536
+subList [4, 9, 16] subList.get(0)=4 toArray 0,1,4,9,16,25
+listIterator backwards 25 16 9 4 1 0
+containsAll true copy [0, 1, 4, 9, 16, 25] asScala 55
+forEach 0/1/4/9/16/25/
+Squares add: threw java.lang.UnsupportedOperationException
+Squares set: threw java.lang.UnsupportedOperationException
+Squares get(6): threw java.lang.IndexOutOfBoundsException
+Growable [a, b, c, d, e] size=5
+after remove/set [A, b, d, e]
+after removeIf [A, b, e]
+after subList.clear [e]
+after sort [z, y, x, e]
+after listIterator edits [Z, new, x, e]
+Growable CME: threw java.util.ConcurrentModificationException
+Growable equals true [Z, new, x, e, late]
+== user Iterator / AbstractSet / AbstractMap
+Countdown 4 3 2 1
+Countdown default remove: threw java.lang.UnsupportedOperationException
+Countdown asScala List(3, 2, 1)
+Evens size=5 contains(4)=true contains(5)=false sorted=[2, 4, 6, 8, 10]
+Evens equals true hashCode 30 30
+Evens toString [10, 8, 6, 4, 2]
+{3^0=1, 3^1=3, 3^2=9, 3^3=27, 3^4=81} size=5 get=9 missing=null containsKey=true containsValue(27)=true containsValue(28)=false
+keySet [3^0, 3^1, 3^2, 3^3, 3^4] values [1, 3, 9, 27, 81] isEmpty=false
+getOrDefault -1 equals true hashCode true
+forEach 3^0=1,3^1=3,3^2=9,3^3=27,3^4=81,
+Powers put: threw java.lang.UnsupportedOperationException
+copied into TreeMap {3^4=81, 3^3=27, 3^2=9, 3^1=3, 3^0=1}
+asScala List((3^0,1), (3^1,3), (3^2,9), (3^3,27), (3^4,81))

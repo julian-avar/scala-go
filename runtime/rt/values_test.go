@@ -28,6 +28,12 @@ func TestToStringMatchesJava(t *testing.T) {
 		{math.NaN(), "NaN"},
 		{float32(0.1), "0.1"},
 		{float32(1e10), "1.0E10"},
+		{math.SmallestNonzeroFloat64, "4.9E-324"},
+		{float32(math.SmallestNonzeroFloat32), "1.4E-45"},
+		{2e-323, "2.0E-323"},
+		{1e23, "1.0E23"},
+		{2 * math.SmallestNonzeroFloat64, "9.9E-324"},
+		{float32(3 * math.SmallestNonzeroFloat32), "4.2E-45"},
 	}
 	for _, c := range cases {
 		if got := ToGoString(c.in); got != c.want {
@@ -126,5 +132,11 @@ func TestRegexSplitAndReplace(t *testing.T) {
 	}
 	if got := StringReplaceFirst(Str("a1b22"), Str(`\d`), Str(`\$`)).GoString(); got != "a$b22" {
 		t.Errorf("replaceFirst: %q", got)
+	}
+}
+
+func BenchmarkClassOf(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		ClassOf("scala.collection.mutable.HashMap")
 	}
 }
