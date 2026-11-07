@@ -64,8 +64,8 @@ Differences from the JVM worth knowing:
 - **Stack traces** are like the JVM's, but line numbers are per statement, and JDK methods
   implemented natively have no frames.
 - **`WeakHashMap`** keeps its keys (Go 1.22 has no weak pointers).
-- **Case mapping** follows Go's Unicode tables, without Unicode's special casing:
-  `"straße".toUpperCase` is `"STRAßE"` (the JVM gives `"STRASSE"`).
+- **Unicode version:** character properties and case mappings come from Go's tables (Unicode
+  15, like JDK 21); characters added in Unicode 16 (JDK 25) have no case mapping.
 
 ## When linking fails
 

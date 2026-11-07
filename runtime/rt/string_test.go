@@ -71,3 +71,32 @@ func BenchmarkSplitOnChar(b *testing.B) {
 		StringSplitLimit(s, sep, 0)
 	}
 }
+
+func TestCaseMapping(t *testing.T) {
+	for in, want := range map[string]string{
+		"straße":  "STRASSE",
+		"ﬁx":      "FIX",
+		"hello":   "HELLO",
+		"Ünïcödé": "ÜNÏCÖDÉ",
+	} {
+		if got := StringToUpperCase(Str(in)).GoString(); got != want {
+			t.Errorf("toUpperCase(%q) = %q, want %q", in, got, want)
+		}
+	}
+	for in, want := range map[string]string{
+		"ΟΔΟΣ":     "οδος",
+		"ΟΔΟΣ ΚΑΙ": "οδος και",
+		"Σ":        "σ",
+		"İ":        "i̇",
+		"HELLO":    "hello",
+		"ΑΣ.Β":     "ασ.β",
+	} {
+		if got := StringToLowerCase(Str(in)).GoString(); got != want {
+			t.Errorf("toLowerCase(%q) = %q, want %q", in, got, want)
+		}
+	}
+	s := Str("already upper")
+	if StringToLowerCase(s) != s {
+		t.Error("an unchanged string should be returned as is")
+	}
+}
