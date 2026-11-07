@@ -1,0 +1,9 @@
+Ada
+3
+10
+ 20 
+30
+windows line
+Grüße ☃
+
+no newline at end

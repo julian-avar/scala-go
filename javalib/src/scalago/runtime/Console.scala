@@ -1,9 +1,12 @@
 package scalago.runtime
 
-/** Entry points into the Go runtime. The linker replaces these methods with native code; the
- *  bodies here only run if the class is used on the JVM by mistake.
+/** The process's standard output and error (see runtime/rt/console.go). Standard output is
+ *  buffered by the runtime, which flushes it at exit, before writing to standard error, before
+ *  reading standard input and around calls into Go code.
  */
 object Console:
-  def writeStdout(s: String): Unit = throw new UnsupportedOperationException("scala-go native")
-  def writeStderr(s: String): Unit = throw new UnsupportedOperationException("scala-go native")
-  def flush(): Unit = throw new UnsupportedOperationException("scala-go native")
+  private def native: Nothing = throw new UnsupportedOperationException("scala-go native")
+
+  /** Prints `String.valueOf(x)`, then a line separator if `newline` is set: one atomic write. */
+  def write(stderr: Boolean, x: Object, newline: Boolean): Unit = native
+  def flush(): Unit = native

@@ -76,7 +76,8 @@ object Linker:
     "IllegalMonitorState"    -> "java.lang.IllegalMonitorStateException",
     "Interrupted"            -> "java.lang.InterruptedException",
     "NoClassDefFound"        -> "java.lang.NoClassDefFoundError",
-    "IndexOutOfBounds"       -> "java.lang.IndexOutOfBoundsException"
+    "IndexOutOfBounds"       -> "java.lang.IndexOutOfBoundsException",
+    "IO"                     -> "java.io.IOException"
   )
   private val MessageConstructor = MethodName(MethodName.ConstructorSimpleName, List(Type.String), Type.Void)
 

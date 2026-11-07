@@ -164,8 +164,8 @@ func Sleep(millis int64, nanos int32) {
 func Yield() { runtime.Gosched() }
 
 // RunMain runs the program's entry point like the JVM's launcher: an uncaught exception is
-// reported, the program waits for the non-daemon threads it started, then exits (with status 1
-// after an uncaught exception in main).
+// reported, the program waits for the non-daemon threads it started, runs the shutdown hooks,
+// then exits (with status 1 after an uncaught exception in main).
 func RunMain(body func()) {
 	mainGoroutine.Store(GoID())
 	status := 0
@@ -184,6 +184,7 @@ func RunMain(body func()) {
 		liveCond.Wait()
 	}
 	liveMu.Unlock()
+	runShutdownHooks()
 	FlushStdout()
 	if status != 0 {
 		os.Exit(status)

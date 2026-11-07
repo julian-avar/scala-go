@@ -7,7 +7,7 @@ import scalago.ir.*
 /** Go implementations of JDK (and a few Scala library) methods.
  *
  *  Natives take precedence over IR, so they can also replace library methods whose IR would
- *  drag in too much (e.g. `Predef.println`, which goes through `Console` and thread locals).
+ *  drag in too much or be slow (e.g. `BoxesRunTime.equals`).
  *  Classes with real state or hierarchy (exceptions, StringBuilder, ...) are written in Scala in
  *  `javalib/` instead.
  */
@@ -171,12 +171,12 @@ object Natives:
   static(S, "<init>([B)V")(as => s"rt.NewStringFromBytes(${as.head}, $utf8)")
   staticFn(S, "<init>([BLjava.lang.String;)V", "rt.NewStringFromBytes")
   staticFn(S, "<init>([BLjava.nio.charset.Charset;)V", "rt.NewStringFromBytes")
+  static(S, "<init>([BII)V")(as => s"rt.NewStringFromByteRange(${as.mkString(", ")}, $utf8)")
+  staticFn(S, "<init>([BIILjava.lang.String;)V", "rt.NewStringFromByteRange")
+  staticFn(S, "<init>([BIILjava.nio.charset.Charset;)V", "rt.NewStringFromByteRange")
   instance(S, "getBytes()[B")((r, _) => s"rt.StringGetBytes($r, $utf8)")
   instanceFn(S, "getBytes(Ljava.lang.String;)[B", "rt.StringGetBytes")
   instanceFn(S, "getBytes(Ljava.nio.charset.Charset;)[B", "rt.StringGetBytes")
-  for (field, name) <- List("UTF_8" -> "UTF-8", "ISO_8859_1" -> "ISO-8859-1", "US_ASCII" -> "US-ASCII") do
-    staticFields(("java.nio.charset.StandardCharsets", field)) = s"any(rt.Str(\"$name\"))"
-  instanceFn("java.nio.charset.Charset", "name()Ljava.lang.String;", "rt.ToString")
 
   // ---- java.lang.Class ------------------------------------------------------------------------
 
@@ -387,9 +387,6 @@ object Natives:
   staticFn(System, "arraycopy(Ljava.lang.Object;ILjava.lang.Object;II)V", "rt.ArrayCopy")
   staticFn(System, "identityHashCode(Ljava.lang.Object;)I", "rt.IdentityHashCode")
   staticFn(System, "exit(I)V", "rt.Exit")
-  static(System, "lineSeparator()Ljava.lang.String;")(_ => "rt.Str(\"\\n\")")
-  static(System, "getProperty(Ljava.lang.String;)Ljava.lang.String;")(_ => "(*rt.String)(nil)")
-  static(System, "getProperty(Ljava.lang.String;Ljava.lang.String;)Ljava.lang.String;")(as => as(1))
   staticFn(System, "getenv(Ljava.lang.String;)Ljava.lang.String;", "rt.Getenv")
 
   private val ReflectArray = "java.lang.reflect.Array"
@@ -520,6 +517,28 @@ object Natives:
   staticFn(Threads, "sleep(JI)V", "rt.Sleep")
   staticFn(Threads, "yieldNow()V", "rt.Yield")
 
+  // java.lang.System's properties and java.lang.Runtime (javalib/src/scalago/runtime/Process.scala).
+  private val Process = "scalago.runtime.Process$"
+  for (desc, fn) <- List(
+      "getProperty(Ljava.lang.String;)Ljava.lang.String;" -> "rt.GetProperty",
+      "setProperty(Ljava.lang.String;Ljava.lang.String;)Ljava.lang.String;" -> "rt.SetProperty",
+      "propertyNames()[Ljava.lang.String;" -> "rt.PropertyNames",
+      "environment()[Ljava.lang.String;" -> "rt.Environ",
+      "exit(I)V" -> "rt.Exit",
+      "halt(I)V" -> "rt.Halt",
+      "removeShutdownHook(Ljava.lang.Object;)I" -> "rt.RemoveShutdownHook",
+      "availableProcessors()I" -> "rt.AvailableProcessors",
+      "totalMemory()J" -> "rt.TotalMemory",
+      "freeMemory()J" -> "rt.FreeMemory",
+      "gc()V" -> "rt.GC"
+    )
+  do staticFn(Process, desc, fn)
+  static(Process, "addShutdownHook(Ljava.lang.Object;)I") { as =>
+    val run = Mangling.virtualMethod(ThreadRunMethod)
+    s"rt.AddShutdownHook(${as(0)}, func(t any) { t.(interface{ $run() }).$run() })"
+  }
+  calls(Process, "addShutdownHook(Ljava.lang.Object;)I", ThreadRunMethod)
+
   // java.util.concurrent.locks' native side (javalib/src/scalago/runtime/Locks.scala).
   private val Locks = "scalago.runtime.Locks$"
   for (desc, fn) <- List(
@@ -553,10 +572,44 @@ object Natives:
     )
   do staticFn(Regexes, desc, fn)
 
+  // Standard output and error (javalib/src/scalago/runtime/Console.scala).
   private val GoConsole = "scalago.runtime.Console$"
-  staticFn(GoConsole, "writeStdout(Ljava.lang.String;)V", "rt.WriteStdout")
-  staticFn(GoConsole, "writeStderr(Ljava.lang.String;)V", "rt.WriteStderr")
+  staticFn(GoConsole, "write(ZLjava.lang.Object;Z)V", "rt.ConsoleWrite")
   static(GoConsole, "flush()V")(_ => "rt.FlushStdout()")
+
+  // java.io and java.nio.file's native side (javalib/src/scalago/runtime/OS.scala).
+  private val OS = "scalago.runtime.OS$"
+  for (desc, fn) <- List(
+      s"stdin()$JO" -> "rt.OSStdin",
+      s"stdout()$JO" -> "rt.OSStdout",
+      s"stderr()$JO" -> "rt.OSStderr",
+      s"open(${JS}II)$JO" -> "rt.OSOpen",
+      s"read($JO[BII)I" -> "rt.OSRead",
+      s"write($JO[BII)V" -> "rt.OSWrite",
+      s"seek(${JO}JI)J" -> "rt.OSSeek",
+      s"available($JO)I" -> "rt.OSAvailable",
+      s"size($JO)J" -> "rt.OSFileSize",
+      s"truncate(${JO}J)V" -> "rt.OSTruncate",
+      s"sync($JO)V" -> "rt.OSSync",
+      s"close($JO)V" -> "rt.OSClose",
+      s"stat(${JS}Z)$JO" -> "rt.OSStat",
+      s"access(${JS}I)Z" -> "rt.OSAccess",
+      s"mkdir(${JS}I)$JO" -> "rt.OSMkdir",
+      s"remove($JS)$JO" -> "rt.OSRemove",
+      s"rename($JS$JS)$JO" -> "rt.OSRename",
+      s"readDir($JS)$JO" -> "rt.OSReadDir",
+      s"createTemp($JS$JS${JS}Z)$JO" -> "rt.OSCreateTemp",
+      s"chmod(${JS}I)$JO" -> "rt.OSChmod",
+      s"setModified(${JS}J)$JO" -> "rt.OSSetModified",
+      s"symlink($JS$JS)$JO" -> "rt.OSSymlink",
+      s"readLink($JS)$JO" -> "rt.OSReadLink",
+      s"realPath($JS)$JO" -> "rt.OSRealPath",
+      s"workingDir()$JS" -> "rt.OSWorkingDir",
+      s"isError($JO)Z" -> "rt.OSIsError",
+      s"errorKind($JO)I" -> "rt.OSErrorKind",
+      s"errorReason($JO)$JS" -> "rt.OSErrorReason"
+    )
+  do staticFn(OS, desc, fn)
 
   // ---- scalago.go: Go strings (library/) --------------------------------------------------------
 
@@ -618,9 +671,4 @@ object Natives:
   // Arrays: `clone` is the only method called on array receivers.
   instanceFn("scala.Array", "clone()Ljava.lang.Object;", "rt.ArrayClone")
 
-  // Console output without Console's DynamicVariable/ThreadLocal machinery.
-  for module <- List("scala.Predef$", "scala.Console$") do
-    static(module, "println(Ljava.lang.Object;)V")(as => s"rt.Println(${as.head})")
-    static(module, "println()V")(_ => "rt.PrintNewline()")
-    static(module, "print(Ljava.lang.Object;)V")(as => s"rt.Print(${as.head})")
 end Natives

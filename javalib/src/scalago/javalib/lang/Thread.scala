@@ -19,6 +19,13 @@ class Thread private (target: Runnable, private var name: String, attached: scal
   private var handler: Thread.UncaughtExceptionHandler = null
   /** 0: new, 1: alive, 2: terminated. */
   @volatile private var state: Int = if attached then 1 else 0
+  /** ThreadLocal values (see ThreadLocal.Values), created on first use. */
+  private[lang] var threadLocals: ThreadLocal.Values = null
+  /** InheritableThreadLocal values, copied from the creating thread. */
+  private[lang] var inheritableThreadLocals: ThreadLocal.Values =
+    if attached then null else ThreadLocal.inheritedValues(Thread.currentThread())
+
+  private[lang] def wasStarted: scala.Boolean = state != 0
 
   override def run(): Unit = if target != null then target.run()
 

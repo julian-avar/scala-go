@@ -1,0 +1,94 @@
+-- byte streams
+6 bytes: 01 03 04 68 c3 a9
+hé
+read 1, available 5
+read 2 into 03 04; skipped 1
+rest: c3 a9, then -1
+ab
+abcd
+wxyz
+-- data streams
+41 bytes written
+-2, 1099511627776, 3.25, -1.5, -1, é, true, naïve ☃
+EOF: java.io.EOFException
+-- readers and writers
+[one]
+[two]
+[three]
+[]
+[last]
+null
+lines: 3
+abc
+abcdefgh234
+11
+olleh
+bcd
+before flush: ''
+after flush: 'buffered'
+-- print writers and streams
+1 2.5 true null
+42-x| 3.14
+000000FF
+checkError: false
+checkError after close: true
+autoflush print: ''
+autoflush println: 'pending'
+PrintStream checkError: true
+e9 3f 6f 6b 21
+java.io.UnsupportedEncodingException: NO-SUCH-CHARSET
+-- charsets
+UTF-8: 21 bytes, 47 72 c3 bc c3 9f 65 2c -> Grüße, ☃ and 😀
+  getBytes: 21 bytes, new String: Grüße, ☃ and 😀
+ISO-8859-1: 14 bytes, 47 72 fc df 65 2c 20 3f -> Grüße, ? and ?
+  getBytes: 14 bytes, new String: Grüße, ? and ?
+US-ASCII: 14 bytes, 47 72 3f 3f 65 2c 20 3f -> Gr??e, ? and ?
+  getBytes: 14 bytes, new String: Gr??e, ? and ?
+UTF-8 ISO-8859-1 UTF-8
+true false
+java.nio.charset.UnsupportedCharsetException: x-unknown
+UTF8
+replaced: 0061 fffd 0062 fffd 0063 fffd
+java.nio.charset.MalformedInputException: Input length = 1
+0061 fffd 0062 fffd 0063 fffd
+0061 fffd 0062 fffd 0063 fffd
+f0 9f 98 80 3f
+-- console
+withOut captured: 'captured line|42'
+withErr captured: 'to err'
+thread captured: 'from a thread'
+setOut captured: 'via System.out'
+c12.5xynull
+!bytes
+append
+printf=7
+System.out checkError: false
+-- Using
+open a
+close a
+result
+open b
+open c
+close c
+close b
+Failure(java.io.IOException: boom)
+Success(first)
+-- thread locals
+main: 5 / parent value; thread: 0 / parent value (child)
+after remove: 0
+-- system
+true
+List(\n, /, :)
+List(true, true, true, true, true)
+null default
+null 1
+1 null
+java.lang.IllegalArgumentException
+true
+null
+true
+true
+java.lang.NullPointerException
+to stderr
+end of main
+shutdown hook ran
