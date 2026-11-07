@@ -8,10 +8,11 @@ standard library (recompiled from its TASTy) and a Java standard library written
 See [docs/design.md](docs/design.md) for the architecture, object model, status and roadmap.
 
 **Status:** early, but real programs work. Classes, traits, objects, exceptions, pattern
-matching, lambdas, `lazy val` and the standard collections all run, and Scala code can call Go
+matching, lambdas, `lazy val`, the standard collections and `java.util` (collections, `Arrays`,
+`Collections`, `Optional`, `Random`, ...) all run, and Scala code can call Go
 packages, and Go code can call Scala libraries. Threads run on goroutines, with `synchronized`,
 `wait`/`notify`, volatiles and atomics, and gears runs on them. The generated code is safe to
-call from any goroutine. `BigDecimal`, `java.util.regex`, reflection and most of
+call from any goroutine. `BigDecimal`, `java.util.stream`, reflection and most of
 `java.util.concurrent` don't work yet.
 
 ## Using it with Mill

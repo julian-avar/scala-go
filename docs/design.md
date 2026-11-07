@@ -37,16 +37,30 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
    plugin and `-P:scala-go:rename` emits replacements under the library's own names, and its IR
    comes first on the link classpath (`scalago-gears` does this for one gears class).
 4. **javalib** (`javalib/`). JDK classes written in Scala: exceptions, `StringBuilder`,
-   `System.out`, `java.util.Arrays`, `MathContext`, references, and so on. It also replaces the
+   `System.out`, `java.util` (collections, `Arrays`, `Collections`, `Optional`, `Random`, `UUID`,
+   `java.util.function`, ...), `MathContext`, references, and so on. It also replaces the
    few Java-written classes of the Scala library (`*Ref`, `LazyVals`, `JProcedureN`,
    `ScalaNumber`). Packages other than `java.lang` are compiled under their own names
    (`package java.util`): a class compiled from source takes precedence over the JDK's, so
    javalib and the JDK class files it is type-checked against agree on one symbol per class.
    The Scala compiler refuses to redefine core `java.lang` classes, so those sources live in
    `scalago.javalib.lang` (and the Scala library's in `scalago.scalalib`), and the plugin renames
-   them in the IR. javalib is only ever linked: its jar must not be on a compile or run
-   classpath. When a class appears more than once on the link classpath, the first occurrence
-   wins, so javalib must come before the stdlib IR.
+   them in the IR. Static methods of JDK classes and interfaces are methods of Scala objects:
+   with `-P:scala-go:static-forwarders`, the plugin adds static forwarders to the companion
+   class (or a mirror class), as the JVM backend does. javalib is always compiled whole, since
+   classes of a previous compilation lose against the JDK's. It is only ever linked: its jar
+   must not be on a compile or run classpath. When a class appears more than once on the link
+   classpath, the first occurrence wins, so javalib must come before the stdlib IR.
+
+   Much of `java.util` is adapted from Scala Native's javalib (Apache-2.0,
+   `javalib/LICENSE-scala-native.md`; each such file says so), changed where programs can
+   observe a difference from the JDK: `HashMap` lays out its table as the JDK does (capacities,
+   growth, order within buckets), so iteration orders match (except in buckets of more than 8
+   colliding hash codes, which the JDK turns into trees); `HashSet`, `LinkedHashSet` and
+   `Hashtable` follow it; iterators are fail-fast (`modCount`, also for programs' subclasses of
+   `AbstractList`); `Random`, `SplittableRandom` and `Collections.shuffle` give the JDK's
+   sequences. The operations of `Arrays` on primitive arrays are natives, generic Go functions
+   standing in for Scala Native's specialization.
 5. **Linker** (`linker/`):
    - **Lambdas** (`Lambdas.scala`): `Closure` nodes become synthetic classes. Their single
      abstract method calls the lifted target method, with boxing and cast adaptation. Bridges are
@@ -409,6 +423,12 @@ Supported and covered by end-to-end tests:
 - standard-library collections (`List`, `Vector`, `Map`, ranges, `sorted`, `groupBy`, ...),
   string interpolation, `StringBuilder`, `BigInt`
 - `scalago.go.GoString`
+- `java.util`: lists, deques, queues, hash, linked and tree maps and sets (with their iteration
+  orders, navigation, views and fail-fast iterators), `Collections`, `Arrays` for every
+  primitive type, `Objects`, `Optional*`, `Random`/`SplittableRandom` sequences, `UUID`,
+  `StringJoiner`, `StringTokenizer`, `BitSet`, `Base64`, summary statistics, `Comparator`
+  combinators, `java.util.function`, `scala.jdk.CollectionConverters` both ways, and Scala
+  classes extending `AbstractList`/`AbstractMap`
 - Go interop: handwritten and generated facades of standard-library packages and of a local Go module, Go interfaces
   implemented in Scala, errors and callbacks, Go slices, maps, channels, pointers and funcs
   shared with Go, and generic Go functions. Mismatched facades are tested as link errors.
@@ -424,8 +444,13 @@ Supported and covered by end-to-end tests:
 Known gaps:
 - `BigDecimal` (`java.math.BigDecimal` is not implemented), regular expressions that RE2
   cannot run (lookaround, backreferences, possessive quantifiers), `String.format` beyond the
-  common conversions, `java.util` collections, `java.time`, and I/O
-  beyond stdout/stderr.
+  common conversions, `java.time`, and I/O beyond stdout/stderr.
+- `java.util`: streams (`stream()` and the `java.util.stream` package), the reversed views of
+  sequenced maps (`LinkedHashMap.reversed()`, `sequencedKeySet()`, ...), `Formatter`, `Locale`,
+  `Properties`, `Date`/`Calendar`/`Timer`, `EnumSet`/`EnumMap`, `WeakHashMap`, `ServiceLoader`,
+  `Arrays.compare`/`mismatch` and the range forms of `Arrays.equals`, `String.CASE_INSENSITIVE_ORDER`.
+  Arrays of references do not know their element type, so `toArray(new Array[String](0))` and
+  `Arrays.copyOf` return arrays whose `getClass` is `Object[]`.
 - Reflection: `getClass` and `Class` names work; nothing else.
 - Concurrency: `java.util.concurrent` beyond what gears needs (executors, concurrent maps,
   `CompletableFuture`), `ThreadLocal`, thread groups. `scala.concurrent.Future` needs an
@@ -489,8 +514,9 @@ earlier has to be redone:
    any Go package, and `scalago-gostd` publishes those of 21 standard library packages.
 7. **Library coverage** and **publishing**, in parallel with the steps above. Done so far:
    regular expressions on Go's `regexp` (`java.util.regex`, Scala's `Regex`), the
-   `java.util.concurrent` subset gears needs, and Scala library dependencies compiled from
-   TASTy. Still to do: `BigDecimal`, `java.util` collections, `java.time`, I/O, stack traces,
+   `java.util.concurrent` subset gears needs, `java.util` (collections and utilities), and
+   Scala library dependencies compiled from TASTy. Still to do: `BigDecimal`, `java.util.stream`,
+   `java.time`, I/O, stack traces,
    and publishing (organization `io.github.scalago` is a placeholder).
 
 ## Open questions

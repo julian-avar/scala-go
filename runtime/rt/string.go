@@ -520,6 +520,21 @@ func StringValueOfChar(c uint16) *String { return newString([]uint16{c}) }
 // Concat implements string concatenation: String.valueOf(a) + String.valueOf(b).
 func Concat(a, b any) *String { return StringConcat(ToString(a), ToString(b)) }
 
+// ConcatAll implements a chain of string concatenations, once all the operands are evaluated.
+func ConcatAll(parts ...any) *String {
+	strs := make([]*String, len(parts))
+	n := 0
+	for i, p := range parts {
+		strs[i] = ToString(p)
+		n += len(strs[i].chars)
+	}
+	chars := make([]uint16, 0, n)
+	for _, s := range strs {
+		chars = append(chars, s.chars...)
+	}
+	return newString(chars)
+}
+
 func StringGetChars(s *String, srcBegin, srcEnd int32, dst *Array[uint16], dstBegin int32) {
 	s.checkRange(srcBegin, srcEnd)
 	copy(dst.Data[dstBegin:], s.chars[srcBegin:srcEnd])
@@ -560,6 +575,14 @@ func NewStringFromBytes(a *Array[int8], charset any) *String {
 		}
 		return newString(chars)
 	}
+}
+
+// NewStringFromByteRange implements new String(bytes, offset, length, charset).
+func NewStringFromByteRange(a *Array[int8], offset, length int32, charset any) *String {
+	if offset < 0 || length < 0 || int(offset)+int(length) > len(a.Data) {
+		ThrowKind(StringIndexOutOfBounds, "offset "+itoa(offset)+", count "+itoa(length)+", length "+itoa(int32(len(a.Data))))
+	}
+	return NewStringFromBytes(&Array[int8]{Data: a.Data[offset : offset+length]}, charset)
 }
 
 // StringGetBytes implements String.getBytes(charset).

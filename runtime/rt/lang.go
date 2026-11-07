@@ -288,6 +288,14 @@ func absInt64(a int64) int64 {
 
 func MathRandom() float64 { return rand.Float64() }
 
+// MathClamp implements Math.clamp(long, int, int) and Math.clamp(long, long, long).
+func MathClamp[T int32 | int64](value int64, lo, hi T) T {
+	if lo > hi {
+		ThrowKind(IllegalArgument, strconv.FormatInt(int64(lo), 10)+" > "+strconv.FormatInt(int64(hi), 10))
+	}
+	return T(min(max(value, int64(lo)), int64(hi)))
+}
+
 // ---- System -------------------------------------------------------------------------------
 
 var startTime = time.Now()

@@ -71,11 +71,15 @@ object javalib extends WithPlugin with Published {
   // Packages other than java.lang are compiled under their own names (java.util, ...). The Scala
   // compiler does not allow redefining core java.lang classes, so those live in scalago.javalib.lang
   // (and the Scala library's overrides in scalago.scalalib); the plugin emits them as java.lang /
-  // scala.* in the IR.
+  // scala.* in the IR. Static methods of JDK classes are methods of Scala objects, called through
+  // static forwarders.
   def scalacOptions = Task {
-    Seq("-feature", "-P:scala-go:rename:scalago.javalib:java", "-P:scala-go:rename:scalago.scalalib:scala") ++
-      pluginOptions()
+    Seq("-feature", "-P:scala-go:rename:scalago.javalib:java", "-P:scala-go:rename:scalago.scalalib:scala",
+      "-P:scala-go:static-forwarders") ++ pluginOptions()
   }
+  // Always compile all sources together: when compiling only some, the others' classes from the
+  // previous run lose against the JDK's classes of the same names.
+  def zincIncrementalCompilation = false
 
   /** scala.runtime.function.JProcedure0..22: Java interfaces in the Scala library. */
   def generatedSources = Task {
