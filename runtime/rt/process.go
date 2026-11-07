@@ -140,7 +140,8 @@ func Environ() *Array[any] {
 	return &Array[any]{Data: out}
 }
 
-func AvailableProcessors() int32 { return int32(runtime.NumCPU()) }
+// AvailableProcessors is GOMAXPROCS: the processors Go runs goroutines on.
+func AvailableProcessors() int32 { return int32(runtime.GOMAXPROCS(0)) }
 
 // Memory statistics for Runtime.totalMemory/freeMemory/maxMemory: the heap Go obtained from the
 // system, and the part of it not in use.
