@@ -699,7 +699,12 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
         program.resolveImplementation(cls, m) match
           case Some(implClass) =>
             val r :: as = genExprs(receiver :: args, Type.Class(implClass) :: m.params): @unchecked
-            s"${Mangling.impl(implClass, m)}(${(r :: as).mkString(", ")})"
+            val exact = ctx.exactReceiver(implClass)
+            val recv = receiver match
+              // `this` already has that type (see LinkContext.exactReceiver).
+              case _: This if exact.isDefined && ctx.exactReceiver(owner.name) == exact => r
+              case _ => exact.fold(r)(ctx.toExactReceiver(_, r))
+            s"${Mangling.impl(implClass, m)}(${(recv :: as).mkString(", ")})"
           case None =>
             error(tree, s"method $cls.$m is not available")
 

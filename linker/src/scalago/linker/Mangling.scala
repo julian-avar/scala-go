@@ -29,6 +29,7 @@ import scalago.ir.*
  *  CL_<n>                    `classOf` constant (a *rt.Class)
  *  As_<class>, Is_<class>    cast and type test to C_<class>, from `any`
  *  CheckCast_<class>         cast to a class that hijacked values implement (references are `any`)
+ *  Exact_<class>             receiver conversion for method bodies whose `this` is exactly <class>
  *  }}}
  *  Methods on structs: `M_<method>` (virtual methods, exported so the runtime can call
  *  `toString` and friends), `A_<class>` (returns the struct of an ancestor class) and
@@ -97,4 +98,5 @@ object Mangling:
   def instanceTest(cls: ClassName): String = s"InstanceOf_${escape(cls)}"
   def ifaceCast(cls: ClassName): String = s"As_${escape(cls)}"
   def checkedCast(cls: ClassName): String = s"CheckCast_${escape(cls)}"
+  def exactReceiver(cls: ClassName): String = s"Exact_${escape(cls)}"
   def ifaceTest(cls: ClassName): String = s"Is_${escape(cls)}"
