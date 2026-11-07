@@ -37,6 +37,11 @@ object FileDescriptor:
   @static val out: FileDescriptor = new FileDescriptor(OS.stdout())
   @static val err: FileDescriptor = new FileDescriptor(OS.stderr())
 
+  /** A descriptor of a native handle, for javalib's java.lang classes (programs, compiled against
+   *  the JDK, do not see it).
+   */
+  def fromHandle(handle: Object): FileDescriptor = new FileDescriptor(handle)
+
   /** Opens a file for java.io's streams: failures are FileNotFoundExceptions with the JDK's
    *  message, `<path> (<reason>)`.
    */

@@ -800,6 +800,23 @@ object Natives:
     )
   do staticFn(OS, desc, fn)
 
+  // java.lang.ProcessBuilder, Process and ProcessHandle (javalib/src/scalago/runtime/Subprocesses.scala).
+  private val Subprocesses = "scalago.runtime.Subprocesses$"
+  for (desc, fn) <- List(
+      s"start([$JS$JS[$JS[I[${JS}Z)$JO" -> "rt.ProcessStart",
+      s"errorMessage($JO)$JS" -> "rt.ProcessErrorMessage",
+      s"stdin($JO)$JO" -> "rt.ProcessStdin",
+      s"stdout($JO)$JO" -> "rt.ProcessStdout",
+      s"stderr($JO)$JO" -> "rt.ProcessStderr",
+      s"pid($JO)J" -> "rt.ProcessPid",
+      s"waitFor(${JO}J)Z" -> "rt.ProcessWait",
+      s"exitCode($JO)I" -> "rt.ProcessExitCode",
+      s"destroy(${JO}Z)V" -> "rt.ProcessDestroy",
+      "currentPid()J" -> "rt.CurrentPid",
+      "parentPid()J" -> "rt.ParentPid"
+    )
+  do staticFn(Subprocesses, desc, fn)
+
   // java.time's native side (javalib/src/scalago/runtime/Time.scala).
   private val Time = "scalago.runtime.Time$"
   /** Loads a time zone: programs that can reach it embed Go's tz database (see `Linker`). */
