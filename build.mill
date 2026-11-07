@@ -68,6 +68,17 @@ object plugin extends ScalaGoModule with Published {
  */
 object javalib extends WithPlugin with Published {
   def artifactName = "scalago-javalib"
+
+  /** javalib reimplements the JDK, whose API is documented by the JDK (scaladoc also cannot
+   *  document sources that redefine JDK packages): an empty documentation jar, which Maven
+   *  Central requires.
+   */
+  def docJar = Task {
+    val jar = Task.dest / "out.jar"
+    val out = new java.util.jar.JarOutputStream(java.nio.file.Files.newOutputStream(jar.toNIO), new java.util.jar.Manifest())
+    out.close()
+    PathRef(jar)
+  }
   // Packages other than java.lang are compiled under their own names (java.util, ...). The Scala
   // compiler does not allow redefining core java.lang classes, so those live in scalago.javalib.lang
   // (and the Scala library's overrides in scalago.scalalib); the plugin emits them as java.lang /
