@@ -366,4 +366,34 @@ object examples extends Module {
       println("bubbletea demo: the final state is as expected")
     }
   }
+
+  /** An HTTP JSON API on gin. `mill examples.gin.goRun` serves it on :8080; `mill examples.gin.check`
+   *  runs it with `--self-test`: it serves on a free port, sends itself requests and checks the
+   *  responses.
+   */
+  object gin extends InBuildScalaGoModule {
+    def goRequires = Seq("github.com/gin-gonic/gin@v1.12.0")
+    def goFacadePackages = Seq("net", "net/http", "context", "time", "github.com/gin-gonic/gin")
+
+    def check() = Task.Command {
+      val output = os.proc(goBuild().path, "--self-test").call().out.text()
+      print(output)
+      if (!output.linesIterator.contains("all requests answered as expected")) throw new Exception("the self-test failed")
+    }
+  }
+
+  /** Configuration that reloads itself, on argus. `mill examples.argus.goRun <file>` watches a
+   *  file; `mill examples.argus.check` runs it with `--self-test`: it edits a temporary file and
+   *  checks that each change is seen.
+   */
+  object argus extends InBuildScalaGoModule {
+    def goRequires = Seq("github.com/agilira/argus@v1.7.5")
+    def goFacadePackages = Seq("time", "github.com/agilira/argus")
+
+    def check() = Task.Command {
+      val output = os.proc(goBuild().path, "--self-test").call().out.text()
+      print(output)
+      if (!output.linesIterator.contains("all changes seen as expected")) throw new Exception("the self-test failed")
+    }
+  }
 }
