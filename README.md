@@ -9,17 +9,18 @@ See [docs/guide.md](docs/guide.md) for using it (setup, dependencies, JVM differ
 errors, performance, shipping binaries) and [docs/design.md](docs/design.md) for the
 architecture, object model, status and roadmap.
 
-**Status:** early, but real programs work. Classes, traits, objects, exceptions, pattern
-matching, lambdas, `lazy val`, the standard collections and `java.util` (collections, `Arrays`,
-`Collections`, `Optional`, `Random`, streams, ...) all run, and Scala code can call Go
-packages, and Go code can call Scala libraries. Threads run on goroutines, with `synchronized`,
-`wait`/`notify`, volatiles and atomics; `java.util.concurrent` (executors, `ForkJoinPool`,
-`CompletableFuture`, locks, concurrent collections), `scala.concurrent.Future` and gears run on
-them. The generated code is safe to
-call from any goroutine. `BigDecimal` and `BigInt` match the JDK. Programs read and write files
-(`java.io`, `java.nio` buffers, channels and files, `scala.io.Source`, os-lib) and standard input,
-and run subprocesses (`ProcessBuilder`, `scala.sys.process`, `os.proc`). `java.time` works, with time
-zones from Go's tz database. Reflection doesn't work yet.
+**Status:** real programs and popular libraries work; not yet published. Classes, traits,
+objects, enums, exceptions (with JVM-style stack traces), pattern matching, lambdas, `lazy val`
+and the standard collections run, as do `java.util` (collections, streams, `Optional`, `Random`,
+regex, ...), `java.util.concurrent` (executors, `ForkJoinPool`, `CompletableFuture`, locks,
+concurrent collections), `scala.concurrent.Future` and gears on goroutines, `BigDecimal` and
+`BigInt` (exact, as on the JDK), `java.io`/`java.nio` (files, buffers, channels), standard input,
+subprocesses (`ProcessBuilder`, `scala.sys.process`), and `java.time` with time zones from Go's tz
+database. Scala 3 libraries are compiled from the TASTy in their jars: cats, upickle, fastparse,
+pprint, mainargs and os-lib are checked against the JVM. Scala code calls Go packages, Go code
+calls Scala libraries, and the generated code is safe to call from any goroutine. Runtime
+reflection (beyond `getClass`/`isAssignableFrom`) and Java-only libraries do not work. See
+[docs/guide.md](docs/guide.md) for the differences from the JVM.
 
 ## Using it with Mill
 

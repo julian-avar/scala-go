@@ -31,8 +31,8 @@ plugin uses compiler internals.
 
 Scala 3 libraries need no scala-go specific artifact: add them to `mvnDeps` as usual, and
 `ScalaGoModule` compiles them to Go from the TASTy in their jars (cached by Mill). For
-example cats, upickle (including derived `ReadWriter`s), fastparse, pprint, mainargs and gears
-work.
+example cats, upickle (including derived `ReadWriter`s), fastparse, pprint, mainargs, os-lib and
+gears work (this repository's `mill ecosystem.check` compares them with the JVM).
 
 What does not work:
 
@@ -48,7 +48,8 @@ What does not work:
 
 scala-go has its own Java standard library (javalib), written in Scala: `java.lang`,
 `java.util` (collections, streams, `Optional`, `Random`, `UUID`, `regex`, `Properties`, ...),
-`java.util.concurrent`'s atomics and locks, `java.math` (`BigInteger`, `BigDecimal`, exact),
+`java.util.concurrent` (executors, `ForkJoinPool`, `CompletableFuture`, locks, atomics,
+concurrent collections; so `scala.concurrent.Future` too), `java.math` (`BigInteger`, `BigDecimal`, exact),
 `java.io`, `java.nio` (buffers, file channels, `Files`, the default file system), subprocesses
 (`ProcessBuilder`, so `scala.sys.process` and os-lib's `os.proc`), `java.time` (time zones from
 Go's tz database), and the parts of `java.text` that `java.time` needs. design.md's [Status](design.md#status) lists the gaps.
