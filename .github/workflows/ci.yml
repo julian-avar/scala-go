@@ -73,9 +73,9 @@ jobs:
       - name: end-to-end tests
         run: ./mill --ticker false linker.test
       - name: example
-        run: ./mill --ticker false example.goRun Ada Grace
+        run: ./mill --ticker false examples.basics.goRun Ada Grace
       - name: popular libraries (compiled from TASTy), JVM and Go output compared
-        run: ./mill --ticker false ecosystem.check
+        run: ./mill --ticker false examples.ecosystem.check
       - name: published artifacts, used by an outside project
         run: |
           ./mill --ticker false __.publishLocal

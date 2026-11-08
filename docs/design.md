@@ -373,8 +373,8 @@ Generated facades are checked against Go at link time like handwritten ones, but
 used, so unused members cost nothing. `scalago-gostd` (`gostd/` in this build) has the facades
 of 21 standard library packages and the types of `io/fs`, `reflect` and `syscall` that they use,
 about 1,700 members. The `go-std` test case uses them; `go-facadegen` generates facades of a
-local module written in the style of bubbletea and checks the rules above; and `gotui/` (`mill
-gotui.check`) uses bubbletea, bubbles and lipgloss.
+local module written in the style of bubbletea and checks the rules above; and `examples/gotui/` (`mill
+examples.gotui.check`) uses bubbletea, bubbles and lipgloss.
 
 ### Go data in Scala
 
@@ -514,7 +514,7 @@ implemented.
 library's, unchanged: its pumping threads are goroutine-backed `Thread`s, its pipes
 `java.io.PipedInputStream`s (javalib, as the JDK's), and `System.getProperties` is a
 `Properties` object as on the JDK. os-lib (`os.proc(...).call()`, `spawn`, and its file
-operations) runs unchanged too (see the `ecosystem` module).
+operations) runs unchanged too (see `examples/ecosystem`).
 
 ## Networking
 

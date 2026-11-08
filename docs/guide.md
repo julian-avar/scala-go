@@ -32,7 +32,7 @@ plugin uses compiler internals.
 Scala 3 libraries need no scala-go specific artifact: add them to `mvnDeps` as usual, and
 `ScalaGoModule` compiles them to Go from the TASTy in their jars (cached by Mill). For
 example cats, upickle (including derived `ReadWriter`s), fastparse, pprint, mainargs, os-lib and
-gears work (this repository's `mill ecosystem.check` compares them with the JVM).
+gears work (this repository's `mill examples.ecosystem.check` compares them with the JVM).
 
 What does not work:
 
@@ -96,7 +96,7 @@ The facades read like the Go API, with Scala types:
 
 `goRequires` modules are downloaded by `go` (module proxy and cache), so the first build needs
 network access. Programs that use Go libraries only run as Go, not on the JVM. This repository's
-`gotui/` is a complete bubbletea application with bubbles components, and `mill gotui.check`
+`examples/gotui/` is a complete bubbletea application with bubbles components, and `mill examples.gotui.check`
 runs it on scripted keys.
 
 ## The JDK

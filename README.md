@@ -96,10 +96,10 @@ facades of the most-used standard library packages (`scalago.gostd.strings`, `fm
 `net/url`, `encoding/json`, ...).
 
 Go modules other than the standard library go in `goRequires` (`"module@version"`), or in
-`goLocalModules` for local directories with a `go.mod` (see `example/`). Facade members throw on
+`goLocalModules` for local directories with a `go.mod` (see `examples/basics/`). Facade members throw on
 the JVM. See [docs/design.md](docs/design.md#go-interop) for the conversion rules.
 
-Popular Go libraries work through generated facades. For example, `gotui/` is a terminal app on
+Popular Go libraries work through generated facades. For example, `examples/gotui/` is a terminal app on
 [bubbletea](https://github.com/charmbracelet/bubbletea), [bubbles](https://github.com/charmbracelet/bubbles)
 and [lipgloss](https://github.com/charmbracelet/lipgloss), with its model in Scala:
 
@@ -170,9 +170,9 @@ Methods annotated with `@throws` return a Go `error`. Other exceptions are panic
 | `gears/`             | gears on goroutines (`scalago-gears`): an override and Go helpers       |
 | `gostd/`             | Generated facades of Go standard library packages (`scalago-gostd`)     |
 | `mill-build/src/`    | `ScalaGoModule`/`ScalaGoLibraryModule` and `TastyIR`, published as `mill-scalago` |
-| `example/`           | A program built with `ScalaGoModule`: `mill example.goRun Ada Grace`    |
-| `ecosystem/`         | Popular Scala libraries compiled from TASTy (`mill ecosystem.check`: JVM and Go agree) |
-| `gotui/`             | A bubbletea/bubbles/lipgloss terminal app in Scala (`mill gotui.goRun`; `mill gotui.check`) |
+| `examples/basics/`   | A program built with `ScalaGoModule`: `mill examples.basics.goRun Ada Grace` |
+| `examples/ecosystem/`| Popular Scala libraries compiled from TASTy (`mill examples.ecosystem.check`: JVM and Go agree) |
+| `examples/gotui/`    | A bubbletea/bubbles/lipgloss terminal app in Scala (`mill examples.gotui.goRun`; `mill examples.gotui.check`) |
 | `bench/`             | CPU benchmarks, run on the JVM (`mill bench.run`) and as Go (`mill bench.goRun`) |
 | `tests/published/`   | A project using only the published artifacts (`tests/published/check.sh` after `publishLocal`) |
 | `tests/cases/`       | End-to-end programs with their expected output                          |
@@ -188,7 +188,8 @@ tests on amd64 and arm64 (Linux, macOS; oldest and newest Go) and everything bel
 ```sh
 mill linker.test                 # end-to-end tests (compile, run on JVM and as Go, compare)
 cd runtime && go test ./...      # runtime unit tests
-mill example.goRun               # the example, through ScalaGoModule
+mill examples.basics.goRun       # an example, through ScalaGoModule
+mill examples.__.check           # examples that check themselves (bubbletea, Scala libraries)
 mill bench.run 3; mill bench.goRun 3   # CPU benchmarks on the JVM and as Go
 ```
 

@@ -278,7 +278,7 @@ object linker extends ScalaGoModule with Published {
 }
 
 /** The Mill plugin (`scalago.mill.ScalaGoModule`). Its source is in `mill-build/src`, where this
- *  build also uses it directly (see `example`).
+ *  build also uses it directly (see `examples`).
  */
 object millplugin extends ScalaModule with Published {
   def scalaVersion = Versions.millScala
@@ -297,68 +297,73 @@ trait InBuildScalaGoModule extends UserScalaGoModule {
   def moduleDeps: Seq[JavaModule] = Seq(library)
 }
 
-/** An example program built with ScalaGoModule: `mill example.goRun [names...]`. */
-object example extends InBuildScalaGoModule {
-  override def moduleDeps = Seq(library, gears)
-  // gears comes as a plain Scala dependency: ScalaGoModule compiles it from TASTy.
-  def mvnDeps = Seq(gears.gearsDep)
-  def goLocalModules = Task.Sources(moduleDir / "go" / "textstats")
-  // Facades generated from Go packages: a standard library package, and the local module.
-  def goFacadePackages = Seq("strconv", "example.com/textstats")
-}
-
 /** CPU benchmarks of generated code against the JVM: `mill bench.run [rounds]` on the JVM,
  *  `mill bench.goRun [rounds]` as Go. Later rounds show warmed-up JVM performance.
  */
 object bench extends InBuildScalaGoModule
 
-/** Popular Scala 3 libraries, compiled from TASTy like any dependency (none has a scala-go
- *  specific artifact): `mill ecosystem.check` runs the program on the JVM and as Go and checks
- *  that both print the same.
+/** Example programs, each built with ScalaGoModule (`examples/<name>`). Those with a `check`
+ *  command verify themselves: `mill examples.__.check`.
  */
-object ecosystem extends InBuildScalaGoModule {
-  def mvnDeps = Seq(
-    mvn"org.typelevel::cats-core:2.13.0",
-    mvn"com.lihaoyi::upickle:4.4.1",
-    mvn"com.lihaoyi::fastparse:3.1.1",
-    mvn"com.lihaoyi::pprint:0.9.4",
-    mvn"com.lihaoyi::mainargs:0.7.6",
-    mvn"com.lihaoyi::os-lib:0.11.4"
-  )
-
-  def check() = Task.Command {
-    val javaExe = os.Path(sys.props("java.home")) / "bin" / "java"
-    val classpath = runClasspath().map(_.path).filter(os.exists(_)).mkString(java.io.File.pathSeparator)
-    val jvm = os.proc(javaExe, "-cp", classpath, finalMainClass()).call().out.text()
-    val go = os.proc(goBuild().path).call().out.text()
-    if (jvm != go) throw new Exception(s"the JVM and Go outputs differ:\n--- JVM\n$jvm--- Go\n$go")
-    println(s"JVM and Go outputs agree (${jvm.linesIterator.size} lines)")
+object examples extends Module {
+  /** A program built with ScalaGoModule: `mill examples.basics.goRun [names...]`. */
+  object basics extends InBuildScalaGoModule {
+    override def moduleDeps = Seq(library, gears)
+    // gears comes as a plain Scala dependency: ScalaGoModule compiles it from TASTy.
+    def mvnDeps = Seq(gears.gearsDep)
+    def goLocalModules = Task.Sources(moduleDir / "go" / "textstats")
+    // Facades generated from Go packages: a standard library package, and the local module.
+    def goFacadePackages = Seq("strconv", "example.com/textstats")
   }
-}
 
-/** Popular Go libraries used from Scala through generated facades: a bubbletea TUI styled with
- *  lipgloss, using bubbles components. `mill gotui.goRun` runs it in the terminal; `mill gotui.check`
- *  runs it on scripted keys and checks the final state.
- */
-object gotui extends InBuildScalaGoModule {
-  def goRequires = Seq(
-    "github.com/charmbracelet/bubbletea@v1.3.10",
-    "github.com/charmbracelet/lipgloss@v1.1.0",
-    "github.com/charmbracelet/bubbles@v1.0.0"
-  )
-  def goFacadePackages = Seq(
-    "io",
-    "github.com/charmbracelet/bubbletea",
-    "github.com/charmbracelet/lipgloss",
-    "github.com/charmbracelet/bubbles/textinput",
-    "github.com/charmbracelet/bubbles/spinner",
-    "github.com/charmbracelet/bubbles/key"
-  )
+  /** Popular Scala 3 libraries, compiled from TASTy like any dependency (none has a scala-go
+   *  specific artifact): `mill examples.ecosystem.check` runs the program on the JVM and as Go and checks
+   *  that both print the same.
+   */
+  object ecosystem extends InBuildScalaGoModule {
+    def mvnDeps = Seq(
+      mvn"org.typelevel::cats-core:2.13.0",
+      mvn"com.lihaoyi::upickle:4.4.1",
+      mvn"com.lihaoyi::fastparse:3.1.1",
+      mvn"com.lihaoyi::pprint:0.9.4",
+      mvn"com.lihaoyi::mainargs:0.7.6",
+      mvn"com.lihaoyi::os-lib:0.11.4"
+    )
 
-  def check() = Task.Command {
-    val expected = Seq("2 todos, 1 done, saved 3 times", "[ ] buy milk", "[x] walk the dog").mkString("", "\n", "\n")
-    val output = os.proc(goBuild().path, "--demo").call().out.text()
-    if (output != expected) throw new Exception(s"unexpected output:\n$output")
-    println("bubbletea demo: the final state is as expected")
+    def check() = Task.Command {
+      val javaExe = os.Path(sys.props("java.home")) / "bin" / "java"
+      val classpath = runClasspath().map(_.path).filter(os.exists(_)).mkString(java.io.File.pathSeparator)
+      val jvm = os.proc(javaExe, "-cp", classpath, finalMainClass()).call().out.text()
+      val go = os.proc(goBuild().path).call().out.text()
+      if (jvm != go) throw new Exception(s"the JVM and Go outputs differ:\n--- JVM\n$jvm--- Go\n$go")
+      println(s"JVM and Go outputs agree (${jvm.linesIterator.size} lines)")
+    }
+  }
+
+  /** Popular Go libraries used from Scala through generated facades: a bubbletea TUI styled with
+   *  lipgloss, using bubbles components. `mill examples.gotui.goRun` runs it in the terminal; `mill examples.gotui.check`
+   *  runs it on scripted keys and checks the final state.
+   */
+  object gotui extends InBuildScalaGoModule {
+    def goRequires = Seq(
+      "github.com/charmbracelet/bubbletea@v1.3.10",
+      "github.com/charmbracelet/lipgloss@v1.1.0",
+      "github.com/charmbracelet/bubbles@v1.0.0"
+    )
+    def goFacadePackages = Seq(
+      "io",
+      "github.com/charmbracelet/bubbletea",
+      "github.com/charmbracelet/lipgloss",
+      "github.com/charmbracelet/bubbles/textinput",
+      "github.com/charmbracelet/bubbles/spinner",
+      "github.com/charmbracelet/bubbles/key"
+    )
+
+    def check() = Task.Command {
+      val expected = Seq("2 todos, 1 done, saved 3 times", "[ ] buy milk", "[x] walk the dog").mkString("", "\n", "\n")
+      val output = os.proc(goBuild().path, "--demo").call().out.text()
+      if (output != expected) throw new Exception(s"unexpected output:\n$output")
+      println("bubbletea demo: the final state is as expected")
+    }
   }
 }
