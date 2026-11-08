@@ -8,7 +8,13 @@ import scala.util.Using
 
 import scalago.ir.{ClassDef, Serialization}
 
-/** Reads every `.goir` file found on a classpath (directories and jars). */
+/** Reads the `.goir` files found on a classpath (directories and jars).
+ *
+ *  The plugin writes each class's IR next to its class file. Incremental compilation deletes the
+ *  class files of classes that no longer exist, but not their IR, so where an entry has class
+ *  files, IR without its class file is stale and ignored. Entries with IR only (the Scala
+ *  library's, dependencies compiled from TASTy) are read whole.
+ */
 object IRLoader:
   def load(classpath: Seq[Path]): Seq[ClassDef] =
     classpath.flatMap { entry =>
@@ -19,18 +25,19 @@ object IRLoader:
 
   private def isIRFile(name: String): Boolean = name.endsWith(Serialization.FileExtension)
 
+  /** The IR files among `files` (relative names) that are not stale. */
+  private def current(files: Seq[String]): Seq[String] =
+    val classFiles = files.filter(_.endsWith(".class")).toSet
+    files.filter(f => isIRFile(f) && (classFiles.isEmpty || classFiles(f.stripSuffix(Serialization.FileExtension) + ".class")))
+
   private def loadDirectory(dir: Path): Seq[ClassDef] =
-    Using.resource(Files.walk(dir)) { files =>
-      files.iterator.asScala
-        .filter(p => Files.isRegularFile(p) && isIRFile(p.getFileName.toString))
-        .map(p => Serialization.deserialize(Files.readAllBytes(p)))
-        .toList
+    val files = Using.resource(Files.walk(dir)) { paths =>
+      paths.iterator.asScala.filter(Files.isRegularFile(_)).map(p => dir.relativize(p).toString).toList
     }
+    current(files).map(f => Serialization.deserialize(Files.readAllBytes(dir.resolve(f))))
 
   private def loadJar(jar: Path): Seq[ClassDef] =
     Using.resource(ZipFile(jar.toFile)) { zip =>
-      zip.entries.asScala
-        .filter(e => !e.isDirectory && isIRFile(e.getName))
-        .map(e => Using.resource(zip.getInputStream(e))(in => Serialization.deserialize(in.readAllBytes())))
-        .toList
+      val names = zip.entries.asScala.filter(!_.isDirectory).map(_.getName).toList
+      current(names).map(n => Using.resource(zip.getInputStream(zip.getEntry(n)))(in => Serialization.deserialize(in.readAllBytes())))
     }

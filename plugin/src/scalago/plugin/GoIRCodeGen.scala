@@ -52,10 +52,16 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
       val classDef = genClass(td)
       if ctx.reporter.errorCount == errorsBefore then generated(td.symbol.asClass) = classDef
     val mirrors = if options.staticForwarders then addStaticForwarders(generated) else Nil
-    (generated.values ++ mirrors).foreach(writeIR)
+    for (sym, classDef) <- generated do writeIR(sym.javaClassName, classDef)
+    for (fileName, classDef) <- mirrors do writeIR(fileName, classDef)
 
-  private def writeIR(classDef: ir.ClassDef): Unit =
-    val parts = classDef.name.split('.')
+  /** Writes `classDef` next to the class file named `binaryName` (before renames: the IR of
+   *  `java.lang.String`, compiled as `scalago.javalib.lang.String`, sits next to the latter's class
+   *  file). The linker ignores IR files without their class file (see `IRLoader`): incremental
+   *  compilation deletes the class files of removed classes, but not their IR.
+   */
+  private def writeIR(binaryName: String, classDef: ir.ClassDef): Unit =
+    val parts = binaryName.split('.')
     val dir = parts.init.foldLeft(ctx.settings.outputDir.value)(_.subdirectoryNamed(_))
     val out = dir.fileNamed(parts.last + ir.Serialization.FileExtension).bufferedOutput
     try out.write(ir.Serialization.serialize(classDef))
@@ -100,7 +106,10 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
    *  against, call them as static methods, so javalib implements JDK classes' static methods
    *  (`Arrays`, `Collections`, static methods of interfaces such as `Map.Entry`) in Scala objects.
    */
-  private def addStaticForwarders(generated: mutable.LinkedHashMap[ClassSymbol, ir.ClassDef]): List[ir.ClassDef] =
+  /** Static forwarders, added to companion classes; mirror classes for objects without one, with
+   *  the binary names of their class files.
+   */
+  private def addStaticForwarders(generated: mutable.LinkedHashMap[ClassSymbol, ir.ClassDef]): List[(String, ir.ClassDef)] =
     for
       (moduleClass, moduleDef) <- generated.toList
       // Classes are flattened by now: look at the owners before `flatten`.
@@ -114,8 +123,8 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
           generated.get(cls).foreach(c => generated(cls) = c.copy(methods = c.methods ++ forwarders))
           None
         else
-          Some(ir.ClassDef(moduleDef.name.stripSuffix("$"), ir.ClassKind.Class, isAbstract = false,
-            Some(ir.ClassName.Object), Nil, Nil, forwarders, moduleDef.pos))
+          Some(moduleClass.javaClassName.stripSuffix("$") -> ir.ClassDef(moduleDef.name.stripSuffix("$"),
+            ir.ClassKind.Class, isAbstract = false, Some(ir.ClassName.Object), Nil, Nil, forwarders, moduleDef.pos))
     yield mirror
 
   /** The JVM backend's rules (`BCodeHelpers.addForwarders`): public concrete methods, except
