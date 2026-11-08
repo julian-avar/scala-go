@@ -1,0 +1,103 @@
+MD5 (16): d41d8cd98f00b204e9800998ecf8427e 900150983cd24fb0d6963f7d28e17f72 9e107d9d372bb6826bd81d3542a419d6 398533d48111e9f664b1f64cb10c4b63
+SHA-1 (20): da39a3ee5e6b4b0d3255bfef95601890afd80709 a9993e364706816aba3e25717850c26c9cd0d89d 2fd4e1c67a2d28fced849ee1bb76e7391b93eb12 c3efa690fa3fdd2e2526853eed670538ea127638
+SHA-224 (28): d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f 23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7 730e109bd7a8a32b1cb9d9a09aa2325d2430587ddbc0c38bad911525 3fd1f1f34b2c22d0ca7f496aa180079401d28c7d9dd96dff5ce4d05c
+SHA-256 (32): e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592 44f8354494a5ba03ba1792a8d3e9c534c47a9181980fde7a3f44b06ef2ae7c7f
+SHA-384 (48): 38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7 ca737f1014a48f4c0b6dd43cb177b0afd9e5169367544c494011e3317dbf9a509cb1e5dc1e85a941bbee3d7f2afbc9b1 f096805600f4ca46f56b08074af11e7ec1da65cc3a66457c11ae0724d0c2e3912428dbc43d4ebc1cd0d7886109b07580
+SHA-512 (64): cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f 07e547d9586f6a73f73fbac0435ed76951218fb7d0c8d788a309d785436bbb642e93a252a954f23912547d1e8a3b5ed6e1bfd7097821233fa0538f3db854fee6 ae13575c5d98bfa689617bb19f0f55efdd52b39397fd620bcd1fbc03fda979e6b69bfba24698176eafe766d31c48b70273b03198064323082e04cc4eb9126310
+SHA-512/224 (28): 6ed0dd02806fa89e25de060c19d3ac86cabb87d6a0ddd05c333b84f4 4634270f707b6a54daae7530460842e20e37ed265ceee9a43e8924aa 944cd2847fb54558d4775db0485a50003111c8e5daa63fe722c6aa37 9777c8a407b036cecd08c42d223d4026a0229d159943409c5374cd13
+SHA-512/256 (32): c672b8d1ef56ed28ab87c3622c5114069bdd3ad7b8f9737498d0c01ecef0967a 53048e2681941ef99b2e29b76b4c7dabe4c2d0c634fc6d46e0e2f13107e7af23 dd9d67b371519c339ed8dbd25af90e976a1eeefd4ad3d889005e532fc5bef04d 906942b77a1b72ae432c5b080a07af6a8f382f49f56abb935e24811a15285acf
+md5 -> md5 16 900150983cd24fb0d6963f7d28e17f72
+SHA -> SHA 20 a9993e364706816aba3e25717850c26c9cd0d89d
+sha1 -> sha1 20 a9993e364706816aba3e25717850c26c9cd0d89d
+SHA256 -> SHA256 32 ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+sha512/256 -> sha512/256 32 53048e2681941ef99b2e29b76b4c7dabe4c2d0c634fc6d46e0e2f13107e7af23
+OID.2.16.840.1.101.3.4.2.1 -> OID.2.16.840.1.101.3.4.2.1 32 ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+1.3.14.3.2.26 -> 1.3.14.3.2.26 20 a9993e364706816aba3e25717850c26c9cd0d89d
+FOO: java.security.NoSuchAlgorithmException: FOO MessageDigest not available
+null: java.lang.NullPointerException: null algorithm name
+provider: SHA-256
+SHA-256 Message Digest from SUN, <initialized>
+SHA-256 Message Digest from SUN, <in progress>
+SHA-256 Message Digest from SUN, <in progress>
+d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592
+SHA-256 Message Digest from SUN, <initialized>
+66163cdaaaad4fa4f7f5e385778d100965f3c2c8653974033badac8caf1958d5
+ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+direct buffer: ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad remaining 0
+into a buffer: 32 ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+short buffer: java.security.DigestException: Length must be at least 32 for SHA-256digests
+small buffer: java.lang.IllegalArgumentException: Output buffer too small for specified offset and length
+update past the end: java.lang.IllegalArgumentException: Input buffer too short
+true
+false true false false
+pieces: true
+digest input: e15ceef7ec1bc5c25959ef60f25d2309
+digest output: 666bbf96690dac9702a90cc3ee42d17a34ba59ab hello, wworld
+XOR Message Digest from (no provider), <initialized>
+60 0
+clone: java.lang.CloneNotSupportedException
+HmacSHA256 RAW 6b6579 -92943760
+true
+false
+323334
+empty key: java.lang.IllegalArgumentException: Empty key
+null key: java.lang.IllegalArgumentException: Missing argument
+HmacMD5 16: 80070713463e7749b90c2dc24911e275 9bf785629eae94112dad3d2d9162dae6
+HmacSHA1 20: de7c9b85b8b78aa6bc8a7a36f70a90701c9db4d9 69bc8db56eadff85feed9183c1a2318137f1c4b5
+HmacSHA224 28: 88ff8b54675d39b8f72322e65ff945c52d96379988ada25639747e69 5d77948925e3b0d56e9cdafb03e73b390fa42c40363fd69c02009491
+HmacSHA256 32: f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8 86522d64cfd7d3d21199f47288e74cdc22a6395aff54f0270c7feef1d0fa61bf
+HmacSHA384 48: d7f4727e2c0b39ae0f1e40cc96f60242d5b7801841cea6fc592c5d3e1ae50700582a96cf35e1e554995fe4e03381c237 b9a3334e3066de072fc10e1c479ce734cad0397af77f7c6d20f4c74f2aa189c36a56dccfb98469445cfbe5b86e2251fc
+HmacSHA512 64: b42af09057bac1e2d41708e48a902e09b5ff7f12ab428a4fe86653c73dd248fb82f948a549f7b791a5b41915ee4d1ec3935357e4e2317250d0372afa2ebeeb3a 2ec850d56a434619da67d65f350b4a2caad666d274cf844ee9ac03f73e14d2012bc00387fc44ee2404aa91155181ae98ee75b0497788ca045997ef2462e82f91
+HmacSHA512/224 28: a1afb4f708cb63570639195121785ada3dc615989cc3c73f38e306a3 6010d04cf8e2e9b48fc9c304b9ca9556a519699e072737f167c22ec3
+HmacSHA512/256 32: 7fb65e03577da9151a1016e9c2e514d4d48842857f13927f348588173dca6d89 20515a29728b15d2e20c9dd0042b3d3c04213755d67e80176e8967fad45d2a80
+hmacsha256 32: f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8 86522d64cfd7d3d21199f47288e74cdc22a6395aff54f0270c7feef1d0fa61bf
+Foo: java.security.NoSuchAlgorithmException: Algorithm Foo not available
+32
+not initialized: java.lang.IllegalStateException: MAC not initialized
+update not initialized: java.lang.IllegalStateException: MAC not initialized
+null key: java.security.InvalidKeyException: Secret key expected
+f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8
+f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8
+0000000000000000f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8
+short output: javax.crypto.ShortBufferException: Cannot store MAC in output buffer
+bad arguments: java.lang.IllegalArgumentException: Bad arguments
+f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8
+NativePRNG
+distinct: true
+ints in range: true
+doubles in range: true
+seed: 7 3
+SHA1PRNG: SHA1PRNG
+NativePRNG: NativePRNG
+DRBG: DRBG
+NativePRNGNonBlocking: NativePRNGNonBlocking
+foo: java.security.NoSuchAlgorithmException: foo SecureRandom not available
+NativePRNGBlocking
+true
+true
+00017f80ff2a
+uppercase: false, delimiter: "", prefix: "", suffix: ""
+uppercase: true, delimiter: ", ", prefix: "#", suffix: ";"
+#00;, #01;, #7F;, #80;, #FF;, #2A;
+#01;, #7F;, #80;
+> #00;, #01;, #7F;, #80;, #FF;, #2A;
+[0, 1, 127, -128, -1, 42]
+[0, -1, 127, -128]
+[1, 2]
+[-85, -51, -17]
+0
+odd: java.lang.IllegalArgumentException: string length not even: 3
+bad digit: java.lang.NumberFormatException: not a hexadecimal digit: "z" = 122
+missing delimiter: java.lang.IllegalArgumentException: extra or missing delimiters or values consisting of prefix, two hexadecimal digits, and suffix
+wrong delimiter: java.lang.IllegalArgumentException: found: "-", expected: ":", index: 2 ch: 45
+2a 0041 fffe
+0000cafe FFFFFFFFFFFFFFFF 234
+ab 07
+true false 11
+2147483647 -1 18
+-1 4886718345
+too long: java.lang.IllegalArgumentException: string length greater than 8: 9
+not hex: java.lang.NumberFormatException: not a hexadecimal digit: "q" = 113
+true false true
+true
+,  # ; true false

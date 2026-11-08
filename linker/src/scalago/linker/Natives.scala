@@ -632,10 +632,20 @@ object Natives:
   utilStatic(Objects, "requireNonNull(Ljava.lang.Object;)Ljava.lang.Object;")(as => s"rt.RequireNonNull(${as.head}, nil)")
   utilStaticFn(Objects, "requireNonNull(Ljava.lang.Object;Ljava.lang.String;)Ljava.lang.Object;", "rt.RequireNonNull")
 
-  // java.util.UUID's native side (javalib/src/scalago/runtime/Crypto.scala).
+  // java.util.UUID, java.security and javax.crypto's native side (javalib/src/scalago/runtime/Crypto.scala).
   private val Crypto = "scalago.runtime.Crypto$"
-  staticFn(Crypto, "secureRandomBytes(I)[B", "rt.SecureRandomBytes")
-  staticFn(Crypto, "md5([B)[B", "rt.MD5")
+  for (desc, fn) <- List(
+      "secureRandomBytes(I)[B" -> "rt.SecureRandomBytes",
+      "md5([B)[B" -> "rt.MD5",
+      "newDigest(Ljava.lang.String;)Ljava.lang.Object;" -> "rt.CryptoNewDigest",
+      "newMac(Ljava.lang.String;[B)Ljava.lang.Object;" -> "rt.CryptoNewMac",
+      "update(Ljava.lang.Object;[BII)V" -> "rt.CryptoUpdate",
+      "digest(Ljava.lang.Object;)[B" -> "rt.CryptoDigest",
+      "reset(Ljava.lang.Object;)V" -> "rt.CryptoReset",
+      "digestLength(Ljava.lang.Object;)I" -> "rt.CryptoDigestLength",
+      "copy(Ljava.lang.Object;)Ljava.lang.Object;" -> "rt.CryptoClone"
+    )
+  do staticFn(Crypto, desc, fn)
 
   // ---- Scala library --------------------------------------------------------------------------
 

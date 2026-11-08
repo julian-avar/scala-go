@@ -1,14 +1,10 @@
 package rt
 
-import (
-	"crypto/md5"
-	"crypto/rand"
-	"slices"
-)
+import "slices"
 
 // Natives for java.util: java.util.Arrays on primitive arrays (and the copying, filling,
-// comparison and hashing of object arrays), java.util.Objects, and UUID's cryptography. The rest
-// of java.util is javalib (javalib/src/java/util).
+// comparison and hashing of object arrays) and java.util.Objects. The rest of java.util is
+// javalib (javalib/src/java/util); UUID's cryptography is in crypto.go.
 
 // ---- java.util.Arrays -----------------------------------------------------------------------
 
@@ -232,19 +228,4 @@ func RequireNonNull(x any, message *String) any {
 		ThrowKind(NullPointer, msg)
 	}
 	return x
-}
-
-// ---- java.util.UUID (scalago.runtime.Crypto) ------------------------------------------------
-
-func SecureRandomBytes(n int32) *Array[int8] {
-	buf := make([]byte, n)
-	if _, err := rand.Read(buf); err != nil {
-		panic(err)
-	}
-	return ArrayOfSlice(Reinterpret[byte, int8](buf))
-}
-
-func MD5(data *Array[int8]) *Array[int8] {
-	sum := md5.Sum(Reinterpret[int8, byte](data.Data))
-	return ArrayOfSlice(Reinterpret[byte, int8](sum[:]))
 }
