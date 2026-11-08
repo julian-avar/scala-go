@@ -1105,15 +1105,15 @@ types](#go-data-in-scala), [exports and library builds](#exports-and-library-bui
 | ES module output, module splitting        | library builds: a Go package other Go code imports        |
 | ScalablyTyped (facades generated from .d.ts) | facades generated from Go packages (`goapi`)           |
 
-### In progress
+### Done since: Go libraries
 
-- **Facades of dependencies reused:** a module's generated facades use the facade types that its
-  dependencies already have (`scalago-gostd`'s `io.Reader`), instead of generating their own.
-- **`go"..."`**, an interpolator for `GoString` literals.
-- **Examples with gin and agilira/argus**, and the interop fixes they need.
-- **A documentation site** (Scaladoc) with the user documentation.
-- **A specification** of Scala's semantics on Go, the runtime's semantics and the data
-  representation.
+Generated facades cover idiomatic Go libraries (func types as Scala functions, conversions to
+named types, composite literals of named maps and slices, interface-constrained generics, the
+types of other packages) and reuse the facades of dependencies (`scalago-gostd`'s); Go structs
+pass to Go interfaces as Go code passes them; `GoData` converts Scala data for reflective Go
+code; `go"..."` writes `GoString`s. `examples/` has bubbletea, gin and argus applications. The
+user documentation is a Scaladoc site (`mill docs.site`), with a specification
+(`docs/_docs/spec/`).
 
 ### Missing
 
@@ -1121,6 +1121,25 @@ Ordered by priority: what keeps users from adopting scala-go first. Sizes are ro
 few hundred lines in one place, **M** a new subsystem or a port of a few thousand lines, **L**
 several subsystems. Library gaps were found by running programs and by scanning the bytecode of
 popular libraries' JVM jars for JDK classes javalib lacks (reachability may avoid some).
+
+#### Known bugs
+
+Deviations from the JVM found by running the same programs on both while writing the
+specification (`docs/_docs/spec/`), where it marks them **Deviation (bug)**. All are small (S).
+
+| Bug | Where |
+|-----|-------|
+| `a * b + c` on `Double`s is fused into one multiply-add on arm64 (and amd64 with `GOAMD64=v3`), rounding once instead of twice | `FunctionEmitter`: wrap products in explicit `float64(...)`/`float32(...)` conversions |
+| `Math.round(0.49999999999999994)` is 1 (JVM 0); `round` of large odd doubles is off by one | `rt.MathRound` (`floor(d + 0.5)`) |
+| `(16777217L: Any) == (16777216f: Any)` is false (JVM true: compared as `Float`) | `rt.Equals` |
+| `(1: Any) == BigInt(1)` is false (JVM true via `ScalaNumber`) | `rt.Equals` ignores a `ScalaNumber` on the right |
+| `asInstanceOf[Integer]` of a `String` does not throw | `LinkContext.castTo`: pointer source, `any` target |
+| Uncaught exceptions in `main` skip `Thread.setDefaultUncaughtExceptionHandler` | `rt.RunMain` |
+| `NonFatal(StackOverflowError())` is true: no `VirtualMachineError` | javalib |
+| An object whose initializer throws gives no `ExceptionInInitializerError`, and the later `NoClassDefFoundError` has no cause | javalib, module initialization |
+| `System.gc()` is a link error (`Runtime.gc()` works) | javalib |
+| `getSimpleName` of a local class is `""` | `rt.ClassGetSimpleName` |
+| `try throw e finally return x` generates code `go vet` rejects (unreachable code) | `FunctionEmitter` |
 
 #### 1. Usable outside this repository
 
