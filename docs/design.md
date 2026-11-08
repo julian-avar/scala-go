@@ -133,14 +133,21 @@ published with the full Scala version as suffix.
 | class `C`                        | struct `S_C` embedding the superclass's struct (root classes embed `rt.ObjectHeader`, which holds the monitor) |
 | reference of static type `C`     | interface `C_C`: embeds parents' interfaces, lists the methods called on `C` receivers |
 | trait `T`                        | interface `C_T`, with a marker method `I_T()`                   |
-| method body                      | free function `Impl_C_m(this C_C, ...)`                         |
+| method body                      | free function `Impl_C_m(this C_C, ...)` (`this *S_D` if only class `D` can be `this`) |
 | virtual method                   | forwarding method on each instantiated struct                   |
-| `object O`                       | singleton `Mod_O_S()`, constructed on first use under an `rt.InitLock` |
+| `object O`                       | singleton `Mod_O_S()` (a `*S_O_S`), constructed on first use under an `rt.InitLock` |
 | `@static` fields, `<clinit>`     | package variables, plus `Clinit_C()`, run once under an `rt.InitLock` |
 | `@volatile` field                | `sync/atomic` value (`rt.VolatileInt32`, ...) or `rt.Volatile[T]` for references |
 
 - **Calls through `this` stay virtual.** Method bodies take `this` as an interface, so calls on it
   stay virtual even in inherited code. Go's struct embedding alone cannot do that.
+- **Exact receivers.** When only one instantiated class `D` is or extends `C` (objects, lambdas,
+  case classes and other leaves, traits with one implementation), `C`'s method bodies take
+  `this` as `*S_D` (`LinkContext.exactReceiver`): field accesses and calls on `this` are then
+  static Go calls, which Go inlines. Super and private calls convert their receiver with an
+  `Exact_D` helper (only null can fail it: an NPE). Object accessors return the struct pointer
+  too, so calls on objects are static. Together these made allocation- and call-heavy
+  benchmarks 15–40% faster.
 - **Forwarders.** An instantiated class gets a forwarding Go method for each method its
   ancestors' interfaces declare, plus each method called without a static class (through
   dispatchers, by Go code or the runtime), with the implementation the vtable resolves,

@@ -67,6 +67,35 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
       .filter((m, _) => untypedMethods.contains(m) || fromInterfaces.contains(m))
       .sortBy(_._1.descriptor)
 
+  // ---- Exact receivers ----------------------------------------------------------------------------
+
+  /** For each class, the instantiated classes that are it or extend it. */
+  private lazy val instantiatedSubclasses: Map[ClassName, Set[ClassName]] =
+    analyzer.instantiated.toList.flatMap(c => (program.ancestors(c) + c).map(_ -> c)).groupMap(_._1)(_._2)
+      .view.mapValues(_.toSet).toMap
+
+  /** The class of every `this` in `cls`'s method bodies, if only one class can be: the only
+   *  instantiated class that is `cls` or extends it (objects, lambdas, final and leaf classes,
+   *  traits with one implementation). Those bodies take `this` as that class's struct pointer
+   *  instead of an interface, so field accesses and calls on `this` are static Go calls, which
+   *  Go inlines. Types that strings, boxes or arrays implement never qualify.
+   */
+  def exactReceiver(cls: ClassName): Option[ClassName] =
+    if Hijacked.hijackedAncestors(cls) || Hijacked.isHijacked(cls) || program.isFacade(cls) then None
+    else instantiatedSubclasses.get(cls).filter(_.size == 1).map(_.head)
+
+  /** The Go type of `this` in `cls`'s method bodies. */
+  def thisGoType(cls: ClassName): String =
+    exactReceiver(cls).fold(goType(Type.Class(cls)))(d => s"*${Mangling.struct(d)}")
+
+  /** Classes whose `Exact_<class>` helper (in support.go) converts receivers to their struct. */
+  val exactReceiverConversions = mutable.LinkedHashSet.empty[ClassName]
+
+  /** Converts a receiver `e` (any reference) for a method body whose `this` is exactly `cls`. */
+  def toExactReceiver(cls: ClassName, e: String): String =
+    exactReceiverConversions += cls
+    s"${Mangling.exactReceiver(cls)}($e)"
+
   /** Whether references of type `cls` are typed with its generated interface (rather than `any`). */
   def hasInterfaceType(cls: ClassName): Boolean =
     declared(cls) && !Hijacked.hijackedAncestors(cls) && !Hijacked.isHijacked(cls)

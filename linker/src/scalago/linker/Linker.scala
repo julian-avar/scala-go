@@ -280,6 +280,18 @@ object Linker:
       line("}")
     if ctx.ifaceCasts.nonEmpty || ctx.ifaceTests.nonEmpty then line()
 
+    for cls <- ctx.exactReceiverConversions.toList.sorted do
+      val struct = Mangling.struct(cls)
+      line(s"func ${Mangling.exactReceiver(cls)}(x any) *$struct {")
+      line(s"\tif p, ok := x.(*$struct); ok && p != nil {")
+      line("\t\treturn p")
+      line("\t}")
+      line("\t// Only null gets here: every instance of the class is a " + struct + ".")
+      line("\trt.ThrowKind(rt.NullPointer, \"\")")
+      line("\treturn nil")
+      line("}")
+    if ctx.exactReceiverConversions.nonEmpty then line()
+
     // Before the type tests below: these add to them.
     for cls <- ctx.checkedCasts.toList.sorted do
       line(s"func ${Mangling.checkedCast(cls)}(x any) any {")

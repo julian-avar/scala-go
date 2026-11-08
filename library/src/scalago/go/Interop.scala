@@ -55,7 +55,7 @@ final class GoImport(path: String, name: String = "") extends StaticAnnotation
  *  methods. Go names are the Scala names capitalized, unless `name` is given:
  *  {{{
  *  object Api:
- *    @GoExport def greet(name: String): String = s"Hello, $name"   // func Greet(name string) string
+ *    @GoExport def greet(name: String): String = s"Hello, \$name"   // func Greet(name string) string
  *
  *  @GoExport class Counter(start: Int):                            // type Counter interface { ... }
  *    private var n = start                                         // func NewCounter(start int32) Counter

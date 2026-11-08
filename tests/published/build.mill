@@ -1,0 +1,13 @@
+//| mill-version: 1.1.8
+//| mvnDeps: ["io.github.scalago:mill-scalago_mill1_3:0.1.0-SNAPSHOT"]
+package build
+
+import mill.*, scalalib.*
+import scalago.mill.ScalaGoModule
+
+object app extends ScalaGoModule {
+  def mvnDeps = Seq(
+    mvn"com.lihaoyi::upickle:4.4.1",
+    mvn"io.github.scalago::scalago-gostd:${scalaGoVersion()}"
+  )
+}

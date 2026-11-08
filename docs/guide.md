@@ -96,11 +96,21 @@ Main.scala:21:35: static method java.time.LocalDate.of(III)... is not available
 
 ## Performance
 
-Generated code is a native binary that starts in a few milliseconds and needs no JVM. Numeric
-loops run as fast as on a warmed-up JVM, and exceptions are cheaper. Code that allocates a lot
-of short-lived objects (immutable collections, boxed values, closures) is typically 2 to 6 times
-slower than a warmed-up JVM: Go's garbage collector is not generational, and virtual calls go
-through Go interfaces. `mill bench.run` and `mill bench.goRun` in this repository compare them.
+Generated code is a native binary that starts in a few milliseconds, with no JVM and no warm-up.
+Against a fully warmed-up JVM (`mill bench.run 3` and `mill bench.goRun 3` in this repository,
+third round; amd64):
+
+| Code                                                         | Go time / JVM time |
+|--------------------------------------------------------------|--------------------|
+| virtual calls, exceptions                                    | 0.5–0.8            |
+| numeric loops, strings, closures, mutable collections, `synchronized` | 1.6–3     |
+| boxed streams, immutable collections, `java.time` arithmetic | 4–7                |
+| allocation-heavy recursion, primitive and collector streams  | 10–13              |
+| `DateTimeFormatter` parsing                                  | about 25           |
+
+The JIT inlines across calls and removes short-lived allocations; Go's compiler cannot do that
+across Go interfaces, and Go's garbage collector is not generational. A JVM before warm-up (the
+first seconds of any program, and all of a short-lived one) is much closer to Go, or slower.
 
 Tuning:
 

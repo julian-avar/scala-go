@@ -118,7 +118,9 @@ final class ClassEmitter(ctx: LinkContext, cls: ClassDef):
     line(s"var $v *$struct")
     line(s"var $lock rt.InitLock")
     line()
-    line(s"func ${Mangling.module(name)}() ${ctx.goType(Type.Class(name))} {")
+    // The struct pointer, not the interface: calls on an object are static Go calls, which Go
+    // can inline.
+    line(s"func ${Mangling.module(name)}() *$struct {")
     line(s"\tif !$lock.Done() {")
     line(s"\t\t$lock.Run(${FunctionEmitter.goStringLiteral(name)}, func() {")
     if analyzer.staticInit.contains(name) then line(s"\t\t\t${Mangling.clinit(name)}()")
@@ -144,7 +146,7 @@ final class ClassEmitter(ctx: LinkContext, cls: ClassDef):
     line()
 
   private def emitImplementation(m: MethodDef): Unit =
-    val thisParam = if m.isStatic then Nil else List(s"this ${ctx.goType(Type.Class(name))}")
+    val thisParam = if m.isStatic then Nil else List(s"this ${ctx.thisGoType(name)}")
     val allParams = (thisParam ++ paramDecls(m)).mkString(", ")
     val header = s"func ${Mangling.impl(name, m.name)}($allParams)${resultDecl(m.name)} {"
     val body = FunctionEmitter(ctx, cls, m).emitBody(analyzer.body(name, m.name))
