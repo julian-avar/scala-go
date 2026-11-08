@@ -4,3 +4,10 @@ héllo, wörld!
 104
 true
 0
+héllo, wörld
+true
+2
+true
+Zebra apple fig pear äpfel
+-1 1 0
+5

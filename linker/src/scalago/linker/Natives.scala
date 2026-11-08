@@ -927,6 +927,7 @@ object Natives:
     s"any(${goStr(as(0))} + ${goStr(as(1))})"
   )
   static(GoString, "sameAs(Ljava.lang.Object;Ljava.lang.Object;)Z")(as => s"(${goStr(as(0))} == ${goStr(as(1))})")
+  static(GoString, "compareBytes(Ljava.lang.Object;Ljava.lang.Object;)I")(as => s"rt.GoStringCompare(${goStr(as(0))}, ${goStr(as(1))})")
 
   // Go slices, maps, channels and pointers (library/src/scalago/go/internal/GoNatives.scala).
   private val GoNatives = "scalago.go.internal.GoNatives$"

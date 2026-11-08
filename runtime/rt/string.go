@@ -67,6 +67,9 @@ func decodeUTF16(chars []uint16) string {
 	return unsafe.String(unsafe.SliceData(buf), len(buf))
 }
 
+// GoStringCompare implements scalago.go.GoString's Ordering: -1, 0 or 1, by bytes.
+func GoStringCompare(a, b string) int32 { return int32(strings.Compare(a, b)) }
+
 // String implements fmt.Stringer.
 func (s *String) String() string { return s.GoString() }
 
