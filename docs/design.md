@@ -723,8 +723,11 @@ generated code are goroutine-safe, with the JVM's guarantees where Scala code re
   and uncaught-exception handlers work. Every thread is goroutine-backed, so virtual threads are
   threads like the others (daemons, unnamed by default, `isVirtual`), and Go's scheduler
   multiplexes all of them. A goroutine that did not start as a `Thread` (the main goroutine, or
-  one started by Go code) gets a `Thread` object the first time it asks for one; that object
-  stays registered as long as the program runs. `Thread.currentThread` is a lookup by goroutine
+  one started by Go code) gets a `Thread` object the first time it asks for one, and keeps it
+  for as long as the goroutine runs. Go does not tell when a goroutine ends, so when the number
+  of such `Thread`s doubles, the runtime drops those of ended goroutines (from a full stack
+  dump's goroutine ids, which are never reused): a Go server calling Scala code from a goroutine
+  per request does not accumulate them. `Thread.currentThread` is a lookup by goroutine
   id, through a direct-mapped cache (an atomic load and a comparison). As on the JVM, `Main()`
   waits for the non-daemon threads before returning, and an exception in a thread is reported
   (`Exception in thread "name" ...`) without ending the program.
@@ -946,8 +949,7 @@ Known gaps:
   archives, encrypted zip entries, `java.util.jar`'s `JarFile`/`JarInputStream`.
 - Concurrency: the atomic field updaters (`AtomicIntegerFieldUpdater`, ... need reflection),
   `SubmissionPublisher`, thread groups beyond names and handlers (`activeCount`, `enumerate`),
-  `Thread.getAllStackTraces`. Goroutines started by Go code that ask for their `Thread` (directly,
-  or through a lock or a thread local) keep it registered after they end.
+  `Thread.getAllStackTraces`.
 
 When reachable code uses something missing, linking fails with a "called from" chain naming
 the API. Reachability over-approximates what runs (virtual calls are resolved by name), so a

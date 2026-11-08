@@ -15,6 +15,7 @@ import (
 // threadState is the native side of a java.lang.Thread object, which holds it (NewThreadState).
 type threadState struct {
 	thread      any
+	started     bool          // started as a Thread (not attached to a goroutine Go started)
 	goroutine   atomic.Uint64 // the goroutine running it, 0 before it runs
 	interrupted atomic.Bool
 	wake        chan struct{} // signaled (without blocking) by interrupt
@@ -108,6 +109,7 @@ func StartThread(state any, daemon bool, run func(thread any)) {
 		liveMu.Unlock()
 	}
 	running.Add(1)
+	t.started = true
 	go func() {
 		g := GoID()
 		bindThread(g, t)
@@ -134,8 +136,81 @@ func CurrentThread() any {
 	return nil
 }
 
-// AttachThread makes the Thread whose state is given the current goroutine's Thread.
-func AttachThread(state any) { bindThread(GoID(), state.(*threadState)) }
+// AttachThread makes the Thread whose state is given the current goroutine's Thread: the main
+// goroutine's, or that of a goroutine started by Go code (which called Scala code that asked for
+// it, directly or through a lock or a thread local).
+func AttachThread(state any) {
+	bindThread(GoID(), state.(*threadState))
+	if attached.Add(1) > attachedLimit.Load() {
+		sweepAttached()
+	}
+}
+
+// Goroutines started by Go code have no end the runtime is told about: a server calling Scala
+// code from a goroutine per request would otherwise keep a Thread registered for each. When the
+// number of attached Threads doubles, the registrations of goroutines that have ended are
+// removed (goroutine ids are never reused). Started Threads unbind themselves when they end.
+var (
+	attached      atomic.Int64 // attached Threads registered since the last sweep, plus survivors
+	attachedLimit atomic.Int64
+	sweepMu       sync.Mutex
+)
+
+const minAttachedLimit = 1024
+
+func init() { attachedLimit.Store(minAttachedLimit) }
+
+func sweepAttached() {
+	if !sweepMu.TryLock() {
+		return // another goroutine is sweeping
+	}
+	defer sweepMu.Unlock()
+	live := liveGoroutines()
+	var survivors int64
+	byGoroutine.Range(func(key, value any) bool {
+		g, t := key.(uint64), value.(*threadState)
+		switch {
+		case t.started:
+		case live[g]:
+			survivors++
+		default:
+			unbindThread(g, t)
+		}
+		return true
+	})
+	attached.Store(survivors)
+	attachedLimit.Store(max(minAttachedLimit, 2*survivors))
+}
+
+// liveGoroutines returns the ids of the goroutines that exist (from the headers of a full stack
+// dump, "goroutine 18 [running]:").
+func liveGoroutines() map[uint64]bool {
+	buf := make([]byte, 1<<20)
+	for {
+		n := runtime.Stack(buf, true)
+		if n < len(buf) {
+			buf = buf[:n]
+			break
+		}
+		buf = make([]byte, 2*len(buf))
+	}
+	live := map[uint64]bool{}
+	const header = "goroutine "
+	for i := 0; i+len(header) <= len(buf); {
+		if string(buf[i:i+len(header)]) == header && (i == 0 || buf[i-1] == '\n') {
+			var id uint64
+			j := i + len(header)
+			for ; j < len(buf) && buf[j] >= '0' && buf[j] <= '9'; j++ {
+				id = id*10 + uint64(buf[j]-'0')
+			}
+			live[id] = true
+			i = j
+			continue
+		}
+		i++
+	}
+	return live
+}
 
 func IsMainGoroutine() bool { return GoID() == mainGoroutine.Load() }
 

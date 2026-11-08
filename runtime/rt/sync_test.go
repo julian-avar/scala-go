@@ -179,3 +179,45 @@ func TestInterruptSleep(t *testing.T) {
 		t.Fatal("sleep not interrupted")
 	}
 }
+
+// Threads attached to goroutines started by Go code are dropped once those goroutines end.
+func TestAttachedThreadsOfEndedGoroutinesAreSwept(t *testing.T) {
+	var wg sync.WaitGroup
+	for i := 0; i < 3*minAttachedLimit; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			AttachThread(NewThreadState(i))
+		}()
+	}
+	wg.Wait()
+	sweepAttached()
+	n := 0
+	byGoroutine.Range(func(_, value any) bool {
+		if !value.(*threadState).started {
+			n++
+		}
+		return true
+	})
+	if n > 1 { // at most the test goroutine's own, if it has one
+		t.Errorf("%d threads of ended goroutines are still registered", n)
+	}
+	// A live goroutine keeps its Thread.
+	done, release := make(chan struct{}), make(chan struct{})
+	go func() {
+		AttachThread(NewThreadState("live"))
+		close(done)
+		<-release
+	}()
+	<-done
+	sweepAttached()
+	found := false
+	byGoroutine.Range(func(_, value any) bool {
+		found = found || value.(*threadState).thread == "live"
+		return true
+	})
+	close(release)
+	if !found {
+		t.Error("the Thread of a live goroutine was dropped")
+	}
+}
