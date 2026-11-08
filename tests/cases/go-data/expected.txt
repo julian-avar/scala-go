@@ -15,3 +15,7 @@ trySend: true true false
 buffered: length=2 capacity=2 first=Some(a)
 pointer: 3.0
 zero: 0
+data: TreeMap(bytes -> Vector(1, 2), char -> c, flag -> true, points -> Vector(TreeMap(label -> a, tags -> Vector(t), x -> 1, y -> 2), TreeMap(label -> null, tags -> Vector(), x -> 3, y -> 4)), shapes -> Vector(TreeMap(radius -> 1.5), Dot))
+map: size=2 a=Vector(x) b=2
+typed slice: Vector(1, 2)
+as is: Point(0,0,None,Set()) null null

@@ -86,6 +86,12 @@ object GoInterop:
           (prefix, name.stripPrefix(prefix).toInt)
       }
 
+  /** A pair type `(K, V)`: its element types. */
+  private object Pair:
+    def unapply(s: ScalaType): Option[(ScalaType, ScalaType)] = s match
+      case ScalaType.Ref("scala.Tuple2", List(k, v)) => Some((k, v))
+      case _                                         => None
+
   private val integerBasics = Set("int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64",
     "uintptr", "byte", "rune")
   private val numericBasics = integerBasics ++ Set("float32", "float64")
@@ -265,7 +271,8 @@ final class GoInterop(ctx: LinkContext):
     case (Ref(t, _), _) if GoValueTypes(t) && t != GoStringType =>
       checkCanonical(s, g)
       s"rt.ConvertGo[${typeString(g)}]($e)"
-    case (Arr(se), GoType.Slice(ge))                 => sliceToGo(e, se, ge)
+    case (Arr(Pair(_, _)) | Ref(SeqClass, List(Pair(_, _))), m: GoType.MapOf) => pairsToGo(e, s, m)
+    case (Arr(se), GoType.Slice(ge))                  => sliceToGo(e, se, ge)
     case (Ref(SeqClass, List(se)), GoType.Slice(ge)) => seqToGo(e, se, ge)
     case (Ref(Arity("scala.Function", _), args), GoType.Func(sig)) => funcToGo(e, args, sig)
     case (Prim(p), GoType.EmptyInterface) if p.isPrimitive => s"any($e)"
@@ -297,7 +304,24 @@ final class GoInterop(ctx: LinkContext):
     s"func($s any) []$goT { $out := make([]$goT, ${ctx.dispatcher(SeqLength)}($s)); " +
       s"for $i := range $out { $out[$i] = ${toGo(elem, se, ge)} }; return $out }($e)"
 
-  /** A Scala function as a Go func: calls `apply` on it, converting arguments and result. */
+  /** Key-value pairs (`Seq[(K, V)]`, `Array[(K, V)]`, varargs) as a new Go map, as Go's composite
+   *  literals of map types (`gin.H{"k": v}` is `gin.H("k" -> v)`). A later pair wins.
+   */
+  private def pairsToGo(e: String, s: ScalaType, g: GoType.MapOf): String =
+    // The pairs as a Go []any first.
+    val (sk, sv, pairs) = s match
+      case Arr(p @ Pair(k, v))                  => (k, v, sliceToGo(e, p, GoType.EmptyInterface))
+      case Ref(SeqClass, List(p @ Pair(k, v))) => (k, v, seqToGo(e, p, GoType.EmptyInterface))
+      case _                                    => fail(s"cannot pass Scala type $s as Go type $g")
+    val (m, p) = (fresh("m"), fresh("p"))
+    def element(i: Int, t: ScalaType) = ctx.cast(s"${ctx.dispatcher(TupleElement(i))}($p)", Type.Object, erased(t))
+    val goMap = typeString(g)
+    s"func(pairs []any) $goMap { $m := make($goMap, len(pairs)); for _, $p := range pairs { " +
+      s"$m[${toGo(element(1, sk), sk, g.key)}] = ${toGo(element(2, sv), sv, g.value)} }; return $m }($pairs)"
+
+  /** A Scala function as a Go func: calls `apply` on it, converting arguments and results (see
+   *  `goResults`).
+   */
   private def funcToGo(e: String, args: List[ScalaType], sig: GoSignature): String =
     if sig.variadic || sig.generic then fail(s"variadic or generic Go func types are not supported")
     if sig.params.size != args.size - 1 then
@@ -307,13 +331,27 @@ final class GoInterop(ctx: LinkContext):
     val apply = ctx.dispatcher(MethodName("apply", List.fill(names.size)(Type.Object), Type.Object))
     val scalaArgs = names.zip(sig.params).zip(args.init).map { case ((p, g), s) => boxed(fromGo(p, g, s), s) }
     val call = s"$apply(${(f :: scalaArgs).mkString(", ")})"
-    val body = sig.results match
-      case Nil       => call
-      case List(res) => s"return ${toGo(ctx.cast(call, Type.Object, erased(args.last)), args.last, res)}"
-      case _         => fail("Go func types with several results are not supported")
-    val funcType = s"func${signatureString(sig, None)}"
-    s"func($f any) $funcType { if $f == nil { return nil }; return func${signatureString(sig, Some(names))} " +
+    val (resultList, body) = goResults(call, ctx.cast(_, Type.Object, erased(args.last)), args.last, sig.results)
+    val params = names.zip(sig.params).map((n, t) => s"$n ${typeString(t)}").mkString(", ")
+    s"func($f any) ${typeString(GoType.Func(sig))} { if $f == nil { return nil }; return func($params)$resultList " +
       s"{ defer rt.GoCallback(); $body } }($e)"
+
+  /** The results of a Go func or method implemented by Scala code: its result list and the body
+   *  that runs `call` (a Go call of the Scala code, made of Scala type `result` by `typed`) and
+   *  returns. A trailing `error` result that `result` leaves out is the exception that the Scala
+   *  code throws (`rt.RecoverAsError`), and several other results come from a Scala tuple.
+   */
+  private def goResults(call: String, typed: String => String, result: ScalaType, rs: List[GoType]): (String, String) =
+    val errorResult = rs.lastOption.contains(GoType.Error) && result != Ref(GoErrorClass, Nil)
+    val values = if errorResult then rs.init else rs
+    val names = values.map(_ => fresh("r"))
+    val declared = names.zip(values).map((n, t) => s"$n ${typeString(t)}") ++ (if errorResult then List("err error") else Nil)
+    val assignments = values match
+      case Nil     => call
+      case List(v) => s"${names.head} = ${toGo(typed(call), result, v)}"
+      case several => tupleToGo(typed(call), result, names.zip(several))
+    val recover = if errorResult then "defer rt.RecoverAsError(&err); " else ""
+    (if declared.isEmpty then "" else declared.mkString(" (", ", ", ")"), s"$recover$assignments; return")
 
   private def boxed(e: String, s: ScalaType): String = s match
     case Prim(p) if p.isPrimitive => s"any($e)"
@@ -626,21 +664,8 @@ final class GoInterop(ctx: LinkContext):
       val names = sig.params.indices.map(_ => fresh("p")).toList
       val scalaArgs = names.zip(sig.params).zip(g.params).map { case ((p, gt), st) => fromGo(p, gt, st) }
       val callScala = s"this.${Mangling.virtualMethod(m.name)}(${scalaArgs.mkString(", ")})"
-      val rs = sig.results
-      val hasError = rs.lastOption.contains(GoType.Error)
-      val scalaReturnsError = g.result == Ref(GoErrorClass, Nil)
       val params = names.zip(sig.params).map((n, gt) => s"$n ${typeString(gt)}").mkString(", ")
-      // Scala exceptions become the error result, unless the Scala method returns the error.
-      val errorResult = hasError && !scalaReturnsError
-      val values = if errorResult then rs.init else rs
-      val resultNames = values.indices.map(_ => fresh("r")).toList
-      val resultDecl = resultNames.zip(values).map((n, gt) => s"$n ${typeString(gt)}") ++ (if errorResult then List("err error") else Nil)
-      val assignments = values match
-        case Nil       => callScala
-        case List(v)   => s"${resultNames.head} = ${toGo(callScala, g.result, v)}"
-        case several   => tupleToGo(callScala, g.result, resultNames.zip(several))
-      val recover = if errorResult then "defer rt.RecoverAsError(&err); " else ""
-      val resultList = if resultDecl.isEmpty then "" else resultDecl.mkString(" (", ", ", ")")
-      s"func (this *$struct) ${g.goName}($params)$resultList { defer rt.GoCallback(); $recover$assignments; return }"
+      val (resultList, body) = goResults(callScala, identity, g.result, sig.results)
+      s"func (this *$struct) ${g.goName}($params)$resultList { defer rt.GoCallback(); $body }"
     }
 end GoInterop

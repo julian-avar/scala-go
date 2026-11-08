@@ -1,0 +1,22 @@
+200 {"message":"pong","n":3,"nested":{"ok":true}}
+200 {"id":7,"manager":null,"name":"ana","roles":["admin","dev"]}
+403 {"error":"no"}
+201 {"admin":false,"name":"bo","tags":["x",1,2.5,null]}
+400 bad body: unexpected end of JSON input
+200 seen=yes path=/seen
+404 not found
+200 {"id":1,"m | 200 {"id":2,"m | 200 {"id":3,"m | 200 {"id":4,"m | 200 {"id":5,"m | 200 {"id":6,"m | 200 {"id":7,"m | 200 {"id":8,"m
+200 last of 2
+true
+1
+Vector(a, b)
+web.H {}
+map[string]interface {} {"id":1,"manager":"cy","name":"ana","roles":[]}
+[]interface {} [1,2,"x",1.5,"s",null,{"3":[true]}]
+map[string]interface {} {"k":[1,2]}
+errors: java.lang.IllegalStateException: broken; not found
+Vector(a, abc)
+load failed: loading bad: java.lang.IllegalArgumentException: unreadable
+11
+parse failed: bad digit '2' for base 2
+key -> value

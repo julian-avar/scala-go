@@ -25,7 +25,8 @@ import scalago.ir.{ClassName, ScalaType, Type}
  *    `GoMap[GoString, GoInt]`), so slices are shared and creating them gives the right Go type.
  *  - Go func types and interfaces without methods are type aliases (`type Cmd = () => Any`), so
  *    Scala functions and values are passed as they are; other named non-struct types get a
- *    conversion named as the type (`def Color(value: String): Color`), as in Go.
+ *    conversion named as the type (`def Color(value: String): Color`), as in Go, and named slice
+ *    and map types their composite literals too (`def H(entries: (String, Any)*): H`).
  *  - generic functions whose type parameters are constrained by interfaces take the interfaces.
  *  The types of other packages that the members use are generated too (only the types), so the
  *  facades of a package are complete without listing its dependencies. Members whose types cannot
@@ -291,15 +292,14 @@ object FacadeGen:
       case GoType.TypeParam(n)                               => no(s"type parameter $n")
       case GoType.Other(d)                                   => no(d)
 
+    /** A Go func type as a Scala function type. Its results are as a function's: a trailing
+     *  `error` is an exception (thrown by the Scala function, or by the Go func called from Scala),
+     *  several results are a tuple.
+     */
     private def function(sig: GoSignature, isResult: Boolean): SType =
       if sig.variadic || sig.generic then no("a variadic or generic func type")
       if isResult && sig.params.size > 3 then no("a returned func with more than 3 parameters")
-      val params = sig.params.map(outer(_, isResult = false))
-      val result = sig.results match
-        case Nil       => SType.prim(Type.Void)
-        case List(one) => outer(one, isResult = true)
-        case _         => no("a func type with several results")
-      SType.function(params, result)
+      SType.function(sig.params.map(outer(_, isResult = false)), results(sig.results))
 
     /** Functions whose `error` result is their value, not a failure (`errors.New`, `ctx.Err()`). */
     private def errorIsValue(name: String): Boolean =
@@ -453,12 +453,21 @@ object FacadeGen:
       sb.toString
 
     /** The conversion to a named non-struct type, as in Go (`lipgloss.Color("205")`): a method of
-     *  the package object, named as the type.
+     *  the package object, named as the type. Named slice and map types also get their composite
+     *  literals, from elements or key-value pairs (`gin.H("message" -> "pong")`).
      */
-    private def conversion(pkg: GoPackage, name: String, decl: GoTypeDecl): Option[String] =
-      decl.underlying.filter(_ => decl.kind == GoTypeKind.Other && aliasOf(pkg.path, name).isEmpty).map { u =>
-        s"def $name(value: ${outer(u, isResult = false).source}): ${named(pkg.path, name).source} = _root_.scalago.go.native"
-      }
+    private def conversions(pkg: GoPackage, name: String, decl: GoTypeDecl, skipped: mutable.ListBuffer[String]): List[String] =
+      val out = mutable.ListBuffer.empty[String]
+      for u <- decl.underlying if decl.kind == GoTypeKind.Other && aliasOf(pkg.path, name).isEmpty do
+        def define(what: String, param: => String): Unit =
+          member(s"$name ($what)", out, skipped)(s"def $name($param): ${named(pkg.path, name).source} = _root_.scalago.go.native")
+        define("conversion", s"value: ${outer(u, isResult = false).source}")
+        u match
+          case GoType.Slice(e) => define("literal", s"elems: ${SType.repeated(outer(e, isResult = false)).source}")
+          case GoType.MapOf(k, v) =>
+            define("literal", s"entries: ${SType.repeated(SType.tuple(List(outer(k, isResult = false), outer(v, isResult = false)))).source}")
+          case _ => ()
+      out.toList
 
     /** An untyped constant, typed by its value (big integers that do not fit a Long are left out). */
     private def constant(pkg: GoPackage, name: String, t: GoType): SType = t match
@@ -510,9 +519,7 @@ object FacadeGen:
         for (n, m) <- rootMembers(pkg) do m.fold(reason => skipped += s"$n ($reason)", lines += _)
       // A root package has the conversions to all its types, dependencies' ones included.
       val converted = if isRoot then pkg.types.toSeq.sortBy(_._1).filter((n, _) => facadeRef(path, n).isDefined) else types
-      for (n, d) <- converted do
-        try conversion(pkg, n, d).foreach(lines += _)
-        catch case e: Unrepresentable => skipped += s"$n (conversion) (${e.reason})"
+      for (n, d) <- converted do lines ++= conversions(pkg, n, d, skipped)
       if isRoot then
         for (n, target) <- pkg.aliases.toSeq.sortBy(_._1) if provided.typeOf(path, n).isEmpty do
           member(n, lines, skipped) {

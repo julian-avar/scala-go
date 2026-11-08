@@ -199,6 +199,31 @@ object GoNatives:
     if p == null then throw new NullPointerException()
     p.asInstanceOf[JvmPtr].value = value
 
+  // ---- Plain data (scalago.go.GoData) -----------------------------------------------------------
+
+  /** `dataKind` results: values of predeclared basic types, maps, slices and arrays. */
+  final val BasicData = 1
+  final val MapData = 2
+  final val SliceData = 3
+
+  /** What kind of Go data `x` is (`BasicData`, `MapData`, `SliceData`), or 0 for anything else. */
+  def dataKind(x: Any): Int = x match
+    case _: Array[Byte] | _: java.lang.Number | _: java.lang.Boolean | _: java.lang.Character => BasicData
+    case _: JvmMap                                                                            => MapData
+    case _: JvmSlice                                                                          => SliceData
+    case _                                                                                    => 0
+
+  /** `x` as a Go `int` (on the JVM, a `Long`). */
+  def intData(x: Long): Any = x
+
+  /** A value of a basic type as a `String`, `Long`, `Double` or `Boolean`. */
+  def basicData(x: Any): Any = x match
+    case bytes: Array[Byte]                       => new String(bytes, java.nio.charset.StandardCharsets.UTF_8)
+    case _: java.lang.Float | _: java.lang.Double => x.asInstanceOf[java.lang.Number].doubleValue
+    case n: java.lang.Number                      => n.longValue
+    case c: java.lang.Character                   => c.charValue.toLong
+    case other                                    => other
+
   // ---- Go funcs (only created by Go facades, so never on the JVM) -------------------------------
 
   private def goOnly: Nothing = throw new UnsupportedOperationException("Go funcs only exist under scala-go")
