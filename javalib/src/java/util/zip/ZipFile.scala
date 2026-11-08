@@ -10,7 +10,7 @@ import ZipEntry.*
  *  independently of each other (each from its own position), so several may be open at a time.
  *  ZIP64 sizes and offsets are read; encrypted entries are not supported.
  */
-class ZipFile(file: File, mode: Int, charset: Charset) extends AutoCloseable:
+class ZipFile(file: File, mode: Int, charset: Charset) extends java.io.Closeable:
   if (mode & ZipFile.OPEN_READ) == 0 || (mode & ~(ZipFile.OPEN_READ | ZipFile.OPEN_DELETE)) != 0 then
     throw new IllegalArgumentException("Illegal mode: 0x" + Integer.toHexString(mode))
   if charset == null then throw new NullPointerException("charset is null")
