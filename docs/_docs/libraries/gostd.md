@@ -34,6 +34,9 @@ Each package is an object of `scalago.gostd`, named as the Go package:
 The types of `io/fs`, `reflect` and `syscall` that these packages use are included too (objects
 `fs`, `reflect`, `syscall`), without their functions.
 
+[Generated facades](../interop/generated-facades.md) of other Go packages use these types when
+the module depends on `scalago-gostd`, instead of generating their own.
+
 Most programs need few of these: the JDK's own APIs (`java.nio.file`, `java.time`, ...) work
 and also run on the JVM. Go's packages are useful when you pass their values to other Go code,
 or want Go's exact behaviour. The [API documentation](scalago.gostd) lists every member.

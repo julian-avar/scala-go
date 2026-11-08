@@ -71,6 +71,8 @@ final case class Counter(n: Int) extends tea.Model:   // a Go interface, impleme
 | `examples/basics/`   | A program built with `ScalaGoModule`: `mill examples.basics.goRun Ada Grace` |
 | `examples/ecosystem/`| Popular Scala libraries compiled from TASTy (`mill examples.ecosystem.check`: JVM and Go agree) |
 | `examples/gotui/`    | A bubbletea/bubbles/lipgloss terminal app in Scala (`mill examples.gotui.goRun`; `mill examples.gotui.check`) |
+| `examples/gin/`      | A JSON API on gin (`mill examples.gin.goRun`; `mill examples.gin.check`) |
+| `examples/argus/`    | Configuration reloading with argus (`mill examples.argus.check`; needs cgo) |
 | `bench/`             | CPU benchmarks, run on the JVM (`mill bench.run`) and as Go (`mill bench.goRun`) |
 | `tests/published/`   | A project using only the published artifacts (`tests/published/check.sh` after `publishLocal`) |
 | `tests/cases/`       | End-to-end programs with their expected output                          |

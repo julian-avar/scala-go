@@ -14,7 +14,7 @@ import java.nio.charset.StandardCharsets.UTF_8
  *  import scalago.go.*
  *
  *  val name = "Grüße"
- *  val g = go"Hi $name"           // or name.toGoString, or GoString(name)
+ *  val g = go"Hi \$name"          // or name.toGoString, or GoString(name)
  *  g.byteLength                   // 10
  *  g.toJavaString                 // "Hi Grüße"
  *  g == GoString("Hi Grüße")      // true: contents are compared

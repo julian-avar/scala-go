@@ -74,4 +74,58 @@ Facades of Go libraries follow the library's Go API closely. A few rules about G
   (`tea.KeyMsg`, `lipgloss.Style`), so the library's type switches see them.
 - `new T` is Go's zero value of `T`, and `null` is `nil`.
 
-<!-- More examples of Go libraries (web servers, command-line parsing, ...) go here. -->
+## Example: a JSON API with gin
+
+[gin](https://github.com/gin-gonic/gin) (`examples/gin`, `mill examples.gin.check`):
+
+```scala sc:nocompile
+object app extends ScalaGoModule {
+  def mvnDeps = Seq(mvn"io.github.scalago::scalago-gostd:${scalaGoVersion()}")
+  def goRequires = Seq("github.com/gin-gonic/gin@v1.12.0")
+  def goFacadePackages = Seq("net/http", "github.com/gin-gonic/gin")
+}
+```
+
+```scala sc:nocompile
+val router = gin.New()
+router.Use(c => { c.Header("X-Served-By", "scala"); c.Next() })
+router.GET("/ping", c => c.JSON(http.StatusOK, gin.H("message" -> "pong")))
+val api = router.Group("/api", c =>
+  if c.GetHeader("Authorization") != "Bearer s3cret" then
+    c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H("error" -> "missing or wrong token")))
+api.GET("/todos/:id", c => store.get(c.Param("id").toLong) match
+  case Some(todo) => c.JSON(http.StatusOK, GoData(todo))   // a case class as JSON
+  case None       => c.JSON(http.StatusNotFound, gin.H("error" -> "no such todo")))
+api.POST("/todos", c =>
+  val body = GoPtr.alloc[Any]
+  c.ShouldBindJSON(body)                                    // throws GoException on bad JSON
+  GoData.toScala(body.get) match
+    case fields: Map[String, Any] @unchecked => ...)
+router.Run(":8080")
+```
+
+Scala cannot declare Go struct types, so struct tags for binding are not available: bind JSON
+into `any` as above, or parse the raw body with a Scala JSON library.
+
+## Example: configuration reloading with argus
+
+[argus](https://github.com/agilira/argus) (`examples/argus`, `mill examples.argus.check`)
+watches configuration files:
+
+```scala sc:nocompile
+val settings = argus.Setup("app")
+  .Defaults(GoData.map("server.port" -> 8080, "log.level" -> "info"))
+  .File("service.json")
+  .MaxStaleness(time.ParseDuration("100ms"))
+  .OnReload((s, change) => current.set(ServiceConfig.from(s)))   // on argus's goroutine
+  .OnError(err => println(s"rejected: ${err.Error()}"))          // the last good revision stays
+  .Start()
+```
+
+argus imports `mattn/go-sqlite3`, which needs cgo (a C compiler) for the first build.
+
+## What is left out
+
+Generated facades leave out, with a comment saying why: generic types and functions whose
+constraints have type sets (`~int | string`), unexported types in exported APIs, funcs stored in
+Go data, variadic func types, and returned funcs with more than 3 parameters.

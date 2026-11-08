@@ -26,8 +26,27 @@ as the Go package (`tea` for `github.com/charmbracelet/bubbletea`). When two pac
 same name, the objects are named after their import paths instead. The generated sources are in
 `out/<module>/goFacadeSources.dest`.
 
-For the most-used standard library packages, depend on `scalago-gostd` instead (see
-[Go standard library](../libraries/gostd.md)).
+## Reusing dependencies' facades
+
+Generated facades reuse the facades that the module's dependencies already provide, as
+ScalablyTyped reuses converted libraries. When a module depends on `scalago-gostd` (see
+[Go standard library](../libraries/gostd.md)) or on another module with facades, the Go types
+those provide are not generated again: generated members take and return the dependency's
+types, and generated types extend its interface traits. So one library's values flow into
+another's, e.g. a `scalago.gostd.strings.Reader` where bubbletea expects an `io.Reader`.
+
+```scala sc:nocompile
+object app extends ScalaGoModule {
+  def mvnDeps = Seq(mvn"io.github.scalago::scalago-gostd:${scalaGoVersion()}")
+  def goRequires = Seq("github.com/charmbracelet/bubbletea@v1.3.10")
+  // io.Reader, time.Duration, ... come from scalago.gostd; only bubbletea's types are generated.
+  def goFacadePackages = Seq("github.com/charmbracelet/bubbletea")
+}
+```
+
+A listed package that dependencies provide completely is skipped, with a note. If two modules of
+a build both generate facades and one depends on the other, give them different
+`goFacadesPackage`s.
 
 ## How Go types map
 
@@ -42,7 +61,10 @@ For the most-used standard library packages, depend on `scalago-gostd` instead (
   without methods are aliases of `Any` (`type Msg = Any`): Scala lambdas and values are passed
   as they are.
 - Other named types get a conversion named as the type, as in Go: `lipgloss.Color("205")`,
-  `time.Duration(n)`.
+  `time.Duration(n)`. Named map and slice types are built like Go composite literals:
+  `gin.H("message" -> "pong")`.
+- A Go func type returning `error` is a Scala function that throws: `() => Unit` for
+  `func() error`; an exception becomes the error. Several results come from a tuple.
 - Inside Go data (slices, maps, channels, pointers), elements have their
   [canonical views](go-data.md#element-types): a `[]string` is a `GoSlice[GoString]`.
 - Generic functions whose type parameters are constrained by interfaces take the interface:

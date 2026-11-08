@@ -25,14 +25,44 @@ Scala strings are `java.lang.String` (UTF-16), so programs behave as on the JVM.
 the opt-in Go string (immutable UTF-8 bytes), like Scala Native's `CString`: no conversion when
 it is passed to Go.
 
+Write them with the `go` interpolator, which works like `s"..."` (same escapes, checked at
+compile time). `GoString` arguments are inserted as they are; anything else is rendered as
+`String.valueOf` would.
+
 ```scala
 import scalago.go.*
 
-val g = "Grüße".toGoString     // or GoString("Grüße")
-g.byteLength                   // 7: UTF-8 bytes
-g.toJavaString                 // "Grüße"
-g.sameAs(GoString("Grüße"))    // true: compare contents with sameAs, not ==
+val name = "Grüße"
+val g = go"Hi $name, ${1 + 1}!"  // or name.toGoString, or GoString(name)
+g.byteLength                     // 14: UTF-8 bytes
+g.toJavaString                   // "Hi Grüße, 2!"
+g == go"Hi Grüße, 2!"            // true: contents are compared, on Go and on the JVM
 ```
+
+On Go, literal parts are string constants and an interpolation is one Go concatenation, with no
+UTF-16 conversion. `Ordering[GoString]` orders by bytes, as Go's `<`. There is no `f`-style
+formatting: format into a `String` first (`go"${"%.2f".format(x)}"`).
+
+## Scala data for Go code
+
+Go code that inspects values by reflection (`encoding/json`, templates, configuration
+libraries) cannot see inside Scala objects. Convert explicitly:
+
+```scala
+import scalago.go.*
+
+final case class Todo(id: Long, title: String, tags: List[String])
+
+val data = GoData(Todo(1, "write docs", List("docs")))  // map[string]any{"id": 1, "title": ..., "tags": []any{...}}
+val config = GoData.map("server.port" -> 8080, "log.level" -> "info")  // GoMap[GoString, Any]
+GoData.toScala(data)                                    // Map("id" -> 1, "tags" -> Vector("docs"), "title" -> "write docs")
+```
+
+`GoData(x)` turns case classes and maps into `map[string]any`, collections into `[]any`,
+strings into Go strings, integers into Go `int` and `Option`s into their value or `nil`.
+`GoData.toScala` turns Go maps into `Map[String, Any]` (sorted by key) and slices into
+`Vector`s, and gives back `String`, `Long`, `Double` and `Boolean`. Both copy: a Scala value
+passed to Go as `Any` without them stays the same object, so it comes back as itself.
 
 ## Slices
 
