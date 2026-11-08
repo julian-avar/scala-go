@@ -289,9 +289,9 @@ object millplugin extends ScalaModule with Published {
 }
 
 /** The documentation site: the pages of `docs/_docs` (with `docs/sidebar.yml`) and the API of
- *  the user-facing modules. `mill docs.site`, then open `out/docs/site.dest/index.html`. The Mill
- *  plugin's settings are documented in a page (`docs/_docs/user/build.md`): its API would bring
- *  in all of Mill's.
+ *  the user-facing modules. `mill docs.site`, then open `out/docs/site.dest/docs/index.html` (the
+ *  pages; `index.html` next to `docs/` is the API). The Mill plugin's settings are documented in
+ *  a page (`docs/_docs/user/build.md`): its API would bring in all of Mill's.
  */
 object docs extends ScalaGoModule with UnidocModule {
   def moduleDeps = Seq(library, gears, gostd)
