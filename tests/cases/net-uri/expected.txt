@@ -97,7 +97,7 @@ http:rel -> http://example.com/a/b/rel
 ./x/../y -> http://example.com/a/b/y
 http://example.com:8080/p?q#r
 http://[::1]/x
-true true false
+true true false false
 http://example.com/a%20b?c#d
 -- URLEncoder/URLDecoder
 hello+world | hello+world | hello world

@@ -73,9 +73,10 @@ object Main:
     do println(s"$spec -> ${new URL(ctx, spec)}")
     println(new URL("http", "example.com", 8080, "/p?q#r"))
     println(new URL("http", "::1", "/x"))
-    val a = new URL("http://Example.com:80/x")
-    val b = new URL("http://example.com/x")
-    println(s"${a.sameFile(b)} ${a == b} ${a == new URL("http://example.com/x#f")}")
+    // Host names would be resolved by the JDK: these are addresses.
+    val a = new URL("http://127.0.0.1:80/x")
+    val b = new URL("http://127.0.0.1/x")
+    println(s"${a.sameFile(b)} ${a == b} ${a == new URL("http://127.0.0.1/x#f")} ${a == new URL("https://127.0.0.1/x")}")
     println(new URL("http://example.com/a%20b?c#d").toURI)
 
   def encoding(): Unit =

@@ -1,7 +1,7 @@
 // Linked with --missing-apis throw: uses of APIs scala-go does not implement are warnings at link
 // time and throw the JVM's linkage errors when they run, as on a JVM without the class.
 object Main:
-  def neverCalled(): String = java.net.InetAddress.getLocalHost.getHostName
+  def neverCalled(): String = java.lang.management.ManagementFactory.getRuntimeMXBean.getName
 
   def main(args: Array[String]): Unit =
     if args.length > 100 then println(neverCalled())
@@ -12,7 +12,7 @@ object Main:
       catch case e: LinkageError => println(s"$what: ${e.getClass.getName}, ${e.getMessage.startsWith("scala-go: ")}")
 
     attempt("static method")(java.lang.management.ManagementFactory.getRuntimeMXBean)
-    attempt("class")(new java.net.ServerSocket(0))
+    attempt("class")(new java.awt.Point(1, 2))
     // Linkage errors are fatal for NonFatal, as on the JVM.
     println(scala.util.control.NonFatal(new NoSuchMethodError("x")))
     println("done")
