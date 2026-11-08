@@ -7,8 +7,9 @@ import scalago.go.{GoByte, GoException, GoSlice}
 /** A todo list in the terminal, written in Scala on bubbletea (the Elm architecture: a model, an
  *  update function and a view), with components from bubbles and styles from lipgloss.
  *
- *  `mill gotui.goRun` runs it interactively; `--demo` feeds it scripted keys without a terminal
- *  and prints the final state.
+ *  The executable (`mill examples.gotui.goBuild`) runs it in a terminal; `mill
+ *  examples.gotui.goRun` cannot, as Mill's daemon has no terminal. `--demo` feeds it scripted
+ *  keys without a terminal and prints the final state.
  */
 object Main:
   def main(args: Array[String]): Unit =
@@ -111,7 +112,9 @@ final case class App(
       copy(todos = rest, cursor = math.max(0, math.min(cursor, rest.size - 1)))
     else this
 
-  /** Saving takes a while: a Go timer delivers a Scala message. */
+  /** Saving takes a while: a Go timer delivers a Scala message. A Go `time.Duration` is not a
+   *  Scala number, so it is converted from nanoseconds (`200 * time.Millisecond` is not possible).
+   */
   private def save(count: Int): tea.Cmd = tea.Tick(time.Duration(200_000_000L), _ => Saved(count))
 
   def View(): String =

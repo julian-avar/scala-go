@@ -383,8 +383,9 @@ object examples extends Module {
   }
 
   /** Popular Go libraries used from Scala through generated facades: a bubbletea TUI styled with
-   *  lipgloss, using bubbles components. `mill examples.gotui.goRun` runs it in the terminal; `mill examples.gotui.check`
-   *  runs it on scripted keys and checks the final state. The generated facades use those of
+   *  lipgloss, using bubbles components. Its executable (`mill examples.gotui.goBuild`) runs in a terminal (not
+   *  through `goRun`: Mill's daemon has no terminal); `mill examples.gotui.check` runs it on scripted keys and checks
+   *  the final state. The generated facades use those of
    *  scalago-gostd for the standard library's types (`io.Reader`, `time.Duration`).
    */
   object gotui extends InBuildScalaGoModule {
