@@ -403,6 +403,55 @@ func GoPtrSet(p any, x any) {
 	v.Elem().Set(fromScalaValue(x, v.Type().Elem()))
 }
 
+// ---- Plain data (scalago.go.GoData) -------------------------------------------------------
+
+// Kinds of Go data, as GoNatives.dataKind reports them.
+const (
+	basicData = 1
+	mapData   = 2
+	sliceData = 3
+)
+
+// GoDataKind tells values of predeclared basic types, maps, and slices and arrays apart from
+// other values (0).
+func GoDataKind(x any) int32 {
+	if x == nil {
+		return 0
+	}
+	t := reflect.TypeOf(x)
+	switch t.Kind() {
+	case reflect.Map:
+		return mapData
+	case reflect.Slice, reflect.Array:
+		return sliceData
+	case reflect.Bool, reflect.String, reflect.Float32, reflect.Float64,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		if t.PkgPath() == "" { // predeclared, not a named type such as time.Duration
+			return basicData
+		}
+	}
+	return 0
+}
+
+// GoIntData is x as a Go int, the type of Go's integer literals in an any.
+func GoIntData(x int64) any { return int(x) }
+
+// GoBasicData is a value of a basic type as a Scala String, Long, Double or Boolean.
+func GoBasicData(x any) any {
+	switch v := reflect.ValueOf(x); v.Kind() {
+	case reflect.String:
+		return Str(v.String())
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int()
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return int64(v.Uint())
+	case reflect.Float32, reflect.Float64:
+		return v.Float()
+	}
+	return x
+}
+
 // ---- Funcs --------------------------------------------------------------------------------
 
 // Go funcs returned to Scala are wrapped by the linker into these shapes (arguments and result
