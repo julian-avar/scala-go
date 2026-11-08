@@ -7,7 +7,8 @@ title: Getting started
 ## Requirements
 
 - A JDK, 17 or later.
-- Go, 1.22 or later, on the `PATH`.
+- Go 1.22 or later on the `PATH` (preferably a release the Go team supports, currently 1.25 or
+  1.26).
 - [Mill](https://mill-build.org) 1.x.
 
 scala-go is not published to Maven Central yet. Until it is, publish it to your local Ivy
@@ -68,8 +69,8 @@ mill app.run Ada Grace     # the same program on the JVM
 | `mill app.run a b`   | runs the program on the JVM, as with any Scala module          |
 
 The plugin only adds `.goir` files next to the `.class` files, so the module still compiles,
-runs and tests on the JVM. A good workflow is to develop and test on the JVM, and to build and
-run the Go binary in CI as well.
+runs and tests on the JVM. Test frameworks do not run as Go yet, so develop and test on the
+JVM, and build and run the Go binary in CI as well.
 
 ## Next steps
 

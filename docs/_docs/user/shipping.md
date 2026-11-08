@@ -17,13 +17,14 @@ object app extends ScalaGoModule {
 
 ## Cross-compiling
 
-Any platform Go supports works:
-
 ```scala sc:nocompile
 object app extends ScalaGoModule {
-  def goBuildEnv = Map("GOOS" -> "windows", "GOARCH" -> "amd64")
+  def goBuildEnv = Map("GOOS" -> "linux", "GOARCH" -> "arm64")
 }
 ```
+
+Linux and macOS on amd64 and arm64 are tested. Big-endian targets (s390x, ppc64, mips) are not
+supported. Windows builds, but file paths are Unix paths there and the tests do not run on it.
 
 ## Static binaries
 

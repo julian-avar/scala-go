@@ -42,6 +42,13 @@ for a Go `[]string`, not `GoSlice[String]` (see [Go data](../interop/go-data.md#
   the program exits with status 1.
 - `SCALAGO_TRACE=1` in the environment keeps every Go frame in stack traces.
 - Go panics in Go code called from Scala become `RuntimeException`s with the panic's message.
+- **Output missing after a crash?** Standard output is buffered. A signal (Ctrl-C, `docker
+  stop`) or a fatal Go error (stack overflow, out of memory, a deadlock) ends the program
+  without flushing it, and without running shutdown hooks.
+- **`NoSuchMethodError` from a pattern match** on a type parameter with a `ClassTag`: such type
+  tests are not supported yet (see [Differences from the JVM](differences.md)).
+- **`f"..."` or `String.format` throws or prints something else:** some format conversions are
+  not supported yet (see [Differences from the JVM](differences.md)).
 
 ## Debugging the generated code
 

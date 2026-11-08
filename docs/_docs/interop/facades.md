@@ -56,7 +56,8 @@ object url:
   def Parse(rawURL: String): URL = native
   class URL:
     def Host: String = native              // a field
-    def Path_=(p: String): Unit = native   // assigning a field
+    def Path: String = native
+    def Path_=(p: String): Unit = native   // assigning it: u.Path = "/"
     def Query(): Values = native           // a method
   class Values:                            // type Values map[string][]string
     def Get(key: String): String = native
@@ -78,7 +79,7 @@ object io:
       p.length
   ```
 
-- Fields are members without parameter lists; `x_=` assigns them.
+- Fields are members without parameter lists. To assign one, declare `x_=` next to the getter `x`.
 - `@GoImport(path, name)` on a top-level class or trait declares a type outside of a package
   object.
 - `isInstanceOf` and pattern matching on facade types are Go type assertions.

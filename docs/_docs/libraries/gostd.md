@@ -13,7 +13,7 @@ object app extends ScalaGoModule {
 }
 ```
 
-```scala sc:nocompile
+```scala
 import scalago.gostd.{strings, strconv}
 
 @main def demo(): Unit =

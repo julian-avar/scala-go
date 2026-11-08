@@ -33,7 +33,7 @@ object app extends ScalaGoModule {
 }
 ```
 
-```scala sc:nocompile
+```scala
 import gears.async.*
 import gears.async.default.given
 
@@ -51,7 +51,8 @@ needs JVM internals. The same code runs on the JVM, on virtual threads.
 `GoChan` is a Go channel (see [Go data](../interop/go-data.md#channels)). `send` and `receive`
 block the calling thread. In gears code, `scalago.gears` adds cancellable operations:
 
-```scala sc:nocompile
+```scala
+import gears.async.*
 import scalago.go.*
 import scalago.gears.*
 
@@ -67,7 +68,7 @@ def drain(ch: GoChan[Int])(using Async): Unit =
 which cancels it and throws `CancellationException`. This is how exported Scala code honours
 the deadlines and cancellation of its Go callers:
 
-```scala sc:nocompile
+```scala
 import gears.async.*
 import gears.async.default.given
 import scalago.go.*
@@ -77,6 +78,10 @@ object Api:
   @GoExport def search(ctx: context.Context, query: String): String =
     Async.blocking:
       withGoContext(ctx)(slowSearch(query))
+
+  private def slowSearch(query: String)(using Async): String =
+    AsyncOperations.sleep(1000)   // cancelled when ctx is done
+    s"results for $query"
 ```
 
 ## The memory model
