@@ -17,7 +17,8 @@ packages, and Go code can call Scala libraries. Threads run on goroutines, with 
 `CompletableFuture`, locks, concurrent collections), `scala.concurrent.Future` and gears run on
 them. The generated code is safe to
 call from any goroutine. `BigDecimal` and `BigInt` match the JDK. Programs read and write files
-(`java.io`, `java.nio.file`, `scala.io.Source`) and standard input. `java.time` works, with time
+(`java.io`, `java.nio` buffers, channels and files, `scala.io.Source`, os-lib) and standard input,
+and run subprocesses (`ProcessBuilder`, `scala.sys.process`, `os.proc`). `java.time` works, with time
 zones from Go's tz database. Reflection doesn't work yet.
 
 ## Using it with Mill
