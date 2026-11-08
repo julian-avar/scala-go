@@ -23,7 +23,8 @@ import scala.util.Using
  *    `GoMap[GoString, GoInt]`), so slices are shared and creating them gives the right Go type.
  *  - Go func types and interfaces without methods are type aliases (`type Cmd = () => Any`), so
  *    Scala functions and values are passed as they are; other named non-struct types get a
- *    conversion named as the type (`def Color(value: String): Color`), as in Go.
+ *    conversion named as the type (`def Color(value: String): Color`), as in Go, and named slice
+ *    and map types their composite literals too (`def H(entries: (String, Any)*): H`).
  *  - generic functions whose type parameters are constrained by interfaces take the interfaces.
  *  The types of other packages that the members use are generated too (only the types), so the
  *  facades of a package are complete without listing its dependencies. Members whose types cannot
@@ -209,14 +210,15 @@ object FacadeGen:
       case GoType.TypeParam(n)                               => no(s"type parameter $n")
       case GoType.Other(d)                                   => no(d)
 
+    /** A Go func type as a Scala function type. Its results are as a function's: a trailing
+     *  `error` is an exception (thrown by the Scala function, or by the Go func called from Scala),
+     *  several results are a tuple.
+     */
     private def function(sig: GoSignature, isResult: Boolean): String =
       if sig.variadic || sig.generic then no("a variadic or generic func type")
       if isResult && sig.params.size > 3 then no("a returned func with more than 3 parameters")
       val params = sig.params.map(outer(_, isResult = false))
-      val result = sig.results match
-        case Nil       => "_root_.scala.Unit"
-        case List(one) => outer(one, isResult = true)
-        case _         => no("a func type with several results")
+      val result = results(sig.results)
       params match
         case List(one) => s"$one => $result"
         case ps        => ps.mkString("(", ", ", s") => $result")
@@ -343,12 +345,22 @@ object FacadeGen:
       sb.toString
 
     /** The conversion to a named non-struct type, as in Go (`lipgloss.Color("205")`): a method of
-     *  the package object, named as the type.
+     *  the package object, named as the type. Named slice and map types also get their composite
+     *  literals, from elements or key-value pairs (`gin.H("message" -> "pong")`).
      */
-    private def conversion(pkg: GoPackage, name: String, decl: GoTypeDecl): Option[String] =
-      decl.underlying.filter(_ => decl.kind == GoTypeKind.Other && aliasOf(pkg.path, name).isEmpty).map { u =>
-        s"def $name(value: ${outer(u, isResult = false)}): ${named(pkg.path, name)} = _root_.scalago.go.native"
-      }
+    private def conversions(pkg: GoPackage, name: String, decl: GoTypeDecl, skipped: mutable.ListBuffer[String]): List[String] =
+      val out = mutable.ListBuffer.empty[String]
+      for u <- decl.underlying if decl.kind == GoTypeKind.Other && aliasOf(pkg.path, name).isEmpty do
+        val t = named(pkg.path, name)
+        member(s"$name (conversion)", out, skipped)(s"def $name(value: ${outer(u, isResult = false)}): $t = _root_.scalago.go.native")
+        u match
+          case GoType.Slice(e) =>
+            member(s"$name (literal)", out, skipped)(s"def $name(elems: ${outer(e, isResult = false)}*): $t = _root_.scalago.go.native")
+          case GoType.MapOf(k, v) =>
+            member(s"$name (literal)", out, skipped)(
+              s"def $name(entries: (${outer(k, isResult = false)}, ${outer(v, isResult = false)})*): $t = _root_.scalago.go.native")
+          case _ => ()
+      out.toList
 
     /** An untyped constant, typed by its value (big integers that do not fit a Long are left out). */
     private def constant(pkg: GoPackage, name: String, t: GoType): String = t match
@@ -380,9 +392,7 @@ object FacadeGen:
           member(n, lines, skipped)(s"def $n: ${outer(t, isResult = true)} = _root_.scalago.go.native")
         for (n, t) <- pkg.consts.toSeq.sortBy(_._1) do
           member(n, lines, skipped)(s"def $n: ${constant(pkg, n, t)} = _root_.scalago.go.native")
-      for (n, d) <- types do
-        try conversion(pkg, n, d).foreach(lines += _)
-        catch case e: Unrepresentable => skipped += s"$n (conversion) (${e.reason})"
+      for (n, d) <- types do lines ++= conversions(pkg, n, d, skipped)
       if isRoot then
         for (n, target) <- pkg.aliases.toSeq.sortBy(_._1) do
           member(n, lines, skipped) {
