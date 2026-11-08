@@ -36,7 +36,7 @@ digest output: 666bbf96690dac9702a90cc3ee42d17a34ba59ab hello, wworld
 XOR Message Digest from (no provider), <initialized>
 60 0
 clone: java.lang.CloneNotSupportedException
-HmacSHA256 RAW 6b6579 -92943760
+HmacSHA256 RAW 6b6579 true
 true
 false
 323334

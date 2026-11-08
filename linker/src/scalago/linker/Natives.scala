@@ -647,6 +647,32 @@ object Natives:
     )
   do staticFn(Crypto, desc, fn)
 
+  // java.util.zip's native side (javalib/src/scalago/runtime/Zip.scala).
+  private val Zip = "scalago.runtime.Zip$"
+  private val ZO = "Ljava.lang.Object;"
+  for (desc, fn) <- List(
+      "crc32(I[BII)I" -> "rt.ZipCRC32",
+      "crc32c(I[BII)I" -> "rt.ZipCRC32C",
+      "adler32(I[BII)I" -> "rt.ZipAdler32",
+      s"newDeflater(Z)$ZO" -> "rt.ZipNewDeflater",
+      s"deflate($ZO[BII[BIIIII)I" -> "rt.ZipDeflate",
+      s"pending($ZO)I" -> "rt.ZipPending",
+      s"newInflater(Z)$ZO" -> "rt.ZipNewInflater",
+      s"setInput($ZO[BII)V" -> "rt.ZipSetInput",
+      s"remaining($ZO)I" -> "rt.ZipRemaining",
+      s"inflate($ZO[BII)I" -> "rt.ZipInflate",
+      s"errorMessage($ZO)Ljava.lang.String;" -> "rt.ZipErrorMessage",
+      s"needsDictionary($ZO)Z" -> "rt.ZipNeedsDictionary",
+      s"finished($ZO)Z" -> "rt.ZipFinished",
+      s"setDictionary($ZO[BII)Z" -> "rt.ZipSetDictionary",
+      s"adler($ZO)I" -> "rt.ZipAdler",
+      s"bytesRead($ZO)J" -> "rt.ZipBytesRead",
+      s"bytesWritten($ZO)J" -> "rt.ZipBytesWritten",
+      s"reset($ZO)V" -> "rt.ZipReset",
+      s"end($ZO)V" -> "rt.ZipEnd"
+    )
+  do staticFn(Zip, desc, fn)
+
   // ---- Scala library --------------------------------------------------------------------------
 
   staticFields((Hijacked.BoxedUnit, "UNIT")) = "rt.UnitValue"

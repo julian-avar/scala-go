@@ -98,7 +98,8 @@ object Main:
 
   def macs(): Unit =
     val key = new SecretKeySpec("key".getBytes, "HmacSHA256")
-    println(s"${key.getAlgorithm} ${key.getFormat} ${hex.formatHex(key.getEncoded)} ${key.hashCode}")
+    // (The JDK's hashCode changed in JDK 25.)
+    println(s"${key.getAlgorithm} ${key.getFormat} ${hex.formatHex(key.getEncoded)} ${key.hashCode == new SecretKeySpec("key".getBytes, "HMACSHA256").hashCode}")
     println(key == new SecretKeySpec("key".getBytes, "HMACSHA256"))
     println(key == new SecretKeySpec("kez".getBytes, "HmacSHA256"))
     println(hex.formatHex(new SecretKeySpec("0123456789".getBytes, 2, 3, "x").getEncoded))
