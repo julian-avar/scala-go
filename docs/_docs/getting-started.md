@@ -77,3 +77,5 @@ JVM, and build and run the Go binary in CI as well.
 - Add Scala libraries to `mvnDeps` as usual: see [Scala libraries](libraries/scala.md).
 - Call Go packages: see [Calling Go](interop/facades.md).
 - Ship the binary: see [Shipping binaries](user/shipping.md).
+- Complete programs: see [Examples](examples/index.md); what does not work yet:
+  [Limitations](user/limitations.md).
