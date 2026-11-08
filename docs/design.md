@@ -1140,6 +1140,12 @@ specification (`docs/_docs/spec/`), where it marks them **Deviation (bug)**. All
 | `System.gc()` is a link error (`Runtime.gc()` works) | javalib |
 | `getSimpleName` of a local class is `""` | `rt.ClassGetSimpleName` |
 | `try throw e finally return x` generates code `go vet` rejects (unreachable code) | `FunctionEmitter` |
+| `==` with a null `String` operand throws `NullPointerException` (JVM: `false`), so string matches on a null selector throw | `genArithmetic`: `UnivEq` operands reach `rt.Equals` without `rt.AnyRef` (a nil `*rt.String` in an `any`); likely `BigInteger`/`BigDecimal` too |
+| `eq` on Go slices, maps or funcs panics (comparing uncomparable types) | `refEq` emits `any(a) == any(b)` |
+| A negative array index throws `RuntimeException` instead of `ArrayIndexOutOfBoundsException` | `rt.Caught`: gc's message for negative indices has no length |
+| `i + inc()`, where `inc` changes a captured `var i`, reads `i` after the call | evaluation order of field reads (Go leaves it unspecified): spill operands that read mutable fields |
+| `lastIndexOf` of a supplementary code point is -1; `indexOf(0x110000)` finds U+FFFD | `rt` string search natives |
+| A facade of a pointer-receiver method of a non-struct Go type links, but the Go code does not compile | `GoInterop`: such values are not addressable; reject at link time or copy to a variable |
 
 #### 1. Usable outside this repository
 
