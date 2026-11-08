@@ -4,8 +4,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import scala.collection.immutable.TreeMap
 
-import gofacades.{context, gin, http, net}
+import gofacades.{gin, http, net}
 import scalago.go.{GoData, GoException, GoPtr}
+import scalago.gostd.context
 
 /** A todo, as the API stores and returns it. */
 final case class Todo(id: Long, title: String, done: Boolean, tags: Seq[String])

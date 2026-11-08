@@ -13,6 +13,8 @@ object Main:
 
     attempt("static method")(java.lang.management.ManagementFactory.getRuntimeMXBean)
     attempt("class")(new java.awt.Point(1, 2))
+    // The value standing in for a missing method's result is used (an array's length).
+    attempt("result used")(classOf[String].getMethods.length)
     // Linkage errors are fatal for NonFatal, as on the JVM.
     println(scala.util.control.NonFatal(new NoSuchMethodError("x")))
     println("done")

@@ -2,8 +2,9 @@ import java.nio.file.{Files, Path, StandardCopyOption}
 import java.util.concurrent.{LinkedBlockingQueue, TimeUnit}
 import java.util.concurrent.atomic.AtomicReference
 
-import gofacades.{argus, time}
+import gofacades.argus
 import scalago.go.GoData
+import scalago.gostd.time
 
 /** A service's configuration, as the application uses it: rebuilt from each revision. */
 final case class ServiceConfig(host: String, port: Long, timeout: java.time.Duration, logLevel: String, features: Seq[String]):

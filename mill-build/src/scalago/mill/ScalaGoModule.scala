@@ -133,7 +133,9 @@ trait ScalaGoModule extends ScalaModule {
   }
 
   /** Go packages (import paths) to generate Scala facades for, as part of the module's sources.
-   *  Packages of `goRequires` and `goLocalModules` are found too.
+   *  Packages of `goRequires` and `goLocalModules` are found too. The facades that dependencies
+   *  provide (`scalago-gostd`, other modules' generated facades) are used instead of generated
+   *  again, and a package that they provide completely is not generated.
    */
   def goFacadePackages: T[Seq[String]] = Task { Seq.empty[String] }
 
@@ -145,11 +147,14 @@ trait ScalaGoModule extends ScalaModule {
     if (goFacadePackages().isEmpty) Seq.empty[PathRef]
     else {
       val javaExe = os.Path(sys.props("java.home")) / "bin" / "java"
+      val sep = _root_.java.io.File.pathSeparator
       val result = os.proc(
-        javaExe, "-cp", scalaGoLinkerClasspath().map(_.path).mkString(_root_.java.io.File.pathSeparator),
+        javaExe, "-cp", scalaGoLinkerClasspath().map(_.path).mkString(sep),
         "scalago.linker.FacadeGen",
         "--out", Task.dest,
         "--package", goFacadesPackage(),
+        // The dependencies, whose facades are reused.
+        "--classpath", compileClasspath().map(_.path).filter(os.exists(_)).mkString(sep),
         goModuleArgs(),
         goFacadePackages()
       ).call(stdout = os.Pipe, stderr = os.Inherit, check = false)
