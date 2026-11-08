@@ -2,7 +2,10 @@ package rt
 
 import (
 	"errors"
+	"fmt"
+	"image"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -89,5 +92,53 @@ func TestFromPtrAndAddr(t *testing.T) {
 	}
 	if Try(func() { Deref[url.URL](nil) }) == nil {
 		t.Fatal("null should throw")
+	}
+}
+
+// Go structs held by Scala code: image.Point has only value-receiver methods (like bubbletea's
+// KeyMsg), strings.Builder has pointer-receiver ones (like bytes.Buffer). Types of this package
+// count as Scala's and are never passed by value.
+func TestGoStructsGoToInterfacesAsGoPassesThem(t *testing.T) {
+	v := &image.Point{1, 2}
+	if got, ok := ToGoAny(v).(image.Point); !ok || got.X != 1 {
+		t.Errorf("a struct without pointer methods should go to any by value, got %T", ToGoAny(v))
+	}
+	p := &strings.Builder{}
+	if got := ToGoAny(p); got != any(p) {
+		t.Errorf("a struct with pointer methods should stay a pointer, got %T", got)
+	}
+	if got := ToGoInterface[fmt.Stringer](v); got != (image.Point{1, 2}) {
+		t.Errorf("a struct whose value implements the interface should go by value, got %T", got)
+	}
+	if got := ToGoInterface[fmt.Stringer](p); got != fmt.Stringer(p) {
+		t.Errorf("a pointer implementing the interface should stay a pointer, got %T", got)
+	}
+	if ToGoInterface[fmt.Stringer](nil) != nil || ToGoAny(nil) != nil {
+		t.Error("null should become nil")
+	}
+	if got := ToGoAny(Str("s")); got != "s" {
+		t.Errorf("Scala strings should become Go strings, got %#v", got)
+	}
+	var nilPtr *image.Point
+	if got := ToGoAny(nilPtr); got != any(nilPtr) {
+		t.Errorf("a nil pointer should stay as it is, got %#v", got)
+	}
+	if got := ToGoAny(&Array[int32]{}); reflect.TypeOf(got) != reflect.TypeFor[*Array[int32]]() {
+		t.Errorf("runtime values should stay as they are, got %T", got)
+	}
+}
+
+func TestStructFacadesAcceptValuesAndPointers(t *testing.T) {
+	var msg any = image.Point{3, 4}
+	if !IsStruct[image.Point](msg) || !IsStruct[image.Point](&image.Point{}) || IsStruct[image.Point]("x") {
+		t.Error("IsStruct should accept T and *T only")
+	}
+	p, ok := CastStruct[image.Point](msg).(*image.Point)
+	if !ok || p.X != 3 {
+		t.Errorf("CastStruct should copy a value to a pointer, got %#v", CastStruct[image.Point](msg))
+	}
+	same := &image.Point{5, 6}
+	if CastStruct[image.Point](same) != any(same) || CastStruct[image.Point](nil) != nil {
+		t.Error("CastStruct should pass pointers and null as they are")
 	}
 }

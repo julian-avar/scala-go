@@ -21,9 +21,15 @@ import scala.util.Using
  *    tuples;
  *  - inside Go data (`[]T`, `map[K]V`, `chan T`, `*T`): canonical views (`GoSlice[GoString]`,
  *    `GoMap[GoString, GoInt]`), so slices are shared and creating them gives the right Go type.
- *  Members whose types cannot be represented (generics, types of packages not generated, unnamed
- *  structs and interfaces, arrays) are left out, with a comment saying why. Facades are checked
- *  against Go at link time only where used, so unused members cost nothing.
+ *  - Go func types and interfaces without methods are type aliases (`type Cmd = () => Any`), so
+ *    Scala functions and values are passed as they are; other named non-struct types get a
+ *    conversion named as the type (`def Color(value: String): Color`), as in Go.
+ *  - generic functions whose type parameters are constrained by interfaces take the interfaces.
+ *  The types of other packages that the members use are generated too (only the types), so the
+ *  facades of a package are complete without listing its dependencies. Members whose types cannot
+ *  be represented (generics with type sets, unnamed structs and interfaces, arrays, funcs inside
+ *  Go data) are left out, with a comment saying why. Facades are checked against Go at link time
+ *  only where used, so unused members cost nothing.
  */
 object FacadeGen:
   final case class Config(scalaPackage: String, packages: Seq[String], goRequires: Seq[(String, String)] = Nil,
@@ -37,7 +43,12 @@ object FacadeGen:
       if config.goRequires.nonEmpty then goMod ++= config.goRequires.map((m, v) => s"\t$m $v\n").mkString("\nrequire (\n", "", ")\n")
       for (m, dir) <- config.goReplaces do goMod ++= s"\nreplace $m => $dir\n"
       Files.writeString(moduleDir.resolve("go.mod"), goMod.toString, UTF_8)
-      val api = GoApi.load(moduleDir, config.packages)
+      // The packages whose types the generated members use are loaded too, until none is missing.
+      var api = GoApi.load(moduleDir, config.packages)
+      var missing = Generator(api, config.scalaPackage, config.packages).missingPackages
+      while missing.nonEmpty do
+        api = GoApi.load(moduleDir, (api.packages.keySet ++ missing).toSeq.sorted)
+        missing = Generator(api, config.scalaPackage, config.packages).missingPackages
       Files.createDirectories(outDir)
       for (name, source) <- generate(api, config.scalaPackage, config.packages).toSeq yield
         val file = outDir.resolve(name)
@@ -45,7 +56,9 @@ object FacadeGen:
         file
     finally Using.resource(Files.walk(moduleDir))(_.iterator.asScala.toList.reverse.foreach(Files.deleteIfExists))
 
-  /** Scala source files (name to content) for `packages` of `api`. */
+  /** Scala source files (name to content) for `packages` of `api`, and for the types of other
+   *  packages of `api` that their members use.
+   */
   def generate(api: GoApi, scalaPackage: String, packages: Seq[String]): Map[String, String] =
     Generator(api, scalaPackage, packages).files
 
@@ -57,12 +70,62 @@ object FacadeGen:
 
   def ident(name: String): String = if scalaKeywords(name) || !name.head.isLetter then s"`$name`" else name
 
+  /** Whether code outside a package's module can import it (not `internal`, not `vendor`). */
+  private def importable(path: String): Boolean =
+    path.nonEmpty && path != "C" && path != "unsafe" && !path.split('/').exists(e => e == "internal" || e == "vendor")
+
+  /** The named types a Go type mentions. */
+  private def namedIn(g: GoType): List[(String, String)] = g match
+    case GoType.Named(p, n)    => if p.isEmpty then Nil else List(p -> n)
+    case GoType.Ptr(e)         => namedIn(e)
+    case GoType.Slice(e)       => namedIn(e)
+    case GoType.ArrayOf(_, e)  => namedIn(e)
+    case GoType.MapOf(k, v)    => namedIn(k) ++ namedIn(v)
+    case GoType.Chan(e, _)     => namedIn(e)
+    case GoType.Func(sig)      => namedIn(sig)
+    case _                     => Nil
+
+  private def namedIn(sig: GoSignature): List[(String, String)] =
+    (sig.params ++ sig.results ++ sig.typeParams.map(_._2)).flatMap(namedIn)
+
   private final class Generator(api: GoApi, scalaPackage: String, roots: Seq[String]):
+    /** The types facades are generated for: all types of the root packages, and the types of other
+     *  packages their members use (transitively). The other packages' objects only have these.
+     */
+    private val (included: Set[(String, String)], missing: Set[String]) =
+      val seen = mutable.LinkedHashSet.empty[(String, String)]
+      val missing = mutable.LinkedHashSet.empty[String]
+      val queue = mutable.Queue.empty[(String, String)]
+      def use(refs: List[(String, String)]): Unit =
+        for r @ (p, n) <- refs if importable(p) && !seen(r) do
+          if !api.packages.contains(p) then missing += p
+          else if api.typeDecl(p, n).isDefined then
+            seen += r
+            queue += r
+      for path <- roots; pkg <- api.packages.get(path) do
+        use(pkg.types.keys.toList.map(path -> _))
+        pkg.funcs.values.foreach(sig => use(namedIn(sig)))
+        (pkg.vars.values ++ pkg.consts.values ++ pkg.aliases.values).foreach(t => use(namedIn(t)))
+      while queue.nonEmpty do
+        val (p, n) = queue.dequeue()
+        val decl = api.typeDecl(p, n).get
+        decl.methods.values.foreach(sig => use(namedIn(sig)))
+        decl.fields.values.foreach(t => use(namedIn(t)))
+        decl.underlying.foreach(t => use(namedIn(t)))
+      (seen.toSet, missing.toSet)
+
+    /** Packages whose types are used but whose APIs are not loaded. */
+    def missingPackages: Set[String] = missing
+
+    /** The generated packages: the roots, then those of the other included types. */
+    private val packages: Seq[String] =
+      (roots.filter(api.packages.contains) ++ included.toSeq.map(_._1).sorted).distinct
+
     /** Scala object name of each generated package: its Go name, or its path when ambiguous. */
     private val objectNames: Map[String, String] =
-      val byName = roots.groupBy(p => api.packages.get(p).map(_.name).getOrElse(p.split('/').last))
-      roots.map { p =>
-        val name = api.packages.get(p).map(_.name).getOrElse(p.split('/').last)
+      val byName = packages.groupBy(p => api.packages(p).name)
+      packages.map { p =>
+        val name = api.packages(p).name
         p -> (if byName(name).size == 1 then name else p.replaceAll("[^A-Za-z0-9]", "_"))
       }.toMap
 
@@ -70,7 +133,7 @@ object FacadeGen:
       for
         obj <- objectNames.get(pkg)
         p <- api.packages.get(pkg)
-        if p.types.contains(name) || p.aliases.contains(name)
+        if included((pkg, name)) || (roots.contains(pkg) && p.aliases.contains(name))
       yield s"_root_.$scalaPackage.${ident(obj)}.$name"
 
     private final class Unrepresentable(val reason: String) extends Exception(reason)
@@ -97,6 +160,21 @@ object FacadeGen:
       if pkg == "" && name == "error" then "_root_.scalago.go.GoError"
       else facadeRef(pkg, name).getOrElse(no(s"type $pkg.$name is not generated"))
 
+    /** The Scala type alias standing for Go type `pkg.name`, if it is one: interfaces without
+     *  methods are `Any`, func types without methods are Scala function types, so that Scala
+     *  values and lambdas can be passed directly (`tea.Msg`, `tea.Cmd`).
+     */
+    private def aliasOf(pkg: String, name: String): Option[String] =
+      api.typeDecl(pkg, name).flatMap { decl =>
+        if decl.isEmptyInterface then Some("_root_.scala.Any")
+        else if decl.methods.isEmpty then
+          decl.funcSignature.flatMap(sig => try Some(function(sig, isResult = true)) catch case _: Unrepresentable => None)
+        else None
+      }
+
+    private def isFuncAlias(pkg: String, name: String): Boolean =
+      api.typeDecl(pkg, name).exists(_.funcSignature.isDefined) && aliasOf(pkg, name).isDefined
+
     /** The Scala type of a parameter or result. */
     def outer(g: GoType, isResult: Boolean): String = g match
       case GoType.Basic(b)                                   => basic(b)
@@ -118,6 +196,7 @@ object FacadeGen:
           case "uint8" | "byte"   => "_root_.scalago.go.GoByte"
           case "string"           => "_root_.scalago.go.GoString"
           case other              => basic(other)
+      case GoType.Named(pkg, n) if isFuncAlias(pkg, n)       => no("a func inside Go data")
       case GoType.Named(pkg, n)                              => named(pkg, n)
       case GoType.Ptr(GoType.Named(pkg, n)) if isStruct(pkg, n) => named(pkg, n)
       case GoType.Ptr(e)                                     => s"_root_.scalago.go.GoPtr[${inner(e)}]"
@@ -127,6 +206,7 @@ object FacadeGen:
       case GoType.EmptyInterface                             => "_root_.scala.Any"
       case GoType.Func(_)                                    => no("a func inside Go data")
       case GoType.ArrayOf(_, _)                              => no("a Go array type")
+      case GoType.TypeParam(n)                               => no(s"type parameter $n")
       case GoType.Other(d)                                   => no(d)
 
     private def function(sig: GoSignature, isResult: Boolean): String =
@@ -167,14 +247,39 @@ object FacadeGen:
         else s"${ident(n)}: ${outer(t, isResult = false)}"
       }.mkString("(", ", ", ")")
 
+    /** A generic function as a monomorphic one, when each type parameter's constraint is an
+     *  interface without type sets: the parameter becomes the constraint (`Matches[K fmt.Stringer](k K)`
+     *  takes a `fmt.Stringer`), which satisfies it, and the linker passes values of that type, so
+     *  that Go infers it as the type argument.
+     */
+    private def monomorphic(sig: GoSignature): GoSignature =
+      if !sig.generic then sig
+      else
+        val bounds = sig.typeParams.map { (n, c) =>
+          c match
+            case GoType.EmptyInterface | _: GoType.Named => n -> c
+            case _                                     => no(s"generic, with a type set constraint on $n")
+        }.toMap
+        def subst(g: GoType): GoType = g match
+          case GoType.TypeParam(n)  => bounds.getOrElse(n, no(s"generic, type parameter $n"))
+          case GoType.Ptr(e)        => GoType.Ptr(subst(e))
+          case GoType.Slice(e)      => GoType.Slice(subst(e))
+          case GoType.ArrayOf(l, e) => GoType.ArrayOf(l, subst(e))
+          case GoType.MapOf(k, v)   => GoType.MapOf(subst(k), subst(v))
+          case GoType.Chan(e, d)    => GoType.Chan(subst(e), d)
+          case GoType.Func(s)       => GoType.Func(s.copy(params = s.params.map(subst), results = s.results.map(subst)))
+          case other                => other
+        if bounds.isEmpty then no("generic")
+        sig.copy(params = sig.params.map(subst), results = sig.results.map(subst), generic = false, typeParams = Nil)
+
     // ---- Members ---------------------------------------------------------------------------------
 
     private def member(name: String, out: mutable.ListBuffer[String], skipped: mutable.ListBuffer[String])(body: => String): Unit =
       try out += body
       catch case e: Unrepresentable => skipped += s"$name (${e.reason})"
 
-    private def method(name: String, sig: GoSignature, abstractMember: Boolean): String =
-      if sig.generic then no("generic")
+    private def method(name: String, genericSig: GoSignature, abstractMember: Boolean): String =
+      val sig = monomorphic(genericSig)
       val rhs = if abstractMember then "" else " = _root_.scalago.go.native"
       s"def $name${params(sig)}: ${results(sig.results, name)}$rhs"
 
@@ -187,10 +292,10 @@ object FacadeGen:
     /** Generated interfaces, with their (representable) method sets. */
     private lazy val interfaces: Seq[((String, String), Map[String, GoSignature])] =
       for
-        path <- roots if api.packages.contains(path)
-        (n, d) <- api.packages(path).types.toSeq.sortBy(_._1) if d.kind == GoTypeKind.Interface
+        key @ (p, n) <- included.toSeq.sorted
+        d = api.typeDecl(p, n).get if d.kind == GoTypeKind.Interface
         methods = representable(d) if methods.size == d.methods.size && methods.nonEmpty
-      yield ((path, n), methods.map((m, sig) => m -> sig.copy(paramNames = Nil)))
+      yield (key, methods.map((m, sig) => m -> sig.copy(paramNames = Nil)))
 
     /** The generated interfaces that type `self` implements (Go typing is structural, Scala's
      *  nominal): the facade extends them. Between interfaces with the same methods, the order of
@@ -205,6 +310,13 @@ object FacadeGen:
       yield named(p, n)
 
     private def typeDef(pkg: GoPackage, name: String, decl: GoTypeDecl): String =
+      aliasOf(pkg.path, name) match
+        case Some(alias) =>
+          val kind = if decl.isEmptyInterface then "interface type" else "func type"
+          s"  /** Go $kind `${pkg.name}.$name`. */\n  type $name = $alias\n"
+        case None => classDef(pkg, name, decl)
+
+    private def classDef(pkg: GoPackage, name: String, decl: GoTypeDecl): String =
       val lines = mutable.ListBuffer.empty[String]
       val skipped = mutable.ListBuffer.empty[String]
       val isInterface = decl.kind == GoTypeKind.Interface
@@ -230,6 +342,14 @@ object FacadeGen:
         if lines.isEmpty then sb ++= s"  end $name\n"
       sb.toString
 
+    /** The conversion to a named non-struct type, as in Go (`lipgloss.Color("205")`): a method of
+     *  the package object, named as the type.
+     */
+    private def conversion(pkg: GoPackage, name: String, decl: GoTypeDecl): Option[String] =
+      decl.underlying.filter(_ => decl.kind == GoTypeKind.Other && aliasOf(pkg.path, name).isEmpty).map { u =>
+        s"def $name(value: ${outer(u, isResult = false)}): ${named(pkg.path, name)} = _root_.scalago.go.native"
+      }
+
     /** An untyped constant, typed by its value (big integers that do not fit a Long are left out). */
     private def constant(pkg: GoPackage, name: String, t: GoType): String = t match
       case GoType.Basic(b) if b.startsWith("untyped-") =>
@@ -250,35 +370,43 @@ object FacadeGen:
 
     private def objectSource(path: String): String =
       val pkg = api.packages(path)
+      val isRoot = roots.contains(path)
       val lines = mutable.ListBuffer.empty[String]
       val skipped = mutable.ListBuffer.empty[String]
-      for (n, sig) <- pkg.funcs.toSeq.sortBy(_._1) do member(n, lines, skipped)(method(n, sig, abstractMember = false))
-      for (n, t) <- pkg.vars.toSeq.sortBy(_._1) do
-        member(n, lines, skipped)(s"def $n: ${outer(t, isResult = true)} = _root_.scalago.go.native")
-      for (n, t) <- pkg.consts.toSeq.sortBy(_._1) do
-        member(n, lines, skipped)(s"def $n: ${constant(pkg, n, t)} = _root_.scalago.go.native")
-      for (n, target) <- pkg.aliases.toSeq.sortBy(_._1) do
-        member(n, lines, skipped) {
-          target match
-            case GoType.Named(p, tn) => s"type $n = ${named(p, tn)}"
-            case other               => no(s"alias of $other")
-        }
-      val types = pkg.types.toSeq.sortBy(_._1).map((n, d) => typeDef(pkg, n, d))
+      val types = pkg.types.toSeq.sortBy(_._1).filter((n, _) => included((path, n)))
+      if isRoot then
+        for (n, sig) <- pkg.funcs.toSeq.sortBy(_._1) do member(n, lines, skipped)(method(n, sig, abstractMember = false))
+        for (n, t) <- pkg.vars.toSeq.sortBy(_._1) do
+          member(n, lines, skipped)(s"def $n: ${outer(t, isResult = true)} = _root_.scalago.go.native")
+        for (n, t) <- pkg.consts.toSeq.sortBy(_._1) do
+          member(n, lines, skipped)(s"def $n: ${constant(pkg, n, t)} = _root_.scalago.go.native")
+      for (n, d) <- types do
+        try conversion(pkg, n, d).foreach(lines += _)
+        catch case e: Unrepresentable => skipped += s"$n (conversion) (${e.reason})"
+      if isRoot then
+        for (n, target) <- pkg.aliases.toSeq.sortBy(_._1) do
+          member(n, lines, skipped) {
+            target match
+              case GoType.Named(p, tn) => s"type $n = ${named(p, tn)}"
+              case other               => no(s"alias of $other")
+          }
+      val typeDefs = types.map((n, d) => typeDef(pkg, n, d))
       val obj = objectNames(path)
       val sb = StringBuilder()
       sb ++= "// Code generated by scala-go (FacadeGen). DO NOT EDIT.\n\n"
       sb ++= s"package $scalaPackage\n\n"
-      sb ++= s"/** Go package `$path`. */\n"
+      if isRoot then sb ++= s"/** Go package `$path`. */\n"
+      else sb ++= s"/** Go package `$path`: the types that the generated packages use. */\n"
       sb ++= s"@_root_.scalago.go.GoImport(${FunctionEmitter.goStringLiteral(path)})\n"
       sb ++= s"object ${ident(obj)}:\n"
       lines.foreach(l => sb ++= s"  $l\n")
       skipped.foreach(s => sb ++= s"  // not generated: $s\n")
-      if types.nonEmpty then sb ++= "\n" ++= types.mkString("\n")
+      if typeDefs.nonEmpty then sb ++= "\n" ++= typeDefs.mkString("\n")
       sb ++= s"end ${ident(obj)}\n"
       sb.toString
 
     def files: Map[String, String] =
-      roots.filter(api.packages.contains).map(p => s"${objectNames(p)}.scala" -> objectSource(p)).toMap
+      packages.map(p => s"${objectNames(p)}.scala" -> objectSource(p)).toMap
   end Generator
 
   // ---- Command line ---------------------------------------------------------------------------------

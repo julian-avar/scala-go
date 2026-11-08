@@ -205,7 +205,7 @@ object gears extends WithPlugin with Published {
 }
 
 /** Facades of the most-used Go standard library packages (`scalago.gostd`), generated from the
- *  packages' APIs by FacadeGen. Go types of packages outside this list are left out of them.
+ *  packages' APIs by FacadeGen, with the types of other packages that they use.
  */
 object gostd extends WithPlugin with Published {
   def artifactName = "scalago-gostd"
@@ -333,5 +333,32 @@ object ecosystem extends InBuildScalaGoModule {
     val go = os.proc(goBuild().path).call().out.text()
     if (jvm != go) throw new Exception(s"the JVM and Go outputs differ:\n--- JVM\n$jvm--- Go\n$go")
     println(s"JVM and Go outputs agree (${jvm.linesIterator.size} lines)")
+  }
+}
+
+/** Popular Go libraries used from Scala through generated facades: a bubbletea TUI styled with
+ *  lipgloss, using bubbles components. `mill gotui.goRun` runs it in the terminal; `mill gotui.check`
+ *  runs it on scripted keys and checks the final state.
+ */
+object gotui extends InBuildScalaGoModule {
+  def goRequires = Seq(
+    "github.com/charmbracelet/bubbletea@v1.3.10",
+    "github.com/charmbracelet/lipgloss@v1.1.0",
+    "github.com/charmbracelet/bubbles@v1.0.0"
+  )
+  def goFacadePackages = Seq(
+    "io",
+    "github.com/charmbracelet/bubbletea",
+    "github.com/charmbracelet/lipgloss",
+    "github.com/charmbracelet/bubbles/textinput",
+    "github.com/charmbracelet/bubbles/spinner",
+    "github.com/charmbracelet/bubbles/key"
+  )
+
+  def check() = Task.Command {
+    val expected = Seq("2 todos, 1 done, saved 3 times", "[ ] buy milk", "[x] walk the dog").mkString("", "\n", "\n")
+    val output = os.proc(goBuild().path, "--demo").call().out.text()
+    if (output != expected) throw new Exception(s"unexpected output:\n$output")
+    println("bubbletea demo: the final state is as expected")
   }
 }

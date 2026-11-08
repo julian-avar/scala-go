@@ -15,13 +15,18 @@
 //	(func <path> <Name> <signature>)
 //	(var <path> <Name> <type>)
 //	(const <path> <Name> <type> <value>)        value: the exact value, as a string
-//	(type <path> <Name> <kind>)                  kind: struct, interface, or other
+//	(type <path> <Name> <kind> [<underlying>])   kind: struct, interface, or other (whose
+//	                                             underlying type follows: func, basic, slice, ...);
+//	                                             (interface) follows interfaces without methods
 //	(method <path> <Type> <Name> <signature>)   method set of *Type (of Type for interfaces)
 //	(field <path> <Type> <Name> <type>)         struct fields, including promoted ones
 //	(error <message>)
 //
 // Signatures are (sig (<param type>...) (<result type>...) <variadic: true/false> [generic]
-// (names <param name>...)); unnamed parameters are "_". Types:
+// (names <param name>...) [(tparams (<name> <constraint>)...)]); unnamed parameters are "_".
+// Constraints are types: (interface) for any, a named interface, or (constraint) for those with
+// type sets (~int | string, comparable), which only instantiation with concrete types satisfies.
+// Types:
 //
 //	(basic <name>)  (named <path> <Name>)  (ptr T)  (slice T)  (array <n> T)  (map K V)
 //	(chan T)  (func <signature>)  (interface)  (struct)  (tparam <name>)
@@ -139,20 +144,24 @@ func printType(out io.Writer, path string, obj *types.TypeName) {
 		fmt.Fprintf(out, "(alias %s %s %s)\n", path, name, typ(t))
 		return
 	}
-	kind := "other"
-	switch named.Underlying().(type) {
-	case *types.Struct:
-		kind = "struct"
+	_, isInterface := named.Underlying().(*types.Interface)
+	switch u := named.Underlying().(type) {
 	case *types.Interface:
-		kind = "interface"
+		if u.Empty() {
+			// Without methods (unexported ones included), so it holds any value.
+			fmt.Fprintf(out, "(type %s %s interface (interface))\n", path, name)
+		} else {
+			fmt.Fprintf(out, "(type %s %s interface)\n", path, name)
+		}
+	case *types.Struct:
+		fmt.Fprintf(out, "(type %s %s struct)\n", path, name)
+	default:
+		fmt.Fprintf(out, "(type %s %s other %s)\n", path, name, typ(u))
 	}
-	fmt.Fprintf(out, "(type %s %s %s)\n", path, name, kind)
 
-	var methodSet *types.MethodSet
-	if kind == "interface" {
+	methodSet := types.NewMethodSet(types.NewPointer(named))
+	if isInterface {
 		methodSet = types.NewMethodSet(named)
-	} else {
-		methodSet = types.NewMethodSet(types.NewPointer(named))
 	}
 	for i := 0; i < methodSet.Len(); i++ {
 		m := methodSet.At(i).Obj().(*types.Func)
@@ -246,8 +255,33 @@ func signature(sig *types.Signature) string {
 		}
 		sb.WriteString(" " + name)
 	}
-	sb.WriteString("))")
+	sb.WriteString(")")
+	if tps := sig.TypeParams(); tps.Len() > 0 {
+		sb.WriteString(" (tparams")
+		for i := 0; i < tps.Len(); i++ {
+			tp := tps.At(i)
+			sb.WriteString(" (" + tp.Obj().Name() + " " + constraint(tp.Constraint()) + ")")
+		}
+		sb.WriteString(")")
+	}
+	sb.WriteString(")")
 	return sb.String()
+}
+
+// constraint describes a type parameter's constraint: a type when it is a basic interface (only
+// methods), which the interface type itself satisfies; (constraint) otherwise.
+func constraint(c types.Type) string {
+	iface, ok := c.Underlying().(*types.Interface)
+	if !ok || !iface.IsMethodSet() {
+		return "(constraint)"
+	}
+	if iface.Empty() {
+		return "(interface)"
+	}
+	if named, ok := types.Unalias(c).(*types.Named); ok && named.TypeArgs().Len() == 0 {
+		return typ(named)
+	}
+	return "(constraint)"
 }
 
 func typ(t types.Type) string {

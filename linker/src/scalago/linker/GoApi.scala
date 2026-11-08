@@ -22,6 +22,8 @@ enum GoType:
   case Func(sig: GoSignature)
   /** `any` / `interface{}`. */
   case EmptyInterface
+  /** A type parameter of a generic function. */
+  case TypeParam(name: String)
   /** Anything the linker cannot convert yet: interface and struct literals, generics. */
   case Other(description: String)
 
@@ -38,6 +40,7 @@ enum GoType:
     case Chan(e, _)        => s"chan $e"
     case Func(sig)         => s"func$sig"
     case EmptyInterface    => "any"
+    case TypeParam(n)      => n
     case Other(d)          => d
 
 object GoType:
@@ -45,7 +48,11 @@ object GoType:
 
 final case class GoSignature(params: List[GoType], results: List[GoType], variadic: Boolean, generic: Boolean,
     /** Parameter names ("_" for unnamed ones; empty when unknown). */
-    paramNames: List[String] = Nil):
+    paramNames: List[String] = Nil,
+    /** Type parameters of a generic function, with their constraints: `EmptyInterface` (`any`), a
+     *  named interface type, or `Other` for constraints with type sets (`~int | string`, `comparable`).
+     */
+    typeParams: List[(String, GoType)] = Nil):
   override def toString: String =
     val ps = params.zipWithIndex.map((t, i) => if variadic && i == params.size - 1 then s"...${t.asInstanceOf[GoType.Slice].elem}" else t.toString)
     val rs = results match
@@ -57,8 +64,18 @@ final case class GoSignature(params: List[GoType], results: List[GoType], variad
 enum GoTypeKind:
   case Struct, Interface, Other
 
-/** A defined Go type: its kind, its method set (of `*T`, or of `T` for interfaces) and its fields. */
-final case class GoTypeDecl(kind: GoTypeKind, methods: Map[String, GoSignature], fields: Map[String, GoType])
+/** A defined Go type: its kind, its method set (of `*T`, or of `T` for interfaces; exported
+ *  methods only), its fields, and for kind `Other` its underlying type (`type Celsius float64`,
+ *  `type Cmd func() Msg`); for interfaces without any methods, `EmptyInterface`.
+ */
+final case class GoTypeDecl(kind: GoTypeKind, methods: Map[String, GoSignature], fields: Map[String, GoType],
+    underlying: Option[GoType] = None):
+  /** The signature of a named func type (`type Cmd func() Msg`). */
+  def funcSignature: Option[GoSignature] = underlying.collect { case GoType.Func(sig) => sig }
+  /** The basic type of a named basic type (`type Color string`). */
+  def basic: Option[String] = underlying.collect { case GoType.Basic(b) => b }
+  /** Whether this is an interface without methods (`type Msg interface{}`), which holds any value. */
+  def isEmptyInterface: Boolean = kind == GoTypeKind.Interface && underlying.contains(GoType.EmptyInterface)
 
 /** The exported API of one Go package. */
 final case class GoPackage(
@@ -116,6 +133,17 @@ object GoApi:
       finally
         Using.resource(Files.walk(tmp))(_.iterator.asScala.toList.reverse.foreach(Files.deleteIfExists))
 
+  /** Adds the requirements that building the Go module in `moduleDir` needs to its `go.mod` (and
+   *  their checksums to `go.sum`): those of the modules its packages import indirectly. Unlike
+   *  `go mod tidy`, this does not need the dependencies' test-only requirements.
+   */
+  def completeGoMod(moduleDir: Path): Unit =
+    val process = ProcessBuilder(List("go", "list", "-mod=mod", "-deps", "./...").asJava)
+      .directory(moduleDir.toFile).redirectErrorStream(true).start()
+    process.getOutputStream.close()
+    val output = String(process.getInputStream.readAllBytes(), UTF_8)
+    if process.waitFor() != 0 then throw GoApiException(s"completing go.mod failed:\n$output")
+
   // ---- Output parsing -------------------------------------------------------------------------
 
   private enum SExpr:
@@ -135,8 +163,10 @@ object GoApi:
       val methods = mutable.LinkedHashMap.empty[String, mutable.LinkedHashMap[String, GoSignature]]
       val fields = mutable.LinkedHashMap.empty[String, mutable.LinkedHashMap[String, GoType]]
       val aliases = mutable.LinkedHashMap.empty[String, GoType]
+      val underlying = mutable.LinkedHashMap.empty[String, GoType]
       def build = GoPackage(path, name, funcs.toMap, vars.toMap, consts.toMap, constValues.toMap,
-        kinds.map((t, k) => t -> GoTypeDecl(k, methods.get(t).fold(Map.empty)(_.toMap), fields.get(t).fold(Map.empty)(_.toMap))).toMap,
+        kinds.map((t, k) => t -> GoTypeDecl(k, methods.get(t).fold(Map.empty)(_.toMap), fields.get(t).fold(Map.empty)(_.toMap),
+          underlying.get(t))).toMap,
         aliases.toMap)
 
     val builders = mutable.LinkedHashMap.empty[String, Builder]
@@ -151,7 +181,8 @@ object GoApi:
           pkg(path).consts(name) = goType(t)
           rest.collectFirst { case Str(v) => v }.foreach(pkg(path).constValues(name) = _)
         case SList(Atom("alias") :: Str(path) :: Atom(name) :: t :: Nil) => pkg(path).aliases(name) = goType(t)
-        case SList(Atom("type") :: Str(path) :: Atom(name) :: Atom(kind) :: Nil) =>
+        case SList(Atom("type") :: Str(path) :: Atom(name) :: Atom(kind) :: rest) =>
+          rest.headOption.foreach(u => pkg(path).underlying(name) = goType(u))
           pkg(path).kinds(name) = kind match
             case "struct"    => GoTypeKind.Struct
             case "interface" => GoTypeKind.Interface
@@ -168,7 +199,10 @@ object GoApi:
   private def signature(e: SExpr): GoSignature = e match
     case SList(Atom("sig") :: SList(params) :: SList(results) :: Atom(variadic) :: rest) =>
       val names = rest.collectFirst { case SList(Atom("names") :: ns) => ns.collect { case Atom(n) => n } }.getOrElse(Nil)
-      GoSignature(params.map(goType), results.map(goType), variadic == "true", rest.contains(Atom("generic")), names)
+      val typeParams = rest.collectFirst { case SList(Atom("tparams") :: tps) =>
+        tps.collect { case SList(List(Atom(n), c)) => n -> goType(c) }
+      }.getOrElse(Nil)
+      GoSignature(params.map(goType), results.map(goType), variadic == "true", rest.contains(Atom("generic")), names, typeParams)
     case other => throw GoApiException(s"bad signature: $other")
 
   private def goType(e: SExpr): GoType = e match
@@ -184,7 +218,8 @@ object GoApi:
     case SList(List(Atom("func"), sig))                    => GoType.Func(signature(sig))
     case SList(List(Atom("interface")))                    => GoType.EmptyInterface
     case SList(List(Atom("generic"), Str(pkg), Atom(name))) => GoType.Other(s"$pkg.$name[...] (generic)")
-    case SList(List(Atom("tparam"), Atom(name)))           => GoType.Other(s"type parameter $name")
+    case SList(List(Atom("tparam"), Atom(name)))           => GoType.TypeParam(name)
+    case SList(List(Atom("constraint")))                   => GoType.Other("a constraint with a type set")
     case SList(List(Atom("unknown"), Str(d)))              => GoType.Other(d)
     case SList(Atom(other) :: _)                           => GoType.Other(s"$other type")
     case other                                             => throw GoApiException(s"bad type: $other")

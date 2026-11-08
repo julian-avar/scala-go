@@ -44,6 +44,61 @@ What does not work:
   instances and `Mirror`s (most Scala 3 libraries) are fine.
 - **Scala 2 libraries** (no TASTy).
 
+## Go libraries
+
+Any Go module can be used from Scala. List its module in `goRequires` and the packages you use
+in `goFacadePackages`, and `ScalaGoModule` generates their facades (Scala package `gofacades`,
+one object per Go package):
+
+```scala
+object app extends ScalaGoModule {
+  def goRequires = Seq("github.com/charmbracelet/bubbletea@v1.3.10", "github.com/charmbracelet/lipgloss@v1.1.0")
+  def goFacadePackages = Seq("github.com/charmbracelet/bubbletea", "github.com/charmbracelet/lipgloss")
+}
+```
+
+```scala
+import gofacades.{lipgloss, tea}
+
+final case class Counter(n: Int) extends tea.Model:            // a Go interface, implemented in Scala
+  def Init(): tea.Cmd = null
+  def Update(msg: tea.Msg): (tea.Model, tea.Cmd) = msg match   // Go's two results are a tuple
+    case k: tea.KeyMsg if k.String() == "q" => (this, tea.Quit) // Go functions are Scala functions
+    case k: tea.KeyMsg if k.String() == "+" => (Counter(n + 1), null)
+    case _                                  => (this, null)
+  def View(): String = Counter.style.Render(s"count: $n")
+
+object Counter:
+  val style = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
+
+@main def run(): Unit = tea.NewProgram(Counter(0)).Run()
+```
+
+The facades read like the Go API, with Scala types:
+
+- Go numbers are Scala numbers (`int` is `Long`), `string` is `String`, several results are a
+  tuple, and a trailing `error` is thrown as `GoException` (a Scala `GoException` thrown where Go
+  calls Scala becomes the `error` it wraps, such as `io.EOF`).
+- Go types are classes, and Go interfaces are traits that Scala classes can implement. Go func
+  types are Scala function types (`tea.Cmd` is `() => Any`), and interfaces without methods are
+  `Any` (`tea.Msg`), so Scala lambdas and case classes can be passed directly.
+- Conversions to named types are written as in Go: `lipgloss.Color("205")`, `time.Duration(n)`.
+- Go structs are held by reference. They go back to Go as Go code passes them: by value when
+  their methods allow (`tea.KeyMsg`, `lipgloss.Style`), so the library's type switches see them.
+  Assigning a field (`input.Placeholder = "..."`) changes the struct you hold. Methods with value
+  receivers return copies, as in Go: `val (input2, cmd) = input.Update(msg)`.
+- `new T` is Go's zero value of `T`, and `null` is Go's `nil`.
+- The types of other packages that the facades use are generated too (only their types). List a
+  package itself to get its functions and constants (`"time"` for `time.Second`).
+- Members that cannot be represented are left out with a comment saying why, in
+  `out/app/goFacadeSources.dest`. The most common cases are generics with type sets and funcs
+  stored inside Go data.
+
+`goRequires` modules are downloaded by `go` (module proxy and cache), so the first build needs
+network access. Programs that use Go libraries only run as Go, not on the JVM. This repository's
+`gotui/` is a complete bubbletea application with bubbles components, and `mill gotui.check`
+runs it on scripted keys.
+
 ## The JDK
 
 scala-go has its own Java standard library (javalib), written in Scala: `java.lang`,

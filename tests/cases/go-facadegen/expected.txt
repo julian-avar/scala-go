@@ -1,0 +1,23 @@
+tick 0
+key +: count=1
+key x: count=1
+key +: count=2
+batch
+tick 1
+tick 2
+quit
+renamed=5
+renamed=0
+KeyMsg value alt+z
+Counter pointer renamed=0
+string text
+nil
+FF00AA
+[FF00AA]alt+z
+true false
+Tick(4)
+> STYLED
+> plain
+a,b,c
+n0:0 n1:1 n2:4 n3:9
+sealed

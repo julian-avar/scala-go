@@ -43,6 +43,9 @@ object GoInterop:
     case ScalaType.Arr(e)                                 => ScalaType.Arr(normalize(e))
     case prim                                             => prim
 
+  /** The accessor of a tuple's `i`-th element (`_1`). */
+  def TupleElement(i: Int): MethodName = MethodName(s"_$i", Nil, Type.Object)
+
   /** `scalago.go.GoFunctionN`: Go funcs returned to Scala. */
   def goFunctionClass(arity: Int): ClassName = s"scalago.go.GoFunction$arity"
   val GoFunctionConstructor: MethodName = MethodName(MethodName.ConstructorSimpleName, List(Type.Object), Type.Void)
@@ -209,9 +212,26 @@ final class GoInterop(ctx: LinkContext):
   private def namedDecl(pkg: String, name: String): GoTypeDecl =
     api.typeDecl(pkg, name).getOrElse(fail(s"unknown Go type ${qualified(pkg, name)}"))
 
+  /** A named interface without methods (`type Msg interface{}`): converted as `any`. */
+  private object EmptyInterfaceNamed:
+    def unapply(g: GoType): Boolean = g match
+      case GoType.Named(pkg, n) if pkg != ScalaExportPkg => api.typeDecl(pkg, n).exists(_.isEmptyInterface)
+      case _                                           => false
+
+  /** The signature of a named func type (`type Cmd func() Msg`), which converts as its func type. */
+  private object NamedFunc:
+    def unapply(g: GoType): Option[GoSignature] = g match
+      case GoType.Named(pkg, n) if pkg != ScalaExportPkg => api.typeDecl(pkg, n).flatMap(_.funcSignature)
+      case _                                           => None
+
   private def scalaGoType(s: ScalaType): String =
     val t = ctx.goType(erased(s))
     if t.isEmpty then "any" else t
+
+  /** Whether values of Scala type `cls` can be Go values (and Go structs, which go to Go
+   *  interfaces by value or by pointer, see `rt.ToGoInterface`): facades and `Any`.
+   */
+  private def holdsGoValues(cls: ClassName): Boolean = cls == ClassName.Object || program.isFacade(cls)
 
   // ---- Scala to Go ------------------------------------------------------------------------------
 
@@ -226,12 +246,15 @@ final class GoInterop(ctx: LinkContext):
   private def toGoNormalized(e: String, s: ScalaType, g: GoType): String = (s, g) match
     case (_: Ref, GoType.Named(ScalaExportPkg, cls)) => s"rt.Cast[${ctx.exports.ifaceName(cls)}](any($e))"
     case (_, GoType.Basic(b)) => basicToGo(e, s, b)
+    case (_, EmptyInterfaceNamed()) => toGoNormalized(e, s, GoType.EmptyInterface)
+    case (Ref(Arity("scala.Function", _), args), NamedFunc(sig)) => funcToGo(e, args, sig)
     case (Prim(p), GoType.Named(pkg, n)) if p.isNumeric && namedDecl(pkg, n).kind == GoTypeKind.Other =>
       s"${qualified(pkg, n)}($e)"
     case (Ref(cls, _), GoType.Named(pkg, n)) =>
       val decl = namedDecl(pkg, n)
       val goT = qualified(pkg, n)
       decl.kind match
+        case GoTypeKind.Interface if holdsGoValues(cls) => s"rt.ToGoInterface[$goT]($e)"
         case GoTypeKind.Interface => s"rt.Cast[$goT]($e)"
         case GoTypeKind.Struct if standsFor(cls, pkg, n) => s"rt.Deref[$goT]($e)"
         case GoTypeKind.Other if standsFor(cls, pkg, n)  => s"rt.Cast[$goT]($e)"
@@ -246,7 +269,7 @@ final class GoInterop(ctx: LinkContext):
     case (Ref(SeqClass, List(se)), GoType.Slice(ge)) => seqToGo(e, se, ge)
     case (Ref(Arity("scala.Function", _), args), GoType.Func(sig)) => funcToGo(e, args, sig)
     case (Prim(p), GoType.EmptyInterface) if p.isPrimitive => s"any($e)"
-    case (Ref(ClassName.String | ClassName.Object, _), GoType.EmptyInterface) => s"rt.ToGoAny($e)"
+    case (Ref(cls, _), GoType.EmptyInterface) if cls == ClassName.String || holdsGoValues(cls) => s"rt.ToGoAny($e)"
     case (_: Ref, GoType.EmptyInterface)              => e
     case _ => fail(s"cannot pass Scala type $s as Go type $g")
 
@@ -304,6 +327,8 @@ final class GoInterop(ctx: LinkContext):
   private def fromGoNormalized(e: String, g: GoType, s: ScalaType): String = (g, s) match
     case (GoType.Named(ScalaExportPkg, _), _: Ref) => ctx.cast(s"any($e)", Type.Object, erased(s))
     case (GoType.Basic(b), _) => basicFromGo(e, b, s)
+    case (EmptyInterfaceNamed(), _) => fromGoNormalized(e, GoType.EmptyInterface, s)
+    case (NamedFunc(sig), Ref(Arity("scala.Function", n), args)) => funcFromGo(e, sig, n, args)
     case (GoType.Named(pkg, n), Prim(p)) if p.isNumeric && namedDecl(pkg, n).kind == GoTypeKind.Other =>
       s"${Hijacked.primitiveGoType(p)}($e)"
     case (GoType.Named(pkg, n), Ref(cls, _)) =>
@@ -419,7 +444,11 @@ final class GoInterop(ctx: LinkContext):
             case Some(sig) if !(g.isProperty && sig.params.nonEmpty) => call(q, sig, args, argTypes, g.result)
             case _ if args.isEmpty && pkg.vars.contains(g.goName)   => fromGo(q, pkg.vars(g.goName), g.result)
             case _ if args.isEmpty && pkg.consts.contains(g.goName) => fromGo(q, pkg.consts(g.goName), g.result)
-            case _ => fail(s"Go package ${facade.pkg} has no exported function, variable or constant ${g.goName}")
+            case _ if args.size == 1 && pkg.types.get(g.goName).exists(d => d.kind == GoTypeKind.Other && d.underlying.isDefined) =>
+              // A conversion to a named type (`lipgloss.Color("205")`, `time.Duration(n)`).
+              val underlying = pkg.types(g.goName).underlying.get
+              fromGo(s"$q(${toGo(args.head, argTypes.head, underlying)})", GoType.Named(facade.pkg, g.goName), g.result)
+            case _ => fail(s"Go package ${facade.pkg} has no exported function, variable, constant or type ${g.goName}")
       else
         val t = facadeType(owner.name)
         val recv = s"rt.Cast[${t.stored}](${receiver.get})"
@@ -455,7 +484,7 @@ final class GoInterop(ctx: LinkContext):
    */
   private def instantiate(sig: GoSignature, argTypes: List[ScalaType], result: ScalaType): GoSignature =
     def mentionsTypeParam(g: GoType): Boolean = g match
-      case GoType.Other(d)                    => d.startsWith("type parameter")
+      case GoType.TypeParam(_)                => true
       case GoType.Ptr(e)                      => mentionsTypeParam(e)
       case GoType.Slice(e)                    => mentionsTypeParam(e)
       case GoType.ArrayOf(_, e)               => mentionsTypeParam(e)
@@ -535,6 +564,17 @@ final class GoInterop(ctx: LinkContext):
         closure(scalaGoType(s), s"rt.Check(${names.last}); return ${fromGo(names.head, rs.head, s)}")
       case _ => fail(s"the Go results ${rs.mkString("(", ", ", ")")} do not match the Scala result type $s")
 
+  /** Assigns the elements of `e`, a Scala tuple of type `s`, to the Go results `targets`. */
+  private def tupleToGo(e: String, s: ScalaType, targets: List[(String, GoType)]): String = s match
+    case Ref(Arity("scala.Tuple", n), targs) if n == targets.size =>
+      val t = fresh("t")
+      val elems = targets.zip(targs).zipWithIndex.map { case (((name, gt), st), i) =>
+        val elem = ctx.cast(s"${ctx.dispatcher(TupleElement(i + 1))}($t)", Type.Object, erased(st))
+        s"$name = ${toGo(elem, st, gt)}"
+      }
+      s"""$t := $e; if $t == nil { rt.ThrowKind(rt.NullPointer, "") }; ${elems.mkString("; ")}"""
+    case _ => fail(s"the Go results ${targets.map(_._2).mkString("(", ", ", ")")} need a Scala tuple of ${targets.size} elements, not $s")
+
   // ---- Go types in Scala code -----------------------------------------------------------------
 
   /** `new C` for a facade class: the Go zero value. */
@@ -547,11 +587,21 @@ final class GoInterop(ctx: LinkContext):
         case GoTypeKind.Interface => fail("Go interface types have no zero value to create")
     }
 
+  /** A type test against a facade. Facade references hold Go structs as pointers, but Go interfaces
+   *  (and so `Any`) can hold struct values (`tea.KeyMsg` in a `tea.Msg`): both pass.
+   */
   def typeTest(e: String, cls: ClassName): String =
-    reporting(Position.NoPosition, s"type test against ${scalaName(cls)}")(s"rt.Is[${facadeType(cls).stored}]($e)")
+    reporting(Position.NoPosition, s"type test against ${scalaName(cls)}") {
+      val t = facadeType(cls)
+      if t.isStruct then s"rt.IsStruct[${t.name}]($e)" else s"rt.Is[${t.stored}]($e)"
+    }
 
+  /** A cast to a facade; a struct value is copied to a new pointer (see `typeTest`). */
   def cast(e: String, cls: ClassName): String =
-    reporting(Position.NoPosition, s"cast to ${scalaName(cls)}")(s"rt.CastForeign[${facadeType(cls).stored}]($e)")
+    reporting(Position.NoPosition, s"cast to ${scalaName(cls)}") {
+      val t = facadeType(cls)
+      if t.isStruct then s"rt.CastStruct[${t.name}]($e)" else s"rt.CastForeign[${t.stored}]($e)"
+    }
 
   // ---- Go interfaces implemented in Scala -------------------------------------------------------
 
@@ -580,21 +630,17 @@ final class GoInterop(ctx: LinkContext):
       val hasError = rs.lastOption.contains(GoType.Error)
       val scalaReturnsError = g.result == Ref(GoErrorClass, Nil)
       val params = names.zip(sig.params).map((n, gt) => s"$n ${typeString(gt)}").mkString(", ")
-      if hasError && !scalaReturnsError then
-        // Scala exceptions become the error result.
-        val values = rs.init
-        val resultNames = values.indices.map(_ => fresh("r")).toList
-        val resultDecl = (resultNames.zip(values).map((n, gt) => s"$n ${typeString(gt)}") :+ "err error").mkString(", ")
-        val body = values match
-          case Nil => s"$callScala; return"
-          case List(v) => s"${resultNames.head} = ${toGo(callScala, g.result, v)}; return"
-          case _ => fail("Go methods with several results cannot be implemented in Scala yet")
-        s"func (this *$struct) ${g.goName}($params) ($resultDecl) { defer rt.GoCallback(); defer rt.RecoverAsError(&err); $body }"
-      else
-        val (resultDecl, body) = rs match
-          case Nil       => ("", callScala)
-          case List(res) => (s" ${typeString(res)}", s"return ${toGo(callScala, g.result, res)}")
-          case _         => fail("Go methods with several results cannot be implemented in Scala yet")
-        s"func (this *$struct) ${g.goName}($params)$resultDecl { defer rt.GoCallback(); $body }"
+      // Scala exceptions become the error result, unless the Scala method returns the error.
+      val errorResult = hasError && !scalaReturnsError
+      val values = if errorResult then rs.init else rs
+      val resultNames = values.indices.map(_ => fresh("r")).toList
+      val resultDecl = resultNames.zip(values).map((n, gt) => s"$n ${typeString(gt)}") ++ (if errorResult then List("err error") else Nil)
+      val assignments = values match
+        case Nil       => callScala
+        case List(v)   => s"${resultNames.head} = ${toGo(callScala, g.result, v)}"
+        case several   => tupleToGo(callScala, g.result, resultNames.zip(several))
+      val recover = if errorResult then "defer rt.RecoverAsError(&err); " else ""
+      val resultList = if resultDecl.isEmpty then "" else resultDecl.mkString(" (", ", ", ")")
+      s"func (this *$struct) ${g.goName}($params)$resultList { defer rt.GoCallback(); $recover$assignments; return }"
     }
 end GoInterop

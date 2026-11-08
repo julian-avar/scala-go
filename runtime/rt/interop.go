@@ -2,6 +2,8 @@ package rt
 
 import (
 	"reflect"
+	"strings"
+	"sync"
 	"unsafe"
 )
 
@@ -207,12 +209,106 @@ func foreignToString(x any) (string, bool) {
 // foreignClassName names the Go type of a value held by Scala code (e.g. `*strings.Builder`).
 func foreignClassName(x any) string { return reflect.TypeOf(x).String() }
 
-// ToGoAny passes a Scala value to a Go parameter of type any: Scala strings become Go strings.
+// ToGoAny passes a Scala value to a Go parameter of type any: Scala strings become Go strings,
+// and Go structs held by Scala code are passed as Go code passes them (see goStructValue).
 func ToGoAny(x any) any {
-	if s, ok := x.(*String); ok && s != nil {
-		return s.GoString()
+	switch v := x.(type) {
+	case nil, scalaClass, scalaClassName:
+		return x
+	case *String:
+		if v != nil {
+			return v.GoString()
+		}
+		return x
+	}
+	if value, ok := goStructValue(x, nil); ok {
+		return value
 	}
 	return x
+}
+
+// ToGoInterface passes a Scala value to a Go parameter of interface type I (see goStructValue).
+func ToGoInterface[I any](x any) I {
+	switch x.(type) {
+	case nil:
+		var zero I
+		return zero
+	case scalaClass, scalaClassName:
+		return x.(I)
+	}
+	if value, ok := goStructValue(x, reflect.TypeFor[I]()); ok {
+		return value.(I)
+	}
+	return x.(I)
+}
+
+// structValueKey caches goStructValue's decision per struct pointer type and interface.
+type structValueKey struct{ ptr, iface reflect.Type }
+
+var (
+	structValues sync.Map // structValueKey -> bool
+	scalaPkgs    = func() [2]string {
+		rt := reflect.TypeFor[String]().PkgPath()
+		return [2]string{rt, strings.TrimSuffix(rt, "/rt") + "/scala"}
+	}()
+)
+
+// goStructValue returns the struct value that a Go struct pointer held by Scala code stands for,
+// when passed to a Go interface (iface; nil for any). Facades hold Go structs as pointers, but Go
+// code passes many struct types by value, and code receiving them tests for values (bubbletea's
+// `case tea.KeyMsg:`). A struct is passed by value when its value implements the interface:
+// for any, when the type has no pointer-receiver methods (`tea.KeyMsg`, `lipgloss.Style`), and
+// otherwise when the value's methods suffice (`time.Time` as a `fmt.Stringer`). Types with
+// pointer-receiver methods stay pointers (`*bytes.Buffer` as an `io.Writer` or in an any).
+func goStructValue(x any, iface reflect.Type) (any, bool) {
+	t := reflect.TypeOf(x)
+	if t.Kind() != reflect.Pointer || t.Elem().Kind() != reflect.Struct {
+		return nil, false
+	}
+	key := structValueKey{t, iface}
+	byValue, ok := structValues.Load(key)
+	if !ok {
+		elem := t.Elem()
+		scala := elem.PkgPath() == scalaPkgs[0] || elem.PkgPath() == scalaPkgs[1]
+		if iface == nil {
+			byValue = !scala && t.NumMethod() == elem.NumMethod()
+		} else {
+			byValue = !scala && elem.Implements(iface)
+		}
+		structValues.Store(key, byValue)
+	}
+	if !byValue.(bool) {
+		return nil, false
+	}
+	v := reflect.ValueOf(x)
+	if v.IsNil() {
+		return nil, false
+	}
+	return v.Elem().Interface(), true
+}
+
+// IsStruct implements isInstanceOf for a facade of Go struct type T. Facade references hold
+// pointers (*T), but Go interfaces, and so Scala's Any, can also hold T values (bubbletea's
+// tea.KeyMsg in a tea.Msg).
+func IsStruct[T any](x any) bool {
+	if _, ok := x.(*T); ok {
+		return true
+	}
+	_, ok := x.(T)
+	return ok
+}
+
+// CastStruct implements asInstanceOf for a facade of Go struct type T: a T value is copied to a
+// new pointer (see IsStruct); null passes.
+func CastStruct[T any](x any) any {
+	switch v := x.(type) {
+	case nil, *T:
+		return x
+	case T:
+		return &v
+	}
+	ThrowKind(ClassCast, GetClass(x).name+" cannot be cast to "+reflect.TypeFor[*T]().String())
+	return nil
 }
 
 // CastForeign implements asInstanceOf for a Go type: null passes, other values must have type T.

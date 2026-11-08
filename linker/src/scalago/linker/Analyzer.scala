@@ -274,6 +274,10 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
             instantiate(name)
             reach(name, ctor)
           args.foreach(useScalaType(_, toScala))
+        case TupleArity(n) =>
+          // A Scala tuple returned to Go as several results (Go methods implemented in Scala).
+          (1 to n).foreach(i => callVirtual(GoInterop.TupleElement(i)))
+          args.foreach(useScalaType(_, toScala))
         case GoInterop.SeqClass if !toScala =>
           callVirtual(GoInterop.SeqLength)
           callVirtual(GoInterop.SeqApply)

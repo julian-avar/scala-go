@@ -75,7 +75,18 @@ class EndToEndTests extends munit.FunSuite:
     val classes = Files.createDirectories(work.resolve("classes"))
     val io = programIO(dir)
 
-    compile(dir, classes)
+    // Subdirectories with a go.mod are local Go modules the program uses.
+    val goModules = Using.resource(Files.list(dir))(_.iterator.asScala.filter(d => Files.exists(d.resolve("go.mod"))).toList)
+      .map(d => goModulePath(d.resolve("go.mod")) -> d.toAbsolutePath.toString)
+    val goRequires = goModules.map((m, _) => m -> "v0.0.0")
+    // `facades.txt` lists Go packages whose facades are generated (package `gofacades`) and compiled.
+    val facadesFile = dir.resolve("facades.txt")
+    val generated =
+      if !Files.exists(facadesFile) then Nil
+      else
+        val packages = Files.readAllLines(facadesFile, UTF_8).asScala.map(_.trim).filter(_.nonEmpty).toSeq
+        FacadeGen.run(FacadeGen.Config("gofacades", packages, goRequires, goModules), work.resolve("facades"))
+    compile(dir, classes, generated)
     // A library (`library.txt`) is linked and used by the Go module in `consumer/`.
     val isLibrary = Files.exists(dir.resolve("library.txt"))
     // Programs calling Go code (`go-only.txt` says why) cannot run on the JVM.
@@ -83,13 +94,10 @@ class EndToEndTests extends munit.FunSuite:
       val jvmClasspath = (classes.toString +: userLibrary +: (extraClasspath ++ scalaLibrary)).mkString(File.pathSeparator)
       assertNoDiff(run(Seq(javaBinary, "-cp", jvmClasspath, mainClass), work, io = io), expected, "JVM output")
 
-    // Subdirectories with a go.mod are local Go modules the program uses.
-    val goModules = Using.resource(Files.list(dir))(_.iterator.asScala.filter(d => Files.exists(d.resolve("go.mod"))).toList)
-      .map(d => goModulePath(d.resolve("go.mod")) -> d.toAbsolutePath.toString)
     val config = Linker.Config(
       mainObject = mainClass,
       goModulePath = if isLibrary then LibraryModule else "scalagoapp",
-      goRequires = goModules.map((m, _) => m -> "v0.0.0"),
+      goRequires = goRequires,
       goReplaces = goModules,
       library = isLibrary,
       // SCALAGO_LINE_DIRECTIVES=false: Go positions in Go error messages, for debugging the linker.
@@ -215,8 +223,9 @@ class EndToEndTests extends munit.FunSuite:
   private def deleteRecursively(dir: Path): Unit =
     if !sys.env.contains("SCALAGO_KEEP_WORK") then Using.resource(Files.walk(dir))(_.iterator.asScala.toList.reverse.foreach(Files.delete))
 
-  private def compile(sourceDir: Path, outDir: Path): Unit =
-    val sources = Using.resource(Files.list(sourceDir))(_.iterator.asScala.map(_.toString).filter(_.endsWith(".scala")).toList)
+  private def compile(sourceDir: Path, outDir: Path, extraSources: Seq[Path]): Unit =
+    val sources = Using.resource(Files.list(sourceDir))(_.iterator.asScala.map(_.toString).filter(_.endsWith(".scala")).toList) ++
+      extraSources.map(_.toString)
     val args = Array(
       "-d", outDir.toString,
       "-classpath", (userLibrary +: (extraClasspath ++ scalaLibrary)).mkString(File.pathSeparator),

@@ -99,6 +99,22 @@ Go modules other than the standard library go in `goRequires` (`"module@version"
 `goLocalModules` for local directories with a `go.mod` (see `example/`). Facade members throw on
 the JVM. See [docs/design.md](docs/design.md#go-interop) for the conversion rules.
 
+Popular Go libraries work through generated facades. For example, `gotui/` is a terminal app on
+[bubbletea](https://github.com/charmbracelet/bubbletea), [bubbles](https://github.com/charmbracelet/bubbles)
+and [lipgloss](https://github.com/charmbracelet/lipgloss), with its model in Scala:
+
+```scala
+final case class Counter(n: Int) extends tea.Model:
+  def Init(): tea.Cmd = null
+  def Update(msg: tea.Msg): (tea.Model, tea.Cmd) = msg match
+    case k: tea.KeyMsg if k.String() == "q" => (this, tea.Quit)
+    case k: tea.KeyMsg if k.String() == "+" => (Counter(n + 1), null)
+    case _                                  => (this, null)
+  def View(): String = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).Render(s"count: $n")
+```
+
+See [docs/guide.md](docs/guide.md#go-libraries).
+
 ## Concurrency with gears
 
 [gears](https://github.com/lampepfl/gears) runs on goroutines, unchanged: add it as a normal
@@ -156,6 +172,7 @@ Methods annotated with `@throws` return a Go `error`. Other exceptions are panic
 | `mill-build/src/`    | `ScalaGoModule`/`ScalaGoLibraryModule` and `TastyIR`, published as `mill-scalago` |
 | `example/`           | A program built with `ScalaGoModule`: `mill example.goRun Ada Grace`    |
 | `ecosystem/`         | Popular Scala libraries compiled from TASTy (`mill ecosystem.check`: JVM and Go agree) |
+| `gotui/`             | A bubbletea/bubbles/lipgloss terminal app in Scala (`mill gotui.goRun`; `mill gotui.check`) |
 | `bench/`             | CPU benchmarks, run on the JVM (`mill bench.run`) and as Go (`mill bench.goRun`) |
 | `tests/published/`   | A project using only the published artifacts (`tests/published/check.sh` after `publishLocal`) |
 | `tests/cases/`       | End-to-end programs with their expected output                          |

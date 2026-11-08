@@ -284,7 +284,8 @@ object url:
   call site, not a Go compile error in generated code. Packages resolve in the output Go module,
   whose `go.mod` lists the configured requirements (`--go-require`, `--go-replace`; in Mill,
   `goRequires` and `goLocalModules`). `go list -mod=mod` completes `go.mod`/`go.sum`, which needs
-  the network for third-party modules.
+  the network for third-party modules: first for the facades' packages, then, once the code is
+  written, for the modules they import (`go build` wants those listed as indirect requirements).
 - **Conversions** (`GoInterop.toGo`/`fromGo`):
 
   | Scala                      | Go                                                                 |
@@ -293,13 +294,14 @@ object url:
   | `String`                   | `string`, transcoded (UTF-16 ↔ UTF-8)                              |
   | `GoString`                 | `string`, as is                                                    |
   | facade class/trait         | its Go type. Struct types are held as pointers: `T` values are copied in and out, `*T` passed as is |
+  | facade struct class, `Any` | a Go interface (or `any`): a struct goes by value if its value implements the interface (for `any`: if it has no pointer-receiver methods), otherwise as the pointer (see below) |
   | Scala class                | a Go interface it implements                                       |
   | `Array[T]`                 | `[]T`. Memory is shared when the representations match (`Array[Byte]`/`[]byte`, `Array[Long]`/`[]int64`, ...); otherwise elements are copied |
   | `T*`, `Array[T]`           | variadic `...T`. Literal varargs skip the `Seq`                    |
-  | `(A, B) => C`              | `func(A, B) C`: calls `apply` through a dispatcher. A Go func *returned* to Scala becomes a `GoFunctionN` wrapping a Go closure that converts with the facade's types |
+  | `(A, B) => C`              | `func(A, B) C`, or a named func type (`type Cmd func() Msg`): calls `apply` through a dispatcher. A Go func *returned* to Scala becomes a `GoFunctionN` wrapping a Go closure that converts with the facade's types |
   | `GoSlice[T]`, `GoMap[K, V]`, `GoChan[T]`, `GoPtr[T]` | the Go value as is (no copy), if `T` is the canonical view of the Go element type (see below); directional channels and named types are converted |
   | `(A, B)` result            | two results                                                        |
-  | `Any`                      | `any`; Scala strings become Go strings                             |
+  | `Any`                      | `any`, or a named interface without methods (`type Msg interface{}`); Scala strings become Go strings |
 
 - **Errors.** A trailing `error` result that the facade's result type leaves out is checked, and
   a non-nil error is thrown as `scalago.go.GoException` (its `error` field is the Go error). A
@@ -307,10 +309,18 @@ object url:
   errors become the usual Java exceptions). Scala exceptions unwind through Go frames as panics.
 - **Go interfaces implemented in Scala.** A Scala class extending a facade trait gets Go methods
   (with the Go names) on its struct. They convert arguments, call the Scala method, and convert the
-  result. If the Go method returns an `error` that the Scala method does not, an exception becomes
-  that error (`rt.RecoverAsError`): a `GoException` gives back the error it wraps, anything else
-  becomes an `*rt.ScalaError`.
+  result; several Go results come from a Scala tuple (bubbletea's `Update(Msg) (Model, Cmd)` is
+  `def Update(msg: Msg): (Model, Cmd)`). If the Go method returns an `error` that the Scala method
+  does not, an exception becomes that error (`rt.RecoverAsError`): a `GoException` gives back the
+  error it wraps, anything else becomes an `*rt.ScalaError`.
 - **Go values in Scala code** are opaque. `isInstanceOf`/`asInstanceOf` are Go type assertions.
+  Go interfaces can hold struct values (`tea.KeyMsg` in a `tea.Msg`), but facades hold struct
+  pointers: a type test against a struct facade accepts both, and the cast copies a value to a new
+  pointer (`rt.IsStruct`, `rt.CastStruct`). In the other direction, passing such a struct to a Go
+  interface passes the value again where Go code would (`rt.ToGoInterface`, `rt.ToGoAny`): Go
+  code receiving it tests for `KeyMsg`, not `*KeyMsg`. The choice depends on the type alone, by
+  its method sets, and is cached per type: a struct with pointer-receiver methods
+  (`bytes.Buffer`, `url.URL`) stays a pointer in an `any`.
   `toString` uses `Error()`/`String()` when available. `getClass.getName` is the Go type
   (`*strings.Builder`). `==` is Go `==`, or identity for maps, slices and funcs. `new T` is the zero
   value.
@@ -319,6 +329,9 @@ object url:
 - **Imports.** Packages are imported with aliases (`gp_url "net/url"`) so they cannot clash with
   generated names or each other.
 
+- **Conversions to named types** are package members named as the type, with one parameter:
+  `def Color(value: String): Color` in a facade of `lipgloss` is Go's `lipgloss.Color(value)`,
+  with the argument converted to the underlying type.
 - **Generic Go functions** are called through monomorphic facades: `def Max(xs: GoSlice[GoInt]):
   GoInt` for `slices.Max`. The Go types that mention type parameters are taken from the facade's
   Scala types, and the call passes values of those types, so Go infers the type arguments. A
@@ -334,17 +347,34 @@ from Go packages' APIs, as ScalablyTyped does from `.d.ts` files. Each package b
   (`int` is `Long`), `string` is `String`, `error` is `GoError`, Go types are the generated
   facades, funcs are Scala functions, and several results are tuples. A trailing `error` is
   thrown, except where the error is the function's value (`errors.New`, `Errorf`, `ctx.Err()`).
+- Go func types without methods are type aliases of Scala function types (`type Cmd = () =>
+  Any`), and interfaces without methods of `Any` (`type Msg = Any`), so that Scala lambdas and
+  values are passed as they are; aliases of function types are erased in the IR, so the plugin
+  records facade types as seen before erasure, aliases followed. Other named non-struct types
+  are classes, with a conversion (`def Color(value: String): Color`).
+- Generic functions whose type parameters are constrained by interfaces (`key.Matches[K
+  fmt.Stringer](k K, ...)`) take the constraint (`k: fmt.Stringer`); the linker passes values of
+  that type, so Go infers it as the type argument. Constraints with type sets (`~int | string`,
+  `comparable`) have no such type, and these functions are left out.
+- The types of other packages that the generated members use are generated too, transitively
+  (`time.Duration` for `tea.Tick`, `io.Reader` for `tea.WithInput`), but only the types: a
+  package's functions, variables and constants need the package itself in the list. `goapi`
+  runs again with the newly needed packages until none is missing. `internal` packages, which
+  the generated Go module could not import, are left out.
 - Inside Go data, the canonical views apply (`GoSlice[GoString]`, `GoMap[GoString, GoInt]`), so
   slices are shared and the right Go types are created.
 - Go typing is structural and Scala's is nominal, so a generated type extends every generated
   interface whose methods it has (`class Buffer extends io.Writer, io.Reader, fmt.Stringer, ...`).
-- Members whose types cannot be represented are left out with a comment saying why: generics,
-  types of packages that are not generated, unnamed structs, arrays, complex numbers, and
-  constants beyond `Long`.
+- Members whose types cannot be represented are left out with a comment saying why: generics
+  with type sets, unnamed structs, arrays, funcs inside Go data, complex numbers, types of
+  `internal` packages, and constants beyond `Long`.
 
 Generated facades are checked against Go at link time like handwritten ones, but only where
 used, so unused members cost nothing. `scalago-gostd` (`gostd/` in this build) has the facades
-of 21 standard library packages, about 1,500 members. The `go-std` test case uses them.
+of 21 standard library packages and the types of `io/fs`, `reflect` and `syscall` that they use,
+about 1,700 members. The `go-std` test case uses them; `go-facadegen` generates facades of a
+local module written in the style of bubbletea and checks the rules above; and `gotui/` (`mill
+gotui.check`) uses bubbletea, bubbles and lipgloss.
 
 ### Go data in Scala
 
