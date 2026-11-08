@@ -1,6 +1,7 @@
 List(null, null)
 List(x, y)
 true
+List(true, false, true, true, true, false)
 List(a, b)
 ArraySeq(b, a)
 List(q, null)

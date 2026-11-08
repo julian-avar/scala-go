@@ -199,6 +199,8 @@ object Natives:
   instanceFn(C, "getComponentType()Ljava.lang.Class;", "rt.ClassGetComponentType")
   instanceFn(C, "toString()Ljava.lang.String;", "rt.ClassToString")
   instanceFn(C, "isAssignableFrom(Ljava.lang.Class;)Z", "rt.ClassIsAssignableFrom")
+  /** When reachable, the linker gives the runtime the program's class hierarchy (Linker.supportFile). */
+  val ClassIsAssignableFrom: (ClassName, MethodName) = (C, parseMethod("isAssignableFrom(Ljava.lang.Class;)Z"))
   instance(C, "desiredAssertionStatus()Z")((_, _) => "false")
   instance(C, "getClassLoader()Ljava.lang.ClassLoader;")((_, _) => "nil")
   staticFn(C, "forName(Ljava.lang.String;)Ljava.lang.Class;", "rt.ClassForName")

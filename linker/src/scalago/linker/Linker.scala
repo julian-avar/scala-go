@@ -302,6 +302,19 @@ object Linker:
       line("}")
     if ctx.checkedCasts.nonEmpty then line()
 
+    // Class.isAssignableFrom needs the class hierarchy: the classes with Go types, and those
+    // `classOf` names, with their ancestors.
+    if ctx.analyzer.usedNatives.contains(Natives.ClassIsAssignableFrom) then
+      val classes = (ctx.declared ++ ctx.classLiterals.keys.filter(ctx.program.contains)).toList.sorted
+      line("func init() {")
+      line("\trt.RegisterClassAncestors(map[string][]string{")
+      for c <- classes do
+        val ancestors = (ctx.program.ancestors(c) - ClassName.Object).toList.sorted
+        line(s"\t\t${FunctionEmitter.goStringLiteral(c)}: {${ancestors.map(FunctionEmitter.goStringLiteral).mkString(", ")}},")
+      line("\t})")
+      line("}")
+      line()
+
     for m <- ctx.dispatchers.toList.sortBy(_.descriptor) do
       val params = m.params.zipWithIndex.map((t, i) => (s"a$i", ctx.goType(t)))
       val result = ctx.goType(m.result)

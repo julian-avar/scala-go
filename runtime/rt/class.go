@@ -215,9 +215,23 @@ func ClassIsAssignableFrom(c, other *Class) bool {
 		}
 		return false
 	}
-	ThrowKind(UnsupportedOperation, "Class.isAssignableFrom("+other.name+") on "+c.name+": scala-go has no reflection")
+	if ancestors, ok := classAncestors[other.name]; ok {
+		for _, a := range ancestors {
+			if a == c.name {
+				return true
+			}
+		}
+		return false
+	}
+	ThrowKind(UnsupportedOperation, "Class.isAssignableFrom("+other.name+") on "+c.name+": the class is not part of the program")
 	return false
 }
+
+// classAncestors maps the program's classes to their ancestors (except java.lang.Object), for
+// isAssignableFrom. The linker registers it only if the program uses isAssignableFrom.
+var classAncestors map[string][]string
+
+func RegisterClassAncestors(m map[string][]string) { classAncestors = m }
 
 // ArrayClassOf is the class of arrays whose elements have class c.
 func ArrayClassOf(c *Class) *Class {

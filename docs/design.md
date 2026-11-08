@@ -832,9 +832,8 @@ Known gaps:
 - Locales: there is no locale data. `java.util.Locale` carries identifiers only, and every
   locale formats and maps case as `Locale.ROOT` does (so `String.format(Locale.GERMANY, "%.1f",
   x)` uses a `.`).
-- Reflection: `getClass` and `Class` names work, and `isAssignableFrom` where the runtime can
-  tell without the program's class hierarchy (equal classes, `Object`, primitives, arrays, and
-  strings, boxes and the other classes whose instances are Go values); nothing else.
+- Reflection: `getClass`, `Class` names and `isAssignableFrom` work (for the latter, the linker
+  gives the runtime the program's class hierarchy when the program uses it); nothing else.
 - `BigInteger` and `BigDecimal` cannot be subclassed (they are Go values).
 - Concurrency: the atomic field updaters (`AtomicIntegerFieldUpdater`, ... need reflection),
   `SubmissionPublisher`, thread groups beyond names and handlers (`activeCount`, `enumerate`),
