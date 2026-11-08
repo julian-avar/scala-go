@@ -262,24 +262,32 @@ class BufferedInputStream(_in: InputStream, initialSize: Int)
           )
         }
 
-        // fill source buffer from source stream
-        fillBuffer(sourceBuffer, source) match {
-          // end of source stream
-          case None =>
-            if (available == 0)
-              bytesRead = -1
-            else
+        // scala-go: as the JDK, stop rather than block (reading a pipe, a console, ...) once
+        // some bytes were read and the source has no more available.
+        if (bytesRead + available > 0 && source.available() <= 0) {
+          pos = count
+          bytesRead += available
+          remaining = 0
+        } else {
+          // fill source buffer from source stream
+          fillBuffer(sourceBuffer, source) match {
+            // end of source stream
+            case None =>
+              if (available == 0)
+                bytesRead = -1
+              else
+                bytesRead += available
+
+              remaining = 0
+
+            // source read into nextBuffer
+            case Some(nextBuffer) =>
+              sourceBuffer = nextBuffer
+              targetOffset += available
               bytesRead += available
 
-            remaining = 0
-
-          // source read into nextBuffer
-          case Some(nextBuffer) =>
-            sourceBuffer = nextBuffer
-            targetOffset += available
-            bytesRead += available
-
-            remaining -= available
+              remaining -= available
+          }
         }
       }
     }
