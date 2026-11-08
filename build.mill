@@ -311,7 +311,8 @@ object ecosystem extends InBuildScalaGoModule {
     mvn"com.lihaoyi::upickle:4.4.1",
     mvn"com.lihaoyi::fastparse:3.1.1",
     mvn"com.lihaoyi::pprint:0.9.4",
-    mvn"com.lihaoyi::mainargs:0.7.6"
+    mvn"com.lihaoyi::mainargs:0.7.6",
+    mvn"com.lihaoyi::os-lib:0.11.4"
   )
 
   def check() = Task.Command {

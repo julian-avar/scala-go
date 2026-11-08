@@ -40,6 +40,33 @@ object Main:
     println(pprint.apply(Point(3, 4, "z")).plainText)
     // mainargs
     println(Cli.parse(Seq("--name", "Ada", "--times", "2")))
+    // os-lib
+    osLib()
+
+  /** Files and subprocesses through os-lib, in a fresh temporary directory. */
+  def osLib(): Unit =
+    val dir = os.temp.dir(prefix = "scalago-ecosystem")
+    try
+      os.write(dir / "a.txt", "hello\nworld\n")
+      os.write.append(dir / "a.txt", "more\n")
+      println(os.read.lines(dir / "a.txt"))
+      os.write(dir / "x" / "y" / "f.txt", "f", createFolders = true)
+      os.copy(dir / "x", dir / "x2")
+      os.move(dir / "x2", dir / "x3")
+      println(os.walk(dir).map(_.relativeTo(dir).toString).sorted)
+      println((os.size(dir / "a.txt"), os.isDir(dir / "x"), os.exists(dir / "x2"), os.stat(dir / "a.txt").fileType))
+      os.remove.all(dir / "x3")
+      println(os.list(dir).map(_.last))
+      println((os.rel / "x" / os.up / "y", os.root / "a" / "b.txt" relativeTo os.root / "c", (os.root / "a.tar.gz").ext))
+      println(os.proc("sh", "-c", "cat; echo $FOO").call(stdin = "piped in ", env = Map("FOO" -> "bar")).out.text())
+      println(os.proc("sh", "-c", "exit 3").call(check = false).exitCode)
+      val cat = os.proc("cat").spawn()
+      cat.stdin.writeLine("spawned")
+      cat.stdin.flush()
+      println(cat.stdout.readLine())
+      cat.stdin.close()
+      println(cat.waitFor(10000))
+    finally os.remove.all(dir)
 
 object Cli:
   @mainargs.main
