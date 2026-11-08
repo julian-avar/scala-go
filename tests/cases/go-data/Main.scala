@@ -1,5 +1,11 @@
 import scalago.go.*
 
+enum Shape:
+  case Circle(radius: Double)
+  case Dot
+
+final case class Point(x: Int, y: Long, label: Option[String], tags: Set[String])
+
 /** Go slices, maps, channels and pointers used from Scala alone: the same program runs on the
  *  JVM (with the library's JVM implementation) and as Go.
  */
@@ -65,3 +71,12 @@ object Main:
     println(s"pointer: ${p.get}")
     val counter = GoPtr.alloc[GoInt]
     println(s"zero: ${counter.get.toLong}")
+
+    // GoData: Scala data as plain Go data and back.
+    val data = GoData(Map("points" -> List(Point(1, 2, Some("a"), Set("t")), Point(3, 4, None, Set.empty)),
+      "shapes" -> Vector(Shape.Circle(1.5), Shape.Dot), "flag" -> true, "char" -> 'c', "bytes" -> Array[Byte](1, 2)))
+    println(s"data: ${GoData.toScala(data)}")
+    val m = GoData.map("b" -> 2, "a" -> Seq("x"))
+    println(s"map: size=${m.size} a=${GoData.toScala(m(GoString("a")))} b=${GoData.toScala(m(GoString("b")))}")
+    println(s"typed slice: ${GoData.toScala(GoSlice.of[GoInt](GoInt(1), GoInt(2)))}")
+    println(s"as is: ${GoData.toScala(Point(0, 0, None, Set.empty))} ${GoData.toScala(null)} ${GoData(null)}")
