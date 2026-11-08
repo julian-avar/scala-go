@@ -10,7 +10,8 @@ import java.nio.charset.StandardCharsets.UTF_8
  *  byte array, so the same code runs and can be tested there. On both, `==` and `hashCode`
  *  compare contents and `toString` decodes, as for a Go string.
  *
- *  Conversions between the two representations copy and transcode.
+ *  Write them with the `go` interpolator (`go"x = \$x"`), or convert a `String` with
+ *  `toGoString`. Conversions between the two representations copy and transcode.
  */
 opaque type GoString = AnyRef
 
@@ -19,6 +20,11 @@ object GoString:
   def apply(s: String): GoString = JvmGoString(wellFormed(s).getBytes(UTF_8))
 
   def empty: GoString = apply("")
+
+  /** `String.valueOf(x)` as a `GoString`: Java's formatting of primitives, `"null"` for null,
+   *  `toString` otherwise. On Go, primitives are formatted without going through a `String`.
+   */
+  def valueOf(x: Any): GoString = apply(String.valueOf(x))
 
   extension (g: GoString)
     /** Decodes UTF-8 into a `String`. */

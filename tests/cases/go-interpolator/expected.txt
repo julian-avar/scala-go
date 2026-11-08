@@ -1,0 +1,25 @@
+literal: hello [5 bytes]
+empty:  [0 bytes]
+escapes: tab	here "quoted" back\slash é $5 [34 bytes]
+newline: a
+b [3 bytes]
+unicode: grüße, 世界, 😀 [21 bytes]
+surrogate pair escape: 😀 [4 bytes]
+lone surrogate: [�] [5 bytes]
+true
+true
+int: i = 42, i + 1 = 43 [18 bytes]
+long, double, float: -7 0.3333333333333333 2.5 1.0E21 NaN [36 bytes]
+char, boolean, unit: ß true () [10 bytes]
+nulls: null null null [14 bytes]
+string: hello, wörld 😀! [19 bytes]
+GoString: <GöGö> [8 bytes]
+GoString as Any: Gö [3 bytes]
+object: p = (1, 2), list = List(1, 2), opt = Some(x) [44 bytes]
+nested: [in 42] [7 bytes]
+only value: 42 [2 bytes]
+adjacent: 42-7wörld 😀 [15 bytes]
+order: ListBuffer(1, 2, 3) 1 ListBuffer(2, 3) 1 2 [42 bytes]
+in a loop: #1,#2,#3 [8 bytes]
+match: answer! [7 bytes]
+printed: 42

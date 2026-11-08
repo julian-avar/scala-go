@@ -134,7 +134,7 @@ published with the full Scala version as suffix.
 | `Int`, `Long`, `Double`, ...     | `int32`, `int64`, `float64`, ... (`Char` = `uint16`)            |
 | boxed primitive                  | the Go primitive inside an `any`                                |
 | `String`                         | `*rt.String`: UTF-16 code units, like the JVM (`nil` = null)    |
-| `scalago.go.GoString` (opt-in)   | Go `string` (UTF-8); a byte array on the JVM                    |
+| `scalago.go.GoString` (opt-in)   | Go `string` (UTF-8); UTF-8 bytes on the JVM (see [Go strings](#go-strings)) |
 | `BigInteger`                     | `*rt.BigInteger` (`math/big`)                                   |
 | `BigDecimal`                     | `*rt.BigDecimal`: an `int64` unscaled value, or a `big.Int` when it does not fit, and a scale |
 | Go facade of a struct type `T`   | `*T` inside an `any` (see [Go interop](#go-interop))            |
@@ -408,6 +408,31 @@ Not supported yet: generic Go *types*, `GoType` instances for facade types, faca
 interface types, variadic callbacks, Go funcs with more than 3 parameters returned to Scala, and
 Scala implementations of Go methods with several non-error results. Go code may call Scala code from any
 goroutine (see [Concurrency](#concurrency-and-the-memory-model)).
+
+### Go strings
+
+`String` stays `java.lang.String` (UTF-16), so programs behave as on the JVM, and converting it
+to Go's `string` transcodes. `scalago.go.GoString` (`library/src/scalago/go/GoString.scala`) is
+the opt-in Go `string`, passed to and from Go code as is. On the JVM it is a `JvmGoString` holding
+the UTF-8 bytes, which `==`, `hashCode`, `toString` and the `Ordering` treat by content, as Go
+strings are on Go, so output agrees. Converting a `String` turns unpaired surrogates into U+FFFD
+on both (Go's rule; the JDK's encoder writes `?`).
+
+- **`go"..."`** (`GoInterpolator.scala`) writes `GoString`s like `s"..."`. It is a macro: it
+  processes escapes as `s` does, at compile time (bad escapes are compile errors), and expands to
+  `GoString(part0).concat(arg0).concat(GoString(part1))...`. Arguments of static type `GoString`
+  are inserted as they are; others become `GoString.valueOf(arg)` (`String.valueOf`). There is no
+  `f`-style formatting: `java.util.Formatter` semantics would need a second implementation over
+  Go strings, and formatting into a `String` then interpolating it is as short.
+- **The linker** (`FunctionEmitter.genGoString`) emits `GoString(s)`, `GoString.valueOf(x)` and
+  chains of `concat` as one Go `string` expression: literals are Go constants (a literal-only
+  `go"..."` is `any("...")`, free at run time), `valueOf` is `rt.ToGoString` (primitives are
+  formatted straight into a Go string), and the operands are joined by one `+`, which Go builds
+  with one allocation. Operands are evaluated left to right, spilled into variables like call
+  arguments, so values are rendered in the same order as on the JVM.
+- A macro in the library, rather than recognition in the plugin, leaves the plugin and the IR
+  alone, reuses the compiler's escape processing, and is the JVM implementation too. What the
+  linker recognizes are ordinary `GoString` calls, so handwritten ones benefit as well.
 
 ## I/O
 

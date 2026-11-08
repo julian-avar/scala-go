@@ -18,6 +18,7 @@ object Main {
     println(GoString("abc") == "abc".toGoString)
     println(Set(GoString("a"), GoString("a"), GoString("b")).size)
     println(GoString("x").hashCode == GoString("x").hashCode)
+    println(GoString.valueOf(g: Any) == g)
     val words = List("pear", "Zebra", "äpfel", "apple", "fig").map(_.toGoString)
     println(words.sorted.mkString(" "))
     val order = Ordering[GoString]

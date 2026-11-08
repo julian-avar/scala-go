@@ -1,5 +1,6 @@
 ababab
 GRÜßE
+3× GRÜßE 😀
 true
 [a,b,c]
 x-y-z

@@ -591,20 +591,28 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
    *  With `expected` types, the results are adapted to them (see [[adapt]]).
    */
   private def genExprs(trees: List[Tree], expected: List[Type] = Nil): List[String] =
+    // Spilled values keep their own type; they are adapted where used, like the others.
+    val exprs = genInOrder(trees, t => ctx.goType(t.tpe))(genExpr)
+    exprs.zipWithIndex.map((e, i) => if i < expected.size then adapt(e, trees(i).tpe, expected(i)) else e)
+
+  /** Go expressions `gen(t)` for `trees`, evaluated in order: when generating one emits
+   *  statements, the impure expressions before it are first evaluated into variables (of Go type
+   *  `goType(t)`).
+   */
+  private def genInOrder(trees: List[Tree], goType: Tree => String)(gen: Tree => String): List[String] =
     val exprs = mutable.ArrayBuffer.empty[String]
     val marks = mutable.ArrayBuffer.empty[Int]
     for t <- trees do
-      exprs += genExpr(t)
+      exprs += gen(t)
       marks += out.size
     val end = out.size
-    // Spilled values keep their own type; they are adapted where used, like the others.
     for i <- trees.indices.reverse if marks(i) < end && !isPure(trees(i)) do
       val temp = freshTemp()
-      val goType = ctx.goType(trees(i).tpe)
+      val t = goType(trees(i))
       val p = if trees(i).pos.line > 0 then trees(i).pos else pos
-      out.insert(marks(i), GoLine(s"var $temp ${if goType.isEmpty then "any" else goType} = ${exprs(i)}", p))
+      out.insert(marks(i), GoLine(s"var $temp ${if t.isEmpty then "any" else t} = ${exprs(i)}", p))
       exprs(i) = temp
-    exprs.toList.zipWithIndex.map((e, i) => if i < expected.size then adapt(e, trees(i).tpe, expected(i)) else e)
+    exprs.toList
 
   /** Converts a Go value of IR type `from` for a location of IR type `to`. Scala upcasts need no
    *  conversion in the IR, but a class that is never instantiated has Go type `any`, which Go does
@@ -657,6 +665,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     program.facadeMember(declaringClass, m) match
       case Some((facade, member)) => return genFacadeUse(tree, facade, member)
       case None                   => ()
+    if declaringClass == Natives.GoString && Natives.goStringMakers.contains(m) then return s"any(${genGoString(tree)})"
     Natives.lookup(declaringClass, m) match
       case Some(native) => genNative(native, Some(receiver), args, m)
       case None if isVirtual =>
@@ -668,6 +677,28 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
           case None =>
             val r :: as = genExprs(receiver :: args, receiver.tpe :: m.params): @unchecked
             s"${ctx.dispatcher(m)}(${(r :: as).mkString(", ")})"
+
+  /** A `GoString` made by `GoString(s)`, `GoString.valueOf(x)` or a chain of `concat`s (what
+   *  `go"..."` expands to), as a Go `string` expression: one `+` over all the operands, literals
+   *  as Go constants, and no intermediate string boxed or built.
+   */
+  private def genGoString(tree: Apply): String =
+    def maker(t: Tree): Option[(MethodName, List[Tree])] = t match
+      case Apply(_, Natives.GoString, m, args, _) if Natives.goStringMakers.contains(m) => Some((m, args))
+      case _                                                                          => None
+    def operands(t: Tree): List[Tree] = maker(t) match
+      case Some((Natives.GoStringConcat, List(a, b))) => operands(a) ++ operands(b)
+      case _                                          => List(t)
+    def constant(t: Tree): Option[String] = maker(t) match
+      case Some((Natives.GoStringApply, List(StringLiteral(s)))) if !hasLoneSurrogate(s) => Some(goStringLiteral(s))
+      case _                                                                            => None
+    def value(t: Tree): String = maker(t) match
+      case Some((m, args)) => Natives.goStringMakers(m)(genExprs(args, m.params))
+      case None            => Natives.goStr(genExpr(t))
+    // Constants need no evaluation; the other operands are evaluated (and converted) in order.
+    val ops = operands(tree)
+    val values = genInOrder(ops.filter(constant(_).isEmpty), _ => "string")(value).iterator
+    ops.map(t => constant(t).getOrElse(values.next())).mkString(" + ")
 
   /** A use of a Go facade member. Arguments are evaluated into variables first, then buffered
    *  Scala output is flushed, so that output stays ordered with what Go code writes.
