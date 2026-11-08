@@ -10,6 +10,11 @@ reference features. Compile-time rules (syntax, typing, implicit search, overloa
 are the Scala compiler's, so for those this page says "as in Scala" and moves on. It specifies
 what happens at run time, and marks every difference from the JVM as **Deviation:**.
 
+Where a construct becomes a Go construct, the rule of the
+[Go specification][go-spec] it relies on is cited ("Go: [Conversions][go-conversions]"), with
+what scala-go adds where Go's rule differs from the JVM's or leaves the result to the
+implementation.
+
 ## 1. Lexical syntax
 
 [Spec chapter 1](https://scala-lang.org/files/archive/spec/3.4/01-lexical-syntax.html). As in
@@ -21,6 +26,17 @@ Scala. At run time:
 - Character literals are UTF-16 code units (`Char` is an unsigned 16-bit integer).
 - Numeric literals have the values the compiler computes. Constant conversions are folded with
   the JVM's semantics (`300.0.toByte` is `44`).
+- The Scala compiler folds constant expressions, also through type ascriptions and inline
+  parameters (`(Int.MaxValue: Int) + 1` reaches the back end as `-2147483648`), so Go's exact
+  constant arithmetic (Go: [Constant expressions][go-constexpr]) never applies to Scala
+  arithmetic. A literal is a typed Go constant (`int32(5)`, `float64(0.1)`); the values Go
+  constants cannot denote, `NaN`, the infinities and `-0.0` (Go: [Constants][go-constants]), are
+  `rt.NaN()`, `rt.Inf(±1)` and `rt.NegZero()`. A conversion of a literal is folded by the linker,
+  because Go rejects constant conversions that do not fit (Go: [Representability][go-repr]).
+- String literals are package variables initialized when the program starts (see
+  [Runtime](runtime.md#program-start-and-exit)); their Go source form is the UTF-8 text, or the
+  UTF-16 code units when the literal has an unpaired surrogate, which a Go string literal cannot
+  express (Go: [String literals][go-string-lits]).
 
 ## 2. Identifiers, names and scopes
 
@@ -107,30 +123,59 @@ first. A chain of string concatenations evaluates all its operands before conver
 them to a string (as the JVM's `StringConcatFactory`). `&&` and `||` short-circuit; `&` and `|`
 on `Boolean` evaluate both operands.
 
+Go evaluates the function calls, method calls, receive operations and logical operations of an
+expression left to right, but leaves unspecified when variables, fields and index expressions
+are read relative to them (Go: [Order of evaluation][go-order]). The generated code relies on
+the following:
+
+- Calls, including getters (`c.n`), natives and `rt` helpers, are Go calls, so they keep their
+  order.
+- When an operand needs Go statements of its own (a conditional, a block, a `try`), the
+  operands before it are first evaluated into Go variables, unless they are literals, `this` or
+  locals that are never reassigned (`FunctionEmitter.genInOrder`).
+- `&&` and `||` are Go's (short-circuit); `&` and `|` on `Boolean` are calls (`rt.And`,
+  `rt.Or`) of the evaluated operands.
+
+**Deviation (bug):** an operand that reads a field directly, followed by a call that changes
+the field, can see the new value: with a local `var i = 0` and a local
+`def inc() = { i += 1; i }`, `i + inc()` is `2` (JVM: `1`). The captured `i` is a
+`scala.runtime.IntRef`, and the generated `(i.elem + inc(i))` reads `elem` after the call (gc's
+order; Go allows both). Fields read directly are those of `*Ref` cells of captured `var`s and
+private fields; fields read through a getter are not affected.
+
 ### Numeric operations
 
-| Operation | Semantics |
-|-----------|-----------|
-| `Int`, `Long` `+ - *` | two's-complement, wrapping (`Int.MaxValue + 1 == Int.MinValue`) |
-| integer `/`, `%` | truncating; `Int.MinValue / -1 == Int.MinValue`, `Int.MinValue % -1 == 0` |
-| integer `/`, `%` by zero | `ArithmeticException("/ by zero")`, after evaluating the dividend |
-| `<<`, `>>`, `>>>` | shift count masked to 5 bits (`Int`) or 6 bits (`Long`): `1 << 33 == 2` |
-| `Byte`, `Short`, `Char` arithmetic | operands promoted to `Int` (`'a' + 1 == 98`); narrowing conversions wrap |
-| `Float`, `Double` arithmetic | IEEE 754 binary32/binary64, round to nearest even |
-| floating `/` by zero | `Infinity`, `-Infinity` or `NaN` |
-| floating `%` | C `fmod`: the result has the sign of the dividend (`-5.5 % 2 == -1.5`); `x % 0.0` is `NaN` |
-| floating → `Int`/`Long` | truncation; `NaN` → `0`; out of range saturates (`1e20.toInt == Int.MaxValue`) |
-| floating → `Byte`/`Short`/`Char` | via `Int`, then narrowing (`300.0.toByte == 44`, `1e20.toChar == '￿'`) |
-| `==`, `<`, ... on floating | IEEE: `NaN != NaN`, `-0.0 == 0.0` |
-| `Double.equals`, `compare` | by bits: `NaN` equals `NaN`, `-0.0` does not equal `0.0`; `-0.0 < 0.0 < NaN` |
+| Operation | Semantics | In Go |
+|-----------|-----------|-------|
+| `Int`, `Long` `+ - *`, unary `-` | two's-complement, wrapping (`Int.MaxValue + 1 == Int.MinValue`) | Go's operators on `int32`/`int64`, which wrap (Go: [Integer overflow][go-overflow]) |
+| integer `/`, `%` | truncating; `Int.MinValue / -1 == Int.MinValue`, `Int.MinValue % -1 == 0` | Go's operators: the same truncation, and `x / -1 == x` for the most negative `x` (Go: [Integer operators][go-intops]) |
+| integer `/`, `%` by zero | `ArithmeticException("/ by zero")`, after evaluating the dividend | a Go run-time panic (Go: [Integer operators][go-intops]), translated (see [Exceptions](#exceptions)); a literal `0` divisor, which Go rejects, is `rt.DivByZero(dividend)` |
+| `<<`, `>>`, `>>>` | shift count masked to 5 bits (`Int`) or 6 bits (`Long`): `1 << 33 == 2` | Go does not mask (`x << 33` is `0` for an `int32`) and panics on a negative count (Go: [Arithmetic operators][go-arith]), so the count is masked: `x << (uint64(n) & 31)` |
+| `>>>` | logical shift | `int32(uint32(x) >> n)` |
+| `Byte`, `Short`, `Char` arithmetic | operands promoted to `Int` (`'a' + 1 == 98`); narrowing conversions wrap | Go integer conversions sign- or zero-extend, then truncate (Go: [Conversions][go-conversions]), as the JVM's `i2b`, `i2s`, `i2c` |
+| `Float`, `Double` arithmetic | IEEE 754 binary32/binary64, round to nearest even | Go's `float32`/`float64` operators; see the fused multiply-add deviation below |
+| floating `/` by zero | `Infinity`, `-Infinity` or `NaN` | Go specifies nothing beyond IEEE 754 and lets an implementation panic (Go: [Floating-point operators][go-floatops]); gc does not |
+| floating `%` | C `fmod`: the result has the sign of the dividend (`-5.5 % 2 == -1.5`); `x % 0.0` is `NaN` | Go has no `%` on floats: `math.Mod`, which is `fmod` |
+| floating → `Int`/`Long` | truncation; `NaN` → `0`; out of range saturates (`1e20.toInt == Int.MaxValue`) | Go truncates, but the result of an out-of-range conversion is implementation-dependent (Go: [Conversions][go-conversions]): `rt.D2I`/`rt.D2L` test `NaN` and the range first |
+| floating → `Byte`/`Short`/`Char` | via `Int`, then narrowing (`300.0.toByte == 44`, `1e20.toChar == '￿'`) | `int8(rt.D2I(x))`, ... |
+| integer → floating, `Double` → `Float` | rounded to nearest | Go's conversions, which round to the precision of the target type |
+| `==`, `<`, ... on floating | IEEE: `NaN != NaN`, `-0.0 == 0.0` | Go's comparison operators, which are IEEE 754's (Go: [Comparison operators][go-compare]) |
+| `Double.equals`, `compare` | by bits: `NaN` equals `NaN`, `-0.0` does not equal `0.0`; `-0.0 < 0.0 < NaN` | natives on the bits (`math.Float64bits`) |
+
+The run-time cases (operands the compiler cannot fold) are checked by the `numerics-runtime`
+test case.
 
 **Deviation (bug):** floating-point expressions of the form `a * b + c` may be computed with a
 fused multiply-add (one rounding instead of two) on arm64, and on amd64 when built with
-`GOAMD64=v3` or higher. The Go specification allows this fusion unless an explicit conversion
-separates the operations, and the generated code has none; the JVM always rounds each
-operation. Results can differ in the last bit. (Verified: the Go compiler emits `FMADDD` for the
-generated form on arm64 and `VFMADD231SD` on amd64 v3; on default amd64 builds no fusion
-happens.)
+`GOAMD64=v3` or higher. Go allows it: "An implementation may combine multiple floating-point
+operations into a single fused operation, possibly across statements, and produce a result that
+differs from the value obtained by executing and rounding the instructions individually. An
+explicit floating-point type conversion rounds to the precision of the target type, preventing
+fusion that would discard that rounding" (Go: [Floating-point operators][go-floatops]). The generated
+code has no such conversion, and since fusion may cross statements, keeping the product in a
+variable would not prevent it either. The JVM always rounds each operation. Results can differ
+in the last bit. (Verified: the Go compiler emits `FMADDD` for the generated form on arm64 and
+`VFMADD231SD` on amd64 v3; on default amd64 builds no fusion happens.)
 
 `java.lang.Math` and `StrictMath`:
 
@@ -176,8 +221,33 @@ the JVM does:
 | arrays | `==` is identity; compare contents with `sameElements` or `java.util.Arrays.equals` |
 | Java enums (incl. Scala 3 enums extending `java.lang.Enum`) | `==` is identity |
 
+In Go:
+
+- `eq` and `ne` are Go comparisons of interface values, `any(a) == any(b)`: equal if both are
+  nil, or if they have identical dynamic types and equal dynamic values (Go:
+  [Comparison operators][go-compare]). Objects, strings and arrays are pointers, so this is
+  identity; boxes are the primitive values themselves, so equal boxes are `eq` (see below).
+- `==` on references is `rt.Equals`; null tests (`x == null`, `x eq null`) compare with Go's
+  `nil`, through `rt.IsNull` when the value is an `any`, which may hold a nil pointer (see
+  [Data representation](data.md#classes-and-objects)).
+- `==` on primitives is Go's `==` after numeric promotion.
+
 Deviations:
 
+- **Deviation (bug):** `==` and `!=` throw `NullPointerException` when an operand of static
+  type `String` is null and the other is not: with `s: String = null`, `"a" == s`, `t == s`,
+  `s == t` and `(t: Any) == s` throw (JVM: `false`). Matches against string literals compile
+  to such comparisons, so `s match { case "a" => ...; case _ => ... }` throws too. `s == null`,
+  `s eq null` and `t.equals(s)` work. The operand is passed to `rt.Equals` as a Go `any`
+  holding a nil `*rt.String`, which is not a nil interface (Go:
+  [Comparison operators][go-compare]), so `rt.Equals` dereferences it. Verified on `String`;
+  operands typed `BigInteger` or `BigDecimal` take the same path.
+- **Deviation (bug):** `eq` on two references to the same Go value of a type Go cannot compare
+  (a `GoSlice`, `GoMap` or Go func, or a Go struct value containing one) throws
+  `RuntimeException("runtime error: comparing uncomparable type []int")`: comparing interface
+  values with identical, non-comparable dynamic types is a Go run-time panic (Go:
+  [Comparison operators][go-compare]). On the JVM, where these are objects, it is `true`. `==`
+  works (identity for slices, maps and funcs).
 - **Deviation (bug):** a boxed `Int` or `Long` compared with a boxed `Float` is compared as
   `Double`; the JVM compares as `Float`. `(16777217L: Any) == (16777216f: Any)` is `false`
   (JVM: `true`). Unboxed comparisons are not affected.
@@ -193,7 +263,13 @@ Deviations:
 
 ### Type tests and casts
 
-`isInstanceOf`, `asInstanceOf`, type patterns and `catch` clauses test the erased class:
+`isInstanceOf`, `asInstanceOf`, type patterns and `catch` clauses test the erased class. In Go,
+they are type assertions (Go: [Type assertions][go-assert]): a test is the comma-ok form
+`_, ok := x.(T)`, which never panics; a cast is `x.(T)` after a nil test (`rt.Cast`, so that
+`null` passes), and a failed assertion's run-time panic (`*runtime.TypeAssertionError`) becomes
+`ClassCastException`. `T` is the class's Go interface, which only its subclasses implement (see
+[Data representation](data.md#classes-and-objects)), or a concrete Go type for strings, boxes
+and arrays. Then:
 
 - A boxed value is an instance of its own box class only (`(1L: Any).isInstanceOf[Int]` is
   `false`), and of `Number`, `Comparable`, `Serializable` as on the JVM.
@@ -222,7 +298,16 @@ Deviations:
 - `try`/`catch`/`finally` behave as on the JVM: `catch` cases are tested in order; `finally`
   runs after normal completion, after an exception and after `return`, `break` or `continue`
   out of the `try`; an exception or `return` in `finally` replaces the outcome of the `try`.
-- Errors detected by the Go runtime become the JVM's exceptions:
+- In Go, `throw e` is `panic(rt.Exc(e))`, a panic whose value (`*rt.Exception`) wraps the
+  `Throwable`. A `try` block is a Go closure run by `rt.Try`, whose deferred function calls
+  `recover` directly, as Go requires for `recover` to stop the panic (Go:
+  [Handling panics][go-panics]), and returns the `Throwable` (or `nil`). The `catch` cases and
+  the `finally` block run after the closure returns, so they run on the stack of the method
+  itself; an uncaught exception is re-thrown with `panic`. `return`, `break` and `continue` out
+  of the closure set a jump code that the enclosing code performs.
+- Errors detected by the Go runtime are run-time panics whose values are `runtime.Error`s,
+  whose exact values Go leaves unspecified (Go: [Run-time panics][go-rtpanics]). The runtime
+  (`rt.Caught`) recognizes them by type and by gc's messages and makes the JVM's exceptions:
 
   | Go runtime error | Exception |
   |------------------|-----------|
@@ -233,6 +318,10 @@ Deviations:
   | negative slice length | `NegativeArraySizeException` |
   | any other run-time panic, or a panic in Go code with a non-exception value | `RuntimeException` with Go's message |
 
+- **Deviation (bug):** a negative array index throws `RuntimeException("runtime error: index
+  out of range [-1]")` (JVM: `ArrayIndexOutOfBoundsException("Index -1 out of bounds for length
+  3")`). For a negative index gc's message has no `with length` part, which the translation
+  expects. Indices beyond the end are translated.
 - **Deviation:** `NullPointerException`s have no message (the JVM's "helpful" messages name the
   `null` expression).
 - **Deviation:** `String` index errors have the messages of older JDKs:
@@ -266,7 +355,11 @@ Deviations:
   without one use a global table (by reference for strings, by value for boxes).
 - `while` loops and `if` are Go loops and conditionals. Self-recursive tail calls are loops
   (the compiler rewrites them, with or without `@tailrec`).
-- Integer and string `match`es with literal cases become Go `switch` statements.
+- `match`es that the Scala compiler turns into switches (integer and character literal cases)
+  are Go expression `switch` statements, whose cases are compared with `==` and do not fall
+  through (Go: [Expression switches][go-switch]). Other matches, including most matches on
+  string literals, are the compiler's `==` tests and jumps (Go `for` loops with labeled
+  `break`s).
 
 ## 7. Implicits
 
@@ -360,3 +453,20 @@ Scala library code that needs a JDK API javalib lacks fails to link if reached.
 | Tuples (`*:`, `TupleXXL`) | Library classes; elements of `Tuple1`–`Tuple22` are boxed (no specialization) |
 | `boundary`/`break` | Exceptions without stack traces, as on the JVM |
 | Explicit nulls, capture checking | Compile-time only |
+
+[go-spec]: https://go.dev/ref/spec
+[go-arith]: https://go.dev/ref/spec#Arithmetic_operators
+[go-assert]: https://go.dev/ref/spec#Type_assertions
+[go-compare]: https://go.dev/ref/spec#Comparison_operators
+[go-constants]: https://go.dev/ref/spec#Constants
+[go-constexpr]: https://go.dev/ref/spec#Constant_expressions
+[go-conversions]: https://go.dev/ref/spec#Conversions
+[go-floatops]: https://go.dev/ref/spec#Floating_point_operators
+[go-intops]: https://go.dev/ref/spec#Integer_operators
+[go-order]: https://go.dev/ref/spec#Order_of_evaluation
+[go-overflow]: https://go.dev/ref/spec#Integer_overflow
+[go-panics]: https://go.dev/ref/spec#Handling_panics
+[go-repr]: https://go.dev/ref/spec#Representability
+[go-rtpanics]: https://go.dev/ref/spec#Run_time_panics
+[go-string-lits]: https://go.dev/ref/spec#String_literals
+[go-switch]: https://go.dev/ref/spec#Expression_switches

@@ -24,6 +24,27 @@ program executes, compared with the same program on the JVM. Differences are mar
 | Go fatal error (stack or heap exhaustion, ...) | Go prints `fatal error: ...` and every goroutine's stack, and exits with status 2; no hooks run |
 | `SIGINT`, `SIGTERM`, `SIGHUP` | The process ends with the signal (status 128 + signal number in a shell) |
 
+In Go terms (Go: [Program initialization and execution][go-init]):
+
+- Package initialization runs first: the runtime package `rt` and the Go packages that facades
+  import, then the generated package, whose package-level variables (string literals, `classOf`
+  constants) are initialized in dependency order and whose `init` functions install the hooks
+  the runtime needs (Go: [Package initialization][go-pkginit]). Scala code does not run during
+  package initialization.
+- `main` calls `rt.RunMain`, which runs the entry point, recovering an uncaught exception. When
+  Go's `main` returns, the program exits without waiting for other goroutines (Go:
+  [Program execution][go-exec]), so `rt.RunMain` first waits for the non-daemon threads
+  (a counter under a `sync.Mutex` and `sync.Cond`), then runs the shutdown hooks and flushes
+  standard output. Daemon threads end with the process, as on the JVM.
+- `System.exit`, `Runtime.halt` and an uncaught exception in `main` end the process with
+  `os.Exit`, which does not run deferred functions: pending `finally` blocks of any thread do not
+  run, as on the JVM.
+- A Go panic that no deferred function recovers ends the program with Go's report and exit
+  status 2 (Go: [Handling panics][go-panics]). Threads started by `Thread.start` recover
+  everything; a Scala exception thrown into Go code that does not recover it (a callback called
+  on a goroutine that Go code started, without an `error` result) ends the program this way (see
+  [Go interoperability](interop.md#errors-and-panics)).
+
 - **Deviation (bug):** an uncaught exception in the main thread is always printed by the
   runtime: `Thread.setDefaultUncaughtExceptionHandler` and the main thread's own handler are not
   called for it. Other threads use them as on the JVM.
@@ -38,7 +59,9 @@ program executes, compared with the same program on the JVM. Differences are mar
 ## Threads
 
 `java.lang.Thread` is javalib Scala code over goroutines (`rt/thread.go`). Every `Thread` runs
-on its own goroutine; Go's scheduler multiplexes all of them over `GOMAXPROCS` OS threads.
+on its own goroutine, started by a `go` statement (Go: [Go statements][go-go]); Go's scheduler
+multiplexes all of them over `GOMAXPROCS` OS threads. A goroutine has no identity, name or
+result in Go, so the `Thread` object and the goroutine are associated by the runtime.
 
 | API | Behavior |
 |-----|----------|
@@ -63,23 +86,43 @@ threads as described above.
 
 ## Memory model
 
-Scala programs rely on the Java Memory Model (JMM). scala-go provides its guarantees through Go's
-memory model, which defines happens-before through synchronization operations in the same way:
+Scala programs rely on the Java Memory Model (JMM). scala-go provides its guarantees through the
+[Go memory model][go-mem], which defines happens-before through synchronization in the same
+way. Each JMM edge is made by a Go operation for which the Go memory model gives the same edge:
 
-| JMM construct | scala-go | Guarantee |
-|---------------|----------|-----------|
-| `synchronized` | per-object reentrant monitor (a Go mutex and condition, created on first use) | mutual exclusion; unlock happens-before the next lock, as on the JVM |
-| `wait`/`notify`/`notifyAll` | monitor wait sets with timeouts and interrupts | as on the JVM; `IllegalMonitorStateException` without the monitor |
-| `@volatile` field | `sync/atomic` value (`rt.VolatileInt32`, ...), or `rt.Volatile[T]` for references | sequentially consistent loads, stores and compare-and-set, as JMM volatiles |
-| `java.util.concurrent.atomic`, `VarHandle`-style operations in javalib | `sync/atomic` operations on volatile fields and arrays | as on the JVM |
-| `Thread.start`, `Thread.join` | goroutine start, channel/condition synchronization | happens-before edges, as on the JVM |
-| class and object initialization | `rt.InitLock` | initialization happens-before every use that observes it complete |
-| `lazy val` | compare-and-set on a volatile state field | initialized once, safely published |
-| `final` fields | plain Go fields | **Deviation:** no freeze guarantee; objects must be published through one of the edges above |
-| data races on plain fields | plain Go memory | **Deviation:** the JVM guarantees no out-of-thin-air values and no torn references; in Go a racy read of a reference (an interface, two words) can observe a torn value and crash the program |
+| JMM construct | scala-go | Go memory model rule |
+|---------------|----------|----------------------|
+| `synchronized`: a monitor exit happens-before the next entry | per-object reentrant monitor: a `sync.Mutex`, a `sync.Cond`, an owner and a count, created on first use | the *n*th `Unlock` of a `sync.Mutex` is synchronized before the *m*th `Lock` returns, for *n* < *m* ([Locks][go-mem-locks]) |
+| `wait`/`notify`/`notifyAll` | a wait set of channels, under the monitor's mutex; timeouts and interrupts | the lock rule, and a send or close is synchronized before the receive it completes ([Channel communication][go-mem-chan]). `IllegalMonitorStateException` without the monitor |
+| `@volatile` reads, writes, compare-and-set | `sync/atomic` values: `rt.VolatileInt32`, ..., and `rt.Volatile[T]`, an atomic pointer to an immutable box, for references | all atomic operations behave as if executed in one sequentially consistent order, and one whose effect another observes is synchronized before it ([Atomic values][go-mem-atomic]): the JMM's synchronization order of volatiles |
+| `java.util.concurrent.atomic`, javalib's `VarHandle`-style operations | `sync/atomic` operations on volatile fields and arrays | as above |
+| `Thread.start` happens-before the thread's actions | a `go` statement | the `go` statement is synchronized before the goroutine starts ([Goroutine creation][go-mem-go]) |
+| a thread's actions happen-before `join` returns or `isAlive` returns `false` | the ending thread sets a volatile state and calls `notifyAll` under the thread's monitor; `join` waits on that monitor | the end of a goroutine is synchronized before nothing ([Goroutine destruction][go-mem-goexit]); the monitor and the volatile carry the edge |
+| `LockSupport.unpark` happens-before the `park` it releases | a one-slot channel per thread | [Channel communication][go-mem-chan] |
+| class and object initialization happens-before the uses that find it complete | `rt.InitLock`: an atomic flag, a mutex, and a channel closed when the initializer ends | [Atomic values][go-mem-atomic], [Locks][go-mem-locks], [Channel communication][go-mem-chan] |
+| `lazy val` | compare-and-set on a volatile state field | [Atomic values][go-mem-atomic] |
+| `final` fields | plain Go fields | **Deviation:** Go has no freeze rule; objects must be published through one of the edges above |
+| data races on plain fields | plain Go memory | see below |
 
-Programs that are data-race-free behave as on the JVM. Go's race detector (`go build -race` on
-the generated module) reports data races in Scala code with Scala file names and lines.
+Programs that are data-race-free behave as on the JVM: both models make them sequentially
+consistent (Go: [Overview][go-mem-overview]). Go's race detector (`go build -race` on the
+generated module) reports data races in Scala code with Scala file names and lines.
+
+For programs with data races, Go guarantees only that a read of a memory location no larger
+than a machine word observes a preceding or concurrent write to it; races on multiword values
+can produce values that no single write wrote and, for interfaces, slices and strings, memory
+corruption (Go: [Implementation restrictions for programs containing data races][go-mem-races]).
+The JMM never tears a reference. A racy read of a plain field is therefore:
+
+| Field type | Go representation | Racy read |
+|------------|-------------------|-----------|
+| primitive types | one word on 64-bit platforms | a value some write stored, as on the JVM |
+| `String`, arrays, `Class`, `BigInteger`, `BigDecimal` | a pointer: one word | a reference some write stored, as on the JVM |
+| other reference types: classes, traits, `Any` | an interface: two words (type, data) | **Deviation:** may pair the type of one write with the data of another, and crash the program or corrupt memory |
+| `GoString`, `GoSlice` and Go interface values held in such fields | inside the interface above | **Deviation:** as above |
+
+A `GoMap` written concurrently with other uses ends the process with Go's fatal error
+`concurrent map writes` (see [Go interoperability](interop.md#go-data)).
 
 ## Garbage collection and memory
 
@@ -260,3 +303,44 @@ There is no `sun.misc.Signal`.
 - File system paths are Unix paths.
 - Floating-point results can depend on the architecture (fused multiply-add, see
   [Language](language.md#numeric-operations)).
+
+## Go implementation dependence
+
+scala-go targets gc, the Go project's toolchain (`go build`). Where the Go specification leaves
+behavior to the implementation, the generated code and the runtime either avoid depending on it
+or depend on gc's behavior:
+
+| Behavior | Go specification | scala-go |
+|----------|------------------|----------|
+| out-of-range floating-point to integer conversions | result implementation-dependent ([Conversions][go-conversions]) | not used: checked before converting |
+| floating-point division by zero | IEEE 754 result; whether it panics is implementation-specific ([Floating-point operators][go-floatops]) | relies on gc: no panic |
+| fused multiply-add | permitted ([Floating-point operators][go-floatops]) | not prevented (a deviation, see [Language](language.md#numeric-operations)) |
+| order of variable, field and index reads relative to calls | unspecified ([Order of evaluation][go-order]) | avoided where an operand needs statements; otherwise gc's order (a deviation, see [Language](language.md#evaluation-order)) |
+| values of run-time panics | `runtime.Error`s, exact values unspecified ([Run-time panics][go-rtpanics]) | relies on gc's messages to choose the Java exception (`integer divide by zero`, `nil pointer dereference`, `index out of range [i] with length n`, `makeslice: len out of range`) |
+| size of `int`, `uint`, `uintptr` | implementation-specific ([Numeric types][go-numeric]) | 64 bits: `GoInt` is a `Long`, and only 64-bit platforms are supported |
+| moving objects | not specified | relies on gc's non-moving collector: identity hash codes are addresses |
+| goroutine identity | not exposed | gc's goroutine structure on amd64 and arm64 (`rt/goid.go`), otherwise the output of `runtime.Stack` |
+| stack size | not specified | gc's growable stacks, up to 1 GB on 64-bit platforms |
+| map iteration order | unspecified, and differs between iterations ([For statements with range clause][go-range]) | not relied on: `GoMap` iteration is Go's order, Scala and Java maps are the libraries' |
+
+Other Go implementations (gccgo, TinyGo) are not supported.
+
+[go-conversions]: https://go.dev/ref/spec#Conversions
+[go-exec]: https://go.dev/ref/spec#Program_execution
+[go-floatops]: https://go.dev/ref/spec#Floating_point_operators
+[go-go]: https://go.dev/ref/spec#Go_statements
+[go-init]: https://go.dev/ref/spec#Program_initialization_and_execution
+[go-numeric]: https://go.dev/ref/spec#Numeric_types
+[go-order]: https://go.dev/ref/spec#Order_of_evaluation
+[go-panics]: https://go.dev/ref/spec#Handling_panics
+[go-pkginit]: https://go.dev/ref/spec#Package_initialization
+[go-range]: https://go.dev/ref/spec#For_range
+[go-rtpanics]: https://go.dev/ref/spec#Run_time_panics
+[go-mem]: https://go.dev/ref/mem
+[go-mem-atomic]: https://go.dev/ref/mem#atomic
+[go-mem-chan]: https://go.dev/ref/mem#chan
+[go-mem-go]: https://go.dev/ref/mem#go
+[go-mem-goexit]: https://go.dev/ref/mem#goexit
+[go-mem-locks]: https://go.dev/ref/mem#locks
+[go-mem-overview]: https://go.dev/ref/mem#overview
+[go-mem-races]: https://go.dev/ref/mem#restrictions
