@@ -59,7 +59,7 @@ object Counter:
 @main def run(): Unit = tea.NewProgram(Counter(0)).Run()
 ```
 
-The repository's `examples/gotui/` is a complete bubbletea application with
+The [gotui example](../examples/gotui.md) is a complete bubbletea application with
 [bubbles](https://github.com/charmbracelet/bubbles) components (text input, spinner, key
 bindings).
 
@@ -76,7 +76,7 @@ Facades of Go libraries follow the library's Go API closely. A few rules about G
 
 ## Example: a JSON API with gin
 
-[gin](https://github.com/gin-gonic/gin) (`examples/gin`, `mill examples.gin.check`):
+[gin](https://github.com/gin-gonic/gin) (the [gin example](../examples/gin.md)):
 
 ```scala sc:nocompile
 object app extends ScalaGoModule {
@@ -109,7 +109,7 @@ into `any` as above, or parse the raw body with a Scala JSON library.
 
 ## Example: configuration reloading with argus
 
-[argus](https://github.com/agilira/argus) (`examples/argus`, `mill examples.argus.check`)
+[argus](https://github.com/agilira/argus) (the [argus example](../examples/argus.md))
 watches configuration files:
 
 ```scala sc:nocompile
@@ -122,10 +122,22 @@ val settings = argus.Setup("app")
   .Start()
 ```
 
-argus imports `mattn/go-sqlite3`, which needs cgo (a C compiler) for the first build.
+argus imports `mattn/go-sqlite3`, a cgo package: with a C compiler installed, the first build
+compiles SQLite. With `CGO_ENABLED=0` it builds a stub of it instead, which suits programs that
+use no SQLite.
 
-## What is left out
+## Limitations
 
-Generated facades leave out, with a comment saying why: generic types and functions whose
-constraints have type sets (`~int | string`), unexported types in exported APIs, funcs stored in
-Go data, variadic func types, and returned funcs with more than 3 parameters.
+- Programs that use Go libraries run only as Go.
+- Go modules may require a newer Go than scala-go's minimum (gin and argus need Go 1.25), and
+  the generated `go.mod` then asks for it too; with Go's default `GOTOOLCHAIN=auto`, an older
+  `go` downloads that version.
+- No Go structs from Scala, so no struct tags: bind into `any` and use `GoData`, or read the raw
+  data and parse it in Scala.
+- Generated facades leave out what Scala cannot express, with a comment saying why (see
+  [Generated facades](generated-facades.md#what-is-left-out)).
+- Libraries that need cgo need a C compiler, and rule out `CGO_ENABLED=0` builds unless they have
+  a fallback without cgo.
+
+The [examples](../examples/index.md) list the limitations each met, and
+[Limitations](../user/limitations.md#go-interop) all limitations of Go interop.

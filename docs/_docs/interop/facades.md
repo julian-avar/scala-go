@@ -150,3 +150,17 @@ runs only as Go. Keep Go calls behind an interface of your own to test the rest 
 
 The standard library needs no setup. Other Go modules are listed in `goRequires`, or in
 `goLocalModules` for a local directory; see [Go libraries](go-libraries.md).
+
+## Limitations
+
+- Programs that call Go run only as Go (see [On the JVM](#on-the-jvm)).
+- Scala cannot define Go struct types: Go sees a Scala class only through the interfaces it
+  implements. Go code that fills structs by reflection (JSON binding, database scanners) cannot
+  fill a Scala class; see [Go data](go-data.md#scala-data-for-go-code) for the alternative.
+- Generic Go types cannot be declared; generic functions are declared once per instantiation
+  (see [Generic functions](#generic-functions)).
+- Named numeric types (`time.Duration`) are facade classes, not Scala numbers: convert with the
+  conversion (`time.Duration(nanos)`) and the type's methods (`d.Nanoseconds()`).
+- Go funcs returned to Scala have at most 3 parameters.
+
+[Limitations](../user/limitations.md#go-interop) lists all limitations of Go interop.

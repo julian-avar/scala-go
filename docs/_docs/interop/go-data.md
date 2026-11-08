@@ -136,3 +136,18 @@ Creating Go data needs the Go element type: `GoSlice.make[GoInt](n)` makes an `[
 other Go numeric types are Scala numbers at run time, so they only matter as type arguments and
 in facades. A facade with the wrong view (`GoSlice[String]` for a Go `[]string`) is a link error
 that names the right one.
+
+## Limitations
+
+- No `select` over several channels.
+- Unsynchronized concurrent writes to a `GoMap` end the process with Go's fatal error
+  `concurrent map writes`, which no `catch` intercepts.
+- Go arrays, complex numbers and funcs inside Go data have no Scala view but `Any`: they can be
+  passed on to Go, not used from Scala.
+- Named slice and map types (`type H map[string]any`) are facade classes, not `GoSlice`s or
+  `GoMap`s; their elements cannot be read from Scala.
+- `GoData` makes maps, not Go structs: Go code sees a case class's fields under their Scala
+  names, and `encoding/json` writes them sorted by name. Numbers that `encoding/json` decodes into
+  `any` are `float64`s, so `GoData.toScala` gives them back as `Double`s.
+
+[Limitations](../user/limitations.md#go-interop) lists all limitations of Go interop.

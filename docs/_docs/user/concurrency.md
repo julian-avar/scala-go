@@ -97,3 +97,18 @@ detector finds races: `def goBuildFlags = Seq("-race")`.
 
 Generated code is safe to call from any goroutine: objects and `lazy val`s initialize once,
 and the runtime's own state is thread-safe.
+
+## Limitations
+
+- The atomic field updaters (`AtomicReferenceFieldUpdater`, ...) are missing, so
+  `scala.collection.concurrent.TrieMap` does not link: use `ConcurrentHashMap`, or an immutable
+  map behind `synchronized` (as the [gin example](../examples/gin.md) does).
+- cats-effect and ZIO do not link yet (see [Scala libraries](../libraries/scala.md)); gears and
+  `scala.concurrent` are the concurrency libraries that work.
+- Parallel streams run sequentially. `SubmissionPublisher`, `Thread.getAllStackTraces` and thread
+  groups' `activeCount` and `enumerate` are missing.
+- No `select` over several Go channels from Scala.
+- A data race can crash the program, and unsynchronized concurrent writes to a `GoMap` end it
+  (see [Go data](../interop/go-data.md#limitations)).
+
+[Limitations](limitations.md) lists all limitations.

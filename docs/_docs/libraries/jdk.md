@@ -25,11 +25,16 @@ standard library.
 
 On top of these, `scala.concurrent.Future`, `scala.sys.process` and os-lib's `os.proc` work.
 
+## Limitations
+
 Notable classes that are missing: `java.util.Scanner`, `java.util.Formatter`, `EnumSet` and
 `EnumMap`, `Calendar`, `java.util.logging`, `java.text`'s number and date formats, TLS
-configuration and ciphers, UDP and NIO socket channels.
+configuration and ciphers, UDP and NIO socket channels, the atomic field updaters. Charsets are
+UTF-8, ISO-8859-1 and US-ASCII only, there is no locale data, regular expressions are RE2's, and
+classpath resources are not in the binary.
 
 Using a class or method that javalib does not have is a link error, naming it; see
 [Troubleshooting](../user/troubleshooting.md#link-errors). The behaviours that differ from the
-JDK are listed in [Differences from the JVM](../user/differences.md), and all known gaps, by
-priority, in the design document's [Roadmap](../contributing/design.md#roadmap).
+JDK are listed in [Differences from the JVM](../user/differences.md), all limitations in
+[Limitations](../user/limitations.md), and all known gaps, by priority, in the design document's
+[Roadmap](../contributing/design.md#roadmap).

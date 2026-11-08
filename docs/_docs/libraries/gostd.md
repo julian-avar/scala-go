@@ -40,3 +40,15 @@ the module depends on `scalago-gostd`, instead of generating their own.
 Most programs need few of these: the JDK's own APIs (`java.nio.file`, `java.time`, ...) work
 and also run on the JVM. Go's packages are useful when you pass their values to other Go code,
 or want Go's exact behaviour. The [API documentation](scalago.gostd) lists every member.
+
+## Limitations
+
+- Only the 21 packages above. Others (`net/http`, `os/exec`, `regexp`, `crypto/...`,
+  `log/slog`, `database/sql`, `encoding/csv`, ...) need `goFacadePackages`, as the
+  [gin example](../examples/gin.md) does for `net` and `net/http`.
+- `slices`, `maps` and `cmp` are not included: most of their functions are generic with type-set
+  constraints, which generated facades leave out. Declare the instantiations you need in a
+  [hand-written facade](../interop/facades.md#generic-functions).
+- The generated facades leave out what Scala cannot express, as for any
+  [generated facade](../interop/generated-facades.md#what-is-left-out).
+- Like all facades, they throw on the JVM.
