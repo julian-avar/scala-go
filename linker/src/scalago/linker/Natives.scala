@@ -198,6 +198,7 @@ object Natives:
   instanceFn(C, "isPrimitive()Z", "rt.ClassIsPrimitive")
   instanceFn(C, "getComponentType()Ljava.lang.Class;", "rt.ClassGetComponentType")
   instanceFn(C, "toString()Ljava.lang.String;", "rt.ClassToString")
+  instanceFn(C, "isAssignableFrom(Ljava.lang.Class;)Z", "rt.ClassIsAssignableFrom")
   instance(C, "desiredAssertionStatus()Z")((_, _) => "false")
   instance(C, "getClassLoader()Ljava.lang.ClassLoader;")((_, _) => "nil")
   staticFn(C, "forName(Ljava.lang.String;)Ljava.lang.Class;", "rt.ClassForName")

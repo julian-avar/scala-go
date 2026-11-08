@@ -28,6 +28,23 @@ func Args() *Array[any] {
 	return &Array[any]{Data: args}
 }
 
+// IsUnitArray is the test of Array[BoxedUnit] (Array[Unit]). Arrays of references do not know
+// their element type, and the Scala library tests for Array[BoxedUnit] before Array[AnyRef]
+// (Array.copyOf, ...), so the test only succeeds for arrays of references that are not empty and
+// hold only ().
+func IsUnitArray(x any) bool {
+	a, ok := x.(*Array[any])
+	if !ok || len(a.Data) == 0 {
+		return false
+	}
+	for _, e := range a.Data {
+		if e != UnitValue {
+			return false
+		}
+	}
+	return true
+}
+
 // NewArrayOf implements java.lang.reflect.Array.newInstance(componentType, length).
 func NewArrayOf(component *Class, length int32) any {
 	switch component.name {
