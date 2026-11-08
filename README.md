@@ -16,7 +16,9 @@ libraries and Scala 2 libraries do not work.
 
 ## Documentation
 
-The documentation is a Scaladoc site, with the API: `./mill docs.site`, then open
+The documentation is at **https://julian-avar.github.io/scala-go/docs/**, with the
+[API](https://julian-avar.github.io/scala-go/). It is a Scaladoc site, published from `main` by
+`.github/workflows/docs.yml`; build it locally with `./mill docs.site`, then open
 `out/docs/site.dest/docs/index.html`. Its pages are in [docs/_docs](docs/_docs):
 [getting started](docs/_docs/getting-started.md), the [user's guide](docs/_docs/user/index.md),
 [Go interop](docs/_docs/interop/index.md), [libraries](docs/_docs/libraries/index.md). The

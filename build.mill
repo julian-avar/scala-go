@@ -319,11 +319,18 @@ object docs extends ScalaGoModule with UnidocModule {
       "-skip-by-id:scalago.go.internal,scalago.gearsrt",
       // Code snippets are compiled, except those marked `sc:nocompile` (build files, generated
       // facades, ...) and those of the design document.
-      s"-snippet-compiler:${root / "_docs" / "contributing"}=nocompile,compile"
+      s"-snippet-compiler:${root / "_docs" / "contributing"}=nocompile,compile",
+      s"-social-links:github::$repositoryUrl",
+      "-project-footer", s"scala-go — <a href=\"$repositoryUrl\">source on GitHub</a>"
     )
   }
 
-  /** The site, in this task's directory (`out/docs/site.dest`). */
+  /** The project's repository, linked from every page. */
+  def repositoryUrl = "https://github.com/julian-avar/scala-go"
+
+  /** The site, in this task's directory (`out/docs/site.dest`); published to GitHub Pages by
+   *  `.github/workflows/docs.yml`.
+   */
   def site = Task {
     siteRoot() // the options only name its directory: rebuild when its contents change
     unidocCommon(local = true)()
