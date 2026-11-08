@@ -70,3 +70,6 @@ class InvalidPathException(input: String, reason: String, index: Int) extends Il
 class DirectoryIteratorException(cause: IOException) extends java.util.ConcurrentModificationException(cause.toString()):
   initCause(cause)
   override def getCause(): IOException = cause
+
+class FileSystemNotFoundException(msg: String) extends RuntimeException(msg):
+  def this() = this(null)

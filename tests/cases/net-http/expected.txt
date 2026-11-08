@@ -1,0 +1,65 @@
+-- HttpURLConnection
+200 OK text/plain; charset=UTF-8 12
+x-multi=b status=HTTP/1.1 200 OK fields=[HTTP/1.1 200 OK]
+null true 12
+Hello, world
+Hello, world
+POST 200 POST /echo type=application/x-www-form-urlencoded x-test=- java-agent=true body=a=1&b=2
+yes [yes]
+200 PUT /echo type=application/json x-test=yes java-agent=true body={"k": "vä"}
+set property after connecting: java.lang.IllegalStateException: Already connected
+200 DELETE /echo type=- x-test=- java-agent=true body=
+bad method: java.net.ProtocolException: Invalid HTTP method: BREW
+HEAD 200 text/plain; charset=UTF-8 []
+404 Not Found
+FileNotFoundException for the URL: true
+no such thing
+Server returned HTTP response code: 500 for URL: BASE/fail
+500 it broke
+error stream of a success: null
+200 /hello Hello, world
+302 /hello /redirect
+chunked -1 chunked one,two,three
+big 1048576 1048576 true
+timeouts 100 0
+read timeout: java.net.SocketTimeoutException: Read timed out
+again: java.net.SocketTimeoutException: Read timed out
+refused: java.net.ConnectException: Connection refused
+file text/plain 12 from a file
+missing file: java.io.FileNotFoundException: /nonexistent/scalago/file (No such file or directory)
+-- HttpClient
+HTTP_2 NEVER Optional[PT5S] Optional.empty
+200 Hello, world HTTP_1_1
+Optional[text/plain; charset=UTF-8] [a, b] OptionalLong[12]
+GET /hello Optional.empty
+(GET BASE/hello) 200
+POST 14 Optional[posted] BASE/echo POST
+POST /echo type=text/plain x-test=posted java-agent=true body=ünïcode body
+PUT /echo type=- x-test=- java-agent=true body=ABC
+DELETE /echo type=- x-test=- java-agent=true body=
+PATCH /echo type=- x-test=- java-agent=true body=p
+404 no such thing
+never: 302 Optional[/hello]
+normal: 200 /hello Hello, world
+utf: café
+chunked: one,two,three
+stream: 200 1048576 true
+lines: Buffer(first, second, third)
+discarding: null
+replacing: instead
+consumer: 1048576
+mapped: 12
+timeout: java.net.http.HttpTimeoutException: request timed out
+1 GET /echo type=- x-test=- java-agent=true body=
+2 GET /echo type=- x-test=- java-agent=true body=
+3 GET /echo type=- x-test=- java-agent=true body=
+4 GET /echo type=- x-test=- java-agent=true body=
+5 GET /echo type=- x-test=- java-agent=true body=
+refused: java.net.ConnectException: null
+async refused: java.util.concurrent.CompletionException java.net.ConnectException
+no uri: java.lang.IllegalStateException: uri is null
+bad scheme: java.lang.IllegalArgumentException: invalid URI scheme ftp
+restricted header: java.lang.IllegalArgumentException: restricted header name: "Host"
+bad header: java.lang.IllegalArgumentException: invalid header name: "a b"
+odd headers: java.lang.IllegalArgumentException: wrong number, 1, of parameters
+zero timeout: java.lang.IllegalArgumentException: Invalid duration: PT0S

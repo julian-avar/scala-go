@@ -13,6 +13,8 @@ class File private (path: String, normalized: scala.Boolean) extends Object with
   def this(pathname: String) = this(File.normalize(pathname), true)
   def this(parent: String, child: String) = this(File.join(parent, child), true)
   def this(parent: File, child: String) = this(File.join(if parent == null then null else parent.getPath(), child), true)
+  /** The file of a `file:` URI. */
+  def this(uri: java.net.URI) = this(File.normalize(File.uriPath(uri)), true)
 
   def getPath(): String = path
   override def toString(): String = path
@@ -42,6 +44,15 @@ class File private (path: String, normalized: scala.Boolean) extends Object with
   def getCanonicalFile(): File = new File(getCanonicalPath(), true)
 
   def toPath(): Path = Path.of(path, new Array[String](0))
+
+  /** A `file:` URI of the absolute path, ending with a slash for a directory. */
+  def toURI(): java.net.URI =
+    var sp = getAbsolutePath()
+    if !sp.endsWith("/") && isDirectory() then sp = sp + "/"
+    if sp.startsWith("//") then sp = "//" + sp
+    new java.net.URI("file", null, sp, null)
+
+  @deprecated def toURL(): java.net.URL = toURI().toURL()
 
   // ---- Attributes ----
 
@@ -153,6 +164,20 @@ class File private (path: String, normalized: scala.Boolean) extends Object with
   override def hashCode(): Int = path.hashCode() ^ 1234321
 
 object File:
+  /** The path of a `file:` URI, checked as the JDK checks it. */
+  private def uriPath(uri: java.net.URI): String =
+    if !uri.isAbsolute() then throw new IllegalArgumentException("URI is not absolute")
+    if uri.isOpaque() then throw new IllegalArgumentException("URI is not hierarchical")
+    val scheme = uri.getScheme()
+    if scheme == null || !scheme.equalsIgnoreCase("file") then
+      throw new IllegalArgumentException("URI scheme is not \"file\"")
+    if uri.getRawAuthority() != null then throw new IllegalArgumentException("URI has an authority component")
+    if uri.getRawFragment() != null then throw new IllegalArgumentException("URI has a fragment component")
+    if uri.getRawQuery() != null then throw new IllegalArgumentException("URI has a query component")
+    val p = uri.getPath()
+    if p.isEmpty() then throw new IllegalArgumentException("URI path component is empty")
+    p
+
   @static val separatorChar: Char = '/'
   @static val separator: String = "/"
   @static val pathSeparatorChar: Char = ':'

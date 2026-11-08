@@ -1,0 +1,1 @@
+HTTP exchanges run on goroutines of net/http while the program's server threads answer them.

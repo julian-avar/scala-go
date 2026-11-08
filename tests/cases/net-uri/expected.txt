@@ -1,0 +1,161 @@
+-- URI
+<http://user:pw@Example.COM:8080/a/b%20c/../d?q=1&r=%C3%A9#frag>: http|//user:pw@Example.COM:8080/a/b%20c/../d?q=1&r=%C3%A9|user:pw@Example.COM:8080|user:pw|Example.COM|8080|/a/b%20c/../d|/a/b c/../d|q=1&r=%C3%A9|q=1&r=é|frag|true|false
+<mailto:someone@example.com>: mailto|someone@example.com|null|null|null|-1|null|null|null|null|null|true|true
+<urn:isbn:096139210x>: urn|isbn:096139210x|null|null|null|-1|null|null|null|null|null|true|true
+<file:///tmp/x%20y>: file|///tmp/x%20y|null|null|null|-1|/tmp/x%20y|/tmp/x y|null|null|null|true|false
+</a/./b/../c>: null|/a/./b/../c|null|null|null|-1|/a/./b/../c|/a/./b/../c|null|null|null|false|false
+<../x>: null|../x|null|null|null|-1|../x|../x|null|null|null|false|false
+<a:b/c>: a|b/c|null|null|null|-1|null|null|null|null|null|true|true
+<>: null||null|null|null|-1|||null|null|null|false|false
+<http://[::1]:80/>: http|//[::1]:80/|[::1]:80|null|[::1]|80|/|/|null|null|null|true|false
+<http://[fe80::1%25eth0]/>: http|//[fe80::1%25eth0]/|[fe80::1%25eth0]|null|[fe80::1%25eth0]|-1|/|/|null|null|null|true|false
+<http://a_b.example/>: http|//a_b.example/|a_b.example|null|null|-1|/|/|null|null|null|true|false
+<//host/p>: null|//host/p|host|null|host|-1|/p|/p|null|null|null|false|false
+<http://h/ü?é#ö>: http|//h/ü?é|h|null|h|-1|/ü|/ü|é|é|ö|true|false
+<s://reg%41name/p>: s|//reg%41name/p|regAname|null|null|-1|/p|/p|null|null|null|true|false
+<http://h:/p>: http|//h:/p|h:|null|h|-1|/p|/p|null|null|null|true|false
+<http://a b/>: java.net.URISyntaxException: Illegal character in authority at index 8: http://a b/
+<ht tp://x>: java.net.URISyntaxException: Illegal character in scheme name at index 2: ht tp://x
+<:x>: java.net.URISyntaxException: Expected scheme name at index 0: :x
+<http:>: java.net.URISyntaxException: Expected scheme-specific part at index 5: http:
+<http://[::1/>: java.net.URISyntaxException: Expected closing bracket for IPv6 address at index 11: http://[::1/
+<http://x/%zz>: java.net.URISyntaxException: Malformed escape pair at index 9: http://x/%zz
+<a b>: java.net.URISyntaxException: Illegal character in path at index 1: a b
+<http://h/#a#b>: java.net.URISyntaxException: Illegal character in fragment at index 11: http://h/#a#b
+<http://[1:2:3]/>: java.net.URISyntaxException: IPv6 address too short at index 8: http://[1:2:3]/
+parseServerAuthority: java.net.URISyntaxException: Illegal character in port number at index 12: http://host:port/
+create: java.lang.IllegalArgumentException: Illegal character in path at index 3: bad uri
+x y | Illegal character in path | 1
+resolve g -> http://a/b/c/g
+resolve ./g -> http://a/b/c/g
+resolve g/ -> http://a/b/c/g/
+resolve /g -> http://a/g
+resolve //g -> http://g
+resolve ?y -> http://a/b/c/?y
+resolve g?y -> http://a/b/c/g?y
+resolve #s -> http://a/b/c/d;p?q#s
+resolve g#s -> http://a/b/c/g#s
+resolve ;x -> http://a/b/c/;x
+resolve  -> http://a/b/c/
+resolve . -> http://a/b/c/
+resolve .. -> http://a/b/
+resolve ../g -> http://a/b/g
+resolve ../.. -> http://a/
+resolve ../../../g -> http://a/../g
+resolve g/./h -> http://a/b/c/g/h
+resolve g/../h -> http://a/b/c/h
+resolve http:g -> http:g
+resolve https://other/x -> https://other/x
+relativize http://example.com/docs/a/b.html?x#y -> a/b.html?x#y
+relativize http://example.com/other -> http://example.com/other
+relativize http://EXAMPLE.com/docs/z -> http://EXAMPLE.com/docs/z
+relativize https://example.com/docs/a -> https://example.com/docs/a
+normalize /a/b/../../../c -> /../c
+normalize a/./b/. -> a/b/
+normalize a/b/.. -> a/
+normalize x:y/../z -> x:y/../z
+normalize //a//b//c -> //a/b/c
+normalize /a//b/ -> /a/b/
+equals true true 0 true
+#f a://h/ a:x b:x http://h/a http://h/b
+http://user%20info@host:8080/a%20path/ü?q=a%20b&c=%25#frag%20ment
+http://host/p%20q#f
+http://[::1]:80/x?a=b
+mailto:a%20b@example.com
+http://[::1]/
+relative path: java.net.URISyntaxException: Relative path in absolute URI: http://hostrel
+http://h/%C3%BC%E2%82%AC?q=%C3%A4
+http://example.com/a
+toURL of a relative URI: java.lang.IllegalArgumentException: URI is not absolute
+-- URL
+<http://user@www.example.com:8080/a/b.html?x=1#top>: http|user@www.example.com:8080|user|www.example.com|8080|80|/a/b.html|x=1|/a/b.html?x=1|top|http://user@www.example.com:8080/a/b.html?x=1#top
+<HTTPS://Example.com>: https|Example.com|null|Example.com|-1|443||null||null|https://Example.com
+<file:/tmp/x.txt>: file|null|null||-1|-1|/tmp/x.txt|null|/tmp/x.txt|null|file:/tmp/x.txt
+<file:///tmp/x.txt>: file||null||-1|-1|/tmp/x.txt|null|/tmp/x.txt|null|file:/tmp/x.txt
+<http://[::1]:9/p>: http|[::1]:9|null|[::1]|9|80|/p|null|/p|null|http://[::1]:9/p
+<jar:file:/a.jar!/b/c.class>: jar|null|null||-1|-1|file:/a.jar!/b/c.class|null|file:/a.jar!/b/c.class|null|jar:file:/a.jar!/b/c.class
+<url:http://x/y>: http|x|null|x|-1|80|/y|null|/y|null|http://x/y
+<  http://x/  >: http|x|null|x|-1|80|/|null|/|null|http://x/
+<mailto:a@b.c>: mailto|null|null||-1|-1|a@b.c|null|a@b.c|null|mailto:a@b.c
+<http://h?q>: http|h|null|h|-1|80||q|?q|null|http://h?q
+<http://h#r>: http|h|null|h|-1|80||null||r|http://h#r
+<nope>: java.net.MalformedURLException: no protocol: nope
+<foo://x>: java.net.MalformedURLException: unknown protocol: foo
+<http://h:port/>: java.net.MalformedURLException: Error at index 0 in: "port"
+<http://[x]/>: java.net.MalformedURLException: Invalid authority field: [x]
+<http://[::1]x/>: java.net.MalformedURLException: Invalid authority field: [::1]x
+</relative>: java.net.MalformedURLException: no protocol: /relative
+d.html -> http://example.com/a/b/d.html
+../d.html -> http://example.com/a/d.html
+/root -> http://example.com/root
+//other/x -> http://other/x
+?y -> http://example.com/a/b/?y
+#s -> http://example.com/a/b/c.html?q#s
+ -> http://example.com/a/b/c.html?q#r
+https://secure/x -> https://secure/x
+http:rel -> http://example.com/a/b/rel
+./x/../y -> http://example.com/a/b/y
+http://example.com:8080/p?q#r
+http://[::1]/x
+true true false
+http://example.com/a%20b?c#d
+-- URLEncoder/URLDecoder
+hello+world | hello+world | hello world
+a%2Bb%3Dc%26d | a%2Bb%3Dc%26d | a+b=c&d
+Gr%C3%BC%C3%9Fe+%E4%B8%96%E7%95%8C+%F0%9F%8C%8D | Gr%FC%DFe+%3F%3F+%3F | Grüße 世界 🌍
+*-._%7E%21%27%28%29 | *-._%7E%21%27%28%29 | *-._~!'()
+ |  | 
+a+b c=€
+decode %: java.lang.IllegalArgumentException: URLDecoder: Incomplete trailing escape (%) pattern
+decode %4: java.lang.IllegalArgumentException: URLDecoder: Incomplete trailing escape (%) pattern
+decode %zz: java.lang.IllegalArgumentException: URLDecoder: Illegal hex characters in escape (%) pattern - Error at index 0 in: "zz"
+decode %-1: java.lang.IllegalArgumentException: URLDecoder: Illegal hex characters in escape (%) pattern - negative value
+decode %+1: 
+encoding: java.io.UnsupportedEncodingException: no-such-charset
+-- InetAddress
+<127.0.0.1>: Inet4Address /127.0.0.1 127.0.0.1 127,0,0,1 2130706433 true false false false false
+<127.1>: Inet4Address /127.0.0.1 127.0.0.1 127,0,0,1 2130706433 true false false false false
+<10.1>: Inet4Address /10.0.0.1 10.0.0.1 10,0,0,1 167772161 false false false true false
+<4294967295>: Inet4Address /255.255.255.255 255.255.255.255 -1,-1,-1,-1 -1 false false false false false
+<::1>: Inet6Address /0:0:0:0:0:0:0:1 0:0:0:0:0:0:0:1 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 1 true false false false false
+<[::1]>: Inet6Address /0:0:0:0:0:0:0:1 0:0:0:0:0:0:0:1 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 1 true false false false false
+<::ffff:192.0.2.1>: Inet4Address /192.0.2.1 192.0.2.1 -64,0,2,1 -1073741311 false false false false false
+<2001:db8::1>: Inet6Address /2001:db8:0:0:0:0:0:1 2001:db8:0:0:0:0:0:1 32,1,13,-72,0,0,0,0,0,0,0,0,0,0,0,1 536939705 false false false false false
+<1:2:3:4:5:6:7:8>: Inet6Address /1:2:3:4:5:6:7:8 1:2:3:4:5:6:7:8 0,1,0,2,0,3,0,4,0,5,0,6,0,7,0,8 1048596 false false false false false
+<fe80::1%2>: Inet6Address /fe80:0:0:0:0:0:0:1%2 fe80:0:0:0:0:0:0:1%2 -2,-128,0,0,0,0,0,0,0,0,0,0,0,0,0,1 -41943039 false false true false false
+<::>: Inet6Address /0:0:0:0:0:0:0:0 0:0:0:0:0:0:0:0 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 0 false true false false false
+<0.0.0.0>: Inet4Address /0.0.0.0 0.0.0.0 0,0,0,0 0 false true false false false
+<::1.2.3.4>: Inet6Address /0:0:0:0:0:0:102:304 0:0:0:0:0:0:102:304 0,0,0,0,0,0,0,0,0,0,0,0,1,2,3,4 16909060 false false false false false
+<>: Inet4Address localhost/127.0.0.1 127.0.0.1 127,0,0,1 2130706433 true false false false false
+<localhost>: Inet4Address localhost/127.0.0.1 127.0.0.1 127,0,0,1 2130706433 true false false false false
+<[::1>: java.net.UnknownHostException: [::1: invalid IPv6 address literal
+<[1.2.3.4]>: java.net.UnknownHostException: [1.2.3.4]: invalid IPv6 address literal
+<1::2::3>: java.net.UnknownHostException: 1::2::3: invalid IPv6 address literal
+<12345::>: java.net.UnknownHostException: 12345::: invalid IPv6 address literal
+<::ffff:1.2.3.4%1>: java.net.UnknownHostException: ::ffff:1.2.3.4%1: invalid IPv4-mapped address
+<fe80::1%nosuchif>: java.net.UnknownHostException: no such interface nosuchif
+10.0.0.1 site=true link=false mc=false global=false mcLink=false
+172.16.5.4 site=true link=false mc=false global=false mcLink=false
+192.168.1.1 site=true link=false mc=false global=false mcLink=false
+169.254.0.1 site=false link=true mc=false global=false mcLink=false
+224.0.0.1 site=false link=false mc=true global=false mcLink=true
+239.255.0.1 site=false link=false mc=true global=false mcLink=false
+8.8.8.8 site=false link=false mc=false global=false mcLink=false
+ff02::1 site=false link=false mc=true global=false mcLink=true
+fec0::1 site=true link=false mc=false global=false mcLink=false
+ff0e::1 site=false link=false mc=true global=true mcLink=false
+example/192.0.2.1
+/0:0:0:0:0:0:0:1
+bad length: java.net.UnknownHostException: addr is of illegal length
+localhost/127.0.0.1
+true
+List(/1.2.3.4)
+-- InetSocketAddress
+/192.0.2.1:80 80 192.0.2.1 false
+/[0:0:0:0:0:0:0:1]:443
+0.0.0.0/0.0.0.0:8080
+example.invalid/<unresolved>:1 true null example.invalid
+localhost/127.0.0.1:99
+true true
+bad port: java.lang.IllegalArgumentException: port out of range:70000
+null host: java.lang.IllegalArgumentException: hostname can't be null

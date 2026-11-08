@@ -1,0 +1,1 @@
+The server socket is accepted from and read in other threads than the client.

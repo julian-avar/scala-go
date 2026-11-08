@@ -34,9 +34,19 @@ trait Path extends Comparable[Path] with java.lang.Iterable[Path]:
   def toAbsolutePath(): Path
   def toRealPath(options: Array[LinkOption]): Path
   def toFile(): File
+  /** A `file:///` URI of the absolute path (ending with a slash for a directory). */
+  def toUri(): java.net.URI
   def iterator(): java.util.Iterator[Path]
 
 object Path:
+  /** The path of a `file:` URI. */
+  @static def of(uri: java.net.URI): Path =
+    val scheme = uri.getScheme()
+    if scheme == null then throw new IllegalArgumentException("Missing scheme")
+    if !scheme.equalsIgnoreCase("file") then
+      throw new FileSystemNotFoundException("Provider \"" + scheme + "\" not installed")
+    new File(uri).toPath()
+
   /** Joins the non-empty parts with `/`, as the JDK's Unix file system. */
   @static def of(first: String, more: Array[String]): Path =
     if more.length == 0 then new UnixPath(first)
@@ -52,6 +62,7 @@ final class Paths private ()
 
 object Paths:
   @static def get(first: String, more: Array[String]): Path = Path.of(first, more)
+  @static def get(uri: java.net.URI): Path = Path.of(uri)
 
 /** A path of the default file system: its string, normalized as by the JDK (no repeated or
  *  trailing slashes), and its name elements.
@@ -194,6 +205,16 @@ private[java] final class UnixPath(input: String) extends Path:
       new UnixPath(r.asInstanceOf[String])
 
   def toFile(): File = new File(path)
+
+  def toUri(): java.net.URI =
+    val absolute = toAbsolutePath().toString
+    val sb = new java.lang.StringBuilder("file://")
+    for b <- absolute.getBytes(java.nio.charset.StandardCharsets.UTF_8) do
+      val c = (b & 0xff).toChar
+      if c < 0x80 && (Character.isLetterOrDigit(c) || "-_.!~*'()/:@&=+$,;".indexOf(c) >= 0) then sb.append(c)
+      else sb.append('%').append("0123456789ABCDEF".charAt((b >> 4) & 0xf)).append("0123456789ABCDEF".charAt(b & 0xf))
+    if !absolute.endsWith("/") && Files.isDirectory(this, new Array[LinkOption](0)) then sb.append('/')
+    new java.net.URI(sb.toString)
 
   def iterator(): java.util.Iterator[Path] =
     val n = getNameCount()

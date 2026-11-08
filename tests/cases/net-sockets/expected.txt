@@ -1,0 +1,43 @@
+-- echo
+bound true localhost/127.0.0.1 true true
+ServerSocket[addr=localhost/127.0.0.1,localport=PORT]
+connected true true false localhost/127.0.0.1 true
+Socket[addr=localhost/127.0.0.1,port=PORT,localport=LOCAL]
+remote localhost/127.0.0.1:PORT local /127.0.0.1
+options false false 0 -1
+options true true 5 true
+echo: hello
+echo: Grüße, 世界 🌍
+echo: 
+shutdown true false
+write after shutdown: java.net.SocketException: Socket output is shutdown
+end null -1
+accepted from /127.0.0.1 true
+server: end of input
+closed true true
+stream of closed socket: java.net.SocketException: Socket is closed
+read of closed socket: -1
+server closed true
+-- timeouts
+accept: java.net.SocketTimeoutException: Accept timed out
+soTimeout 100
+read: java.net.SocketTimeoutException: Read timed out
+read again: x
+read to the end: -1
+-- closing from another thread
+blocked accept: java.net.SocketException: Socket closed
+accept after close: java.net.SocketException: Socket is closed
+blocked read: java.net.SocketException: Socket closed
+-- errors
+bind in use: java.net.BindException: Address already in use
+refused: java.net.ConnectException: Connection refused
+unconnected Socket[unconnected] false 0 -1 null
+unconnected stream: java.net.SocketException: Socket is not connected
+negative timeout: java.lang.IllegalArgumentException: connect: timeout can't be negative
+unresolved: java.net.UnknownHostException: nowhere.invalid
+connect closed: java.net.SocketException: Socket is closed
+bad port: java.lang.IllegalArgumentException: Port value out of range: 70000
+bad timeout: java.lang.IllegalArgumentException: timeout < 0
+ServerSocket[unbound]
+-- bulk
+received 3145745 bytes, intact: true
