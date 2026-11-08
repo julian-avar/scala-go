@@ -1,0 +1,38 @@
+# The site's navigation (Scaladoc's static site format). Scaladoc 3.9 ignores `title` on sections:
+# a section's title is the `title` of its index page, and `directory` keeps its URLs stable.
+index: index.md
+subsection:
+  - page: getting-started.md
+  - index: user/index.md
+    directory: user
+    subsection:
+      - page: user/build.md
+      - page: user/concurrency.md
+      - page: user/differences.md
+      - page: user/troubleshooting.md
+      - page: user/performance.md
+      - page: user/shipping.md
+  - index: interop/index.md
+    directory: interop
+    subsection:
+      - page: interop/facades.md
+      - page: interop/generated-facades.md
+      - page: interop/go-data.md
+      - page: interop/go-libraries.md
+      - page: interop/exports.md
+  - index: libraries/index.md
+    directory: libraries
+    subsection:
+      - page: libraries/scala.md
+      - page: libraries/jdk.md
+      - page: libraries/gostd.md
+  - index: spec/index.md
+    directory: spec
+    subsection:
+      - page: spec/language.md
+      - page: spec/runtime.md
+      - page: spec/data.md
+  - index: contributing/index.md
+    directory: contributing
+    subsection:
+      - page: contributing/design.md
