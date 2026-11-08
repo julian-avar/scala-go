@@ -14,8 +14,9 @@ directory: in the directory
 appended 'to a file appended'
 from a file 'to a file appended' java.io.IOException: Stream closed
 discard '' 'kept'
-PIPE INHERIT WRITE redirect to read from file "x" redirect to write to file "y"
-redirect to append to file "z" true List(PIPE, INHERIT, READ, WRITE, APPEND)
+PIPE INHERIT WRITE redirect to read from file "x"
+redirect to write to file "y" redirect to append to file "z"
+true List(PIPE, INHERIT, READ, WRITE, APPEND)
 java.lang.IllegalArgumentException: Redirect invalid for reading: redirect to write to file "<root>/out.txt"
 java.lang.IllegalArgumentException: Redirect invalid for writing: redirect to read from file "<root>/out.txt"
 before an inheriting child
@@ -31,6 +32,9 @@ java.io.IOException: invalid null character in command
 -- lifecycle
 alive true java.lang.IllegalThreadStateException: process hasn't exited waitFor(50ms) false
 got x waitFor(10s) true 0
+interactive: first
+interactive: second
+interactive: null 0
 destroyed: 143 alive false
 destroyed forcibly: 137 false
 current pid true true alive true

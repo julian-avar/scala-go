@@ -293,7 +293,8 @@ private[nio] final class HeapByteBufferR(cap: Int, array0: Array[Byte], offset0:
 /** java.nio.MappedByteBuffer. `FileChannel.map` gives a copy of the file's contents in memory
  *  (see `FileChannel`).
  */
-abstract class MappedByteBuffer private[nio] (cap: Int, array0: Array[Byte], offset0: Int) extends ByteBuffer(cap, array0, offset0):
+abstract class MappedByteBuffer private[nio] (cap: Int, array0: Array[Byte], offset0: Int)
+    extends ByteBuffer(cap, array0, offset0):
   def isLoaded(): Boolean = true
   def load(): MappedByteBuffer = this
   def force(): MappedByteBuffer = this

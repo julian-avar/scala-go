@@ -135,7 +135,8 @@ private[nio] object Buffer:
   /** `Objects.checkFromIndexSize`, with the JDK's message. */
   def checkRange(from: Int, size: Int, length: Int): Unit =
     if (length | from | size) < 0 || size > length - from then
-      throw new IndexOutOfBoundsException("Range [" + from + ", " + from + " + " + size + ") out of bounds for length " + length)
+      throw new IndexOutOfBoundsException(
+        "Range [" + from + ", " + from + " + " + size + ") out of bounds for length " + length)
 
   /** The checks of `wrap(array, offset, length)`. */
   def checkWrap(arrayLength: Int, offset: Int, length: Int): Unit =

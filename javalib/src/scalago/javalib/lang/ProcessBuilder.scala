@@ -87,7 +87,7 @@ final class ProcessBuilder(private var commandList: List[String]):
     val program = command(0)
     def failure(message: String) =
       new IOException("Cannot run program \"" + program + "\"" +
-        (if dir == null then "" else " (in directory \"" + dir + "\")") + ": " + message)
+        (if dir == null then "" else " (in directory \"" + dir + "\")") + ": " + message, new IOException(message))
     for arg <- command do
       if arg.indexOf('\u0000') >= 0 then throw new IOException("invalid null character in command")
     val environment =

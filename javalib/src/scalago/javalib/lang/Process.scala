@@ -47,7 +47,8 @@ abstract class Process:
 
   def pid(): scala.Long = throw new java.lang.UnsupportedOperationException(getClass().getName() + ".pid() not supported")
 
-  def toHandle(): ProcessHandle = throw new java.lang.UnsupportedOperationException(getClass().getName() + ".toHandle() not supported")
+  def toHandle(): ProcessHandle =
+    throw new java.lang.UnsupportedOperationException(getClass().getName() + ".toHandle() not supported")
 
   def info(): ProcessHandle.Info = toHandle().info()
 
@@ -166,7 +167,8 @@ private[lang] final class ProcessHandleImpl(id: scala.Long, process: Process) ex
   def supportsNormalTermination(): scala.Boolean = true
 
   private def checkNotCurrent(): Unit =
-    if id == ProcessHandleImpl.current.pid() then throw new java.lang.IllegalStateException("destroy of current process not allowed")
+    if id == ProcessHandleImpl.current.pid() then
+      throw new java.lang.IllegalStateException("destroy of current process not allowed")
 
   def destroy(): scala.Boolean =
     checkNotCurrent()

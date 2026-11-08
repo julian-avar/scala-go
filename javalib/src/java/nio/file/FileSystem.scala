@@ -53,7 +53,8 @@ private[java] object UnixFileSystem extends FileSystem:
     val pattern = Pattern.compile(regex)
     path => pattern.matcher(path.toString()).matches()
 
-  def newWatchService(): WatchService = throw new UnsupportedOperationException("Watch services are not supported by scala-go")
+  def newWatchService(): WatchService =
+    throw new UnsupportedOperationException("Watch services are not supported by scala-go")
 
   override def toString(): String = "sun.nio.fs.LinuxFileSystem"
 
