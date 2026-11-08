@@ -27,16 +27,22 @@ Notation: `rt.X` is a type of the runtime package; `S_C` is the struct generated
 | `Unit` | no value (methods have no result) | `*rt.BoxedUnit`, the single `rt.UnitValue` | `scala.runtime.BoxedUnit` | an array of references |
 | `Nothing` | no value | — | — | — |
 
+- The Go types have the JVM types' sizes and representations: Go guarantees the sizes of its
+  sized numeric types, two's-complement integers and IEEE 754 floating-point numbers (Go:
+  [Numeric types][go-numeric], [Size and alignment guarantees][go-size]). Go's `int`, `uint` and
+  `uintptr`, whose size is implementation-specific, are not used for Scala values.
 - Values of primitive types are unboxed in fields, locals, parameters, results and primitive
   arrays.
 - **Boxing.** A boxed primitive is the Go value stored in an `any`; the box class is determined
-  by the Go type (`int32` is an `Integer`, `uint16` a `Character`). Converting to `any` is Go's
-  interface conversion, which allocates unless the value is small (Go keeps the values 0–255 in a
-  static table). `Integer.valueOf`, `BoxesRunTime.boxToInteger` and implicit boxing are the same
-  conversion.
-- **Unboxing** is a Go type assertion; unboxing `null` gives the zero value, as on the JVM.
-- **Deviation:** boxes have no identity. Two boxes of the same type and value are `eq`, their
-  `System.identityHashCode` is `0`, and they share one monitor.
+  by the dynamic Go type (`int32` is an `Integer`, `uint16` a `Character`). Boxing is the
+  conversion of the value to an interface type (Go: [Assignability][go-assign]), which allocates
+  unless the value is small (gc keeps the values 0–255 in a static table). `Integer.valueOf`,
+  `BoxesRunTime.boxToInteger` and implicit boxing are the same conversion.
+- **Unboxing** is a Go type assertion (Go: [Type assertions][go-assert]); unboxing `null` gives
+  the zero value, as on the JVM.
+- **Deviation:** boxes have no identity. Two interface values are equal when their dynamic types
+  and values are (Go: [Comparison operators][go-compare]), so two boxes of the same type and
+  value are `eq`, their `System.identityHashCode` is `0`, and they share one monitor.
 
 ## Strings
 
@@ -53,6 +59,17 @@ Notation: `rt.X` is a type of the runtime package; `S_C` is the struct generated
   invalid UTF-8 with U+FFFD.
 - `String` and `GoString` are distinct types; `s.toGoString` and `g.toJavaString` copy and
   transcode.
+- A Go `string` is a sequence of bytes, conventionally UTF-8: `len` counts bytes, indexing gives
+  bytes and `range` decodes UTF-8 (Go: [String types][go-strings]). `GoString` exposes these
+  (`byteLength`, `byteAt`); `String` never uses them.
+- Go's conversion of an integer to a string gives the UTF-8 encoding of that code point, or
+  `"�"` for values that are not valid code points (Go:
+  [Conversions to and from a string type][go-string-conv]). **Deviation (bug):**
+  `s.indexOf(cp)` with an integer that is not a valid code point (`0x110000`) searches for
+  U+FFFD this way: `"a�b".indexOf(0x110000)` is `1` (JVM: `-1`).
+- **Deviation (bug):** `s.lastIndexOf(cp)` and `lastIndexOf(cp, from)` with a supplementary
+  code point compare it with single UTF-16 code units, so they never find it:
+  `"a😀b".lastIndexOf(0x1F600)` is `-1` (JVM: `1`). `indexOf` finds it.
 
 ## Arrays
 
@@ -95,9 +112,25 @@ Notation: `rt.X` is a type of the runtime package; `S_C` is the struct generated
 | `new Object()` | `*rt.Object` |
 | `null` | a nil interface (or a nil pointer for `String`, arrays, `Class`, `BigInteger`, `BigDecimal`); converted to `any`, a nil pointer becomes a nil `any` |
 
+- In Go terms: a subclass's struct embeds its superclass's struct, so the superclass's fields
+  and the Go methods declared on it are promoted (Go: [Struct types][go-struct]). A `*S_C`
+  implements `C_C` because its method set, which includes the methods promoted through the
+  embedded structs, contains every method of `C_C` (Go: [Method sets][go-methodsets],
+  [Implementing an interface][go-implements]). `C_C` has an accessor `A_C() *S_C`, declared on
+  `*S_C` and promoted to the subclasses, which returns the embedded `S_C` (fields are accessed
+  through it); a trait's interface has a marker method `I_T()` instead. Virtual methods are
+  declared on each instantiated struct, as forwarders calling the implementation with the outer
+  pointer: a promoted method would receive the embedded struct and lose the object's identity.
 - Type tests against classes are Go type assertions on interfaces whose marker methods are
   unique per class, so they are exact (subclasses pass, unrelated classes with the same methods
-  do not).
+  do not): Go interfaces are satisfied structurally, and the marker methods make the structure
+  name the class.
+- **Null.** An interface value is nil only if it has neither a dynamic type nor a value; an
+  interface holding a nil pointer is not nil (Go: [Comparison operators][go-compare]). Null
+  references of pointer types (`String`, arrays, ...) are therefore converted to `any` through
+  `rt.AnyRef`, which gives a nil `any`, and null tests on `any` values use `rt.IsNull` (see the
+  `==` deviation in [Language](language.md#equality-and-hashing), where an operand misses this
+  conversion).
 - Classes that are never instantiated have no struct; references to them are `any`, and only
   `null` passes a cast to them.
 - **Object header.** `rt.ObjectHeader` is one atomic pointer (8 bytes) to the object's monitor,
@@ -177,8 +210,8 @@ Scala.js), and their methods are Go functions (`linker/Hijacked.scala`, `linker/
 
 ## Go interop types
 
-These types of `scalago.go` represent Go values directly (see the design document's Go interop
-section for the conversion rules at facade calls):
+These types of `scalago.go` represent Go values directly. Their semantics, and the conversions
+at facade calls and exports, are specified in [Go interoperability](interop.md):
 
 | Scala | Go value | On the JVM |
 |-------|----------|------------|
@@ -196,19 +229,18 @@ section for the conversion rules at facade calls):
 | `GoException` | a Scala exception holding a Go `error` | — |
 | Go func returned to Scala | a `GoFunction0`–`GoFunction3` wrapping it | — |
 
-- **Canonical element views.** Inside Go data, elements have one Scala representation decided by
-  the Go element type: `int`, `int64`, `uint`, `uint64`, `uintptr` are `Long`; `int32`, `uint32`
-  are `Int`; `int16`, `uint16`, `int8`, `uint8` are `Short`, `Char`, `Byte`; `float32`, `float64`,
-  `bool` are `Float`, `Double`, `Boolean`; `string` is `GoString`; struct values are facades (a
-  pointer to a copy); everything else is the Go value. The linker rejects other views.
-- **Structs: values and pointers.** Facades hold Go structs as pointers. A type test against a
-  struct facade accepts both `T` and `*T`; a cast of a `T` value copies it to a new pointer.
-  When a struct is passed to a Go interface (or `any`), it goes by value if the value's method set
-  implements the interface (for `any`: if the type has no pointer-receiver methods), otherwise as
-  the pointer, so Go code receives what Go code would have passed.
-- **Equality and strings.** `==` on Go values is Go's `==`, or identity for maps, slices and funcs;
-  `toString` uses `Error()` or `String()` when the value has one; `getClass.getName` is the Go
-  type (`*strings.Builder`).
-- `new T` of a facade class is Go's zero value of `T`.
-- **Deviation:** unsynchronized concurrent writes to a `GoMap` can end the process with Go's
-  fatal error `concurrent map writes`, which no `catch` intercepts.
+Elements inside Go data have canonical Scala views (Go `int` is `Long`, `string` is
+`GoString`, ...); facades hold Go structs as pointers and pass them to Go interfaces by value
+where Go code would; `==` on Go values is Go's `==`, or identity for maps, slices and funcs.
+[Go interoperability](interop.md) specifies these rules.
+
+[go-assert]: https://go.dev/ref/spec#Type_assertions
+[go-assign]: https://go.dev/ref/spec#Assignability
+[go-compare]: https://go.dev/ref/spec#Comparison_operators
+[go-implements]: https://go.dev/ref/spec#Implementing_an_interface
+[go-methodsets]: https://go.dev/ref/spec#Method_sets
+[go-numeric]: https://go.dev/ref/spec#Numeric_types
+[go-size]: https://go.dev/ref/spec#Size_and_alignment_guarantees
+[go-string-conv]: https://go.dev/ref/spec#Conversions_to_and_from_a_string_type
+[go-strings]: https://go.dev/ref/spec#String_types
+[go-struct]: https://go.dev/ref/spec#Struct_types

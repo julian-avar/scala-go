@@ -1,0 +1,32 @@
+1 << -1: -2147483648
+1 << 33: 2
+1L << 65: 2
+-8 >> 33: -4
+-8 >>> 33: 2147483644
+-8L >>> 65: 9223372036854775804
+1e20.toInt: 2147483647
+-1e20.toInt: -2147483648
+1e20.toLong: 9223372036854775807
+1e20.toChar: 65535
+1e20f.toShort: -1
+NaN.toInt: 0
+NaN.toLong: 0
+NaN == NaN: false
+NaN < 1: false
+NaN.equals(NaN): true
+Long.MaxValue.toFloat: 9.223372E18
+Int.MinValue / -1: -2147483648
+Long.MinValue % -1: 0
+1 / 0: ArithmeticException: / by zero
+1L % 0: ArithmeticException: / by zero
+1.0 / 0: Infinity
+-1.0 / 0: -Infinity
+0.0 / 0: NaN
+-(0.0): -0.0
+-(0.0) == 0.0: true
+-5.5 % 2: -1.5
+5.5 % 0: NaN
+300.toByte: 44
+65535.toShort: -1
+-1.toChar: 65535
+(-1: Byte).toChar: 65535

@@ -32,6 +32,7 @@ subsection:
       - page: spec/language.md
       - page: spec/runtime.md
       - page: spec/data.md
+      - page: spec/interop.md
   - index: contributing/index.md
     directory: contributing
     subsection:
