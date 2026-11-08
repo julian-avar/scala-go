@@ -9,6 +9,7 @@ subsection:
       - page: user/build.md
       - page: user/concurrency.md
       - page: user/differences.md
+      - page: user/limitations.md
       - page: user/troubleshooting.md
       - page: user/performance.md
       - page: user/shipping.md
@@ -26,6 +27,14 @@ subsection:
       - page: libraries/scala.md
       - page: libraries/jdk.md
       - page: libraries/gostd.md
+  - index: examples/index.md
+    directory: examples
+    subsection:
+      - page: examples/basics.md
+      - page: examples/ecosystem.md
+      - page: examples/gotui.md
+      - page: examples/gin.md
+      - page: examples/argus.md
   - index: spec/index.md
     directory: spec
     subsection:

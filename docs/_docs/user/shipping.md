@@ -53,3 +53,16 @@ too, and adjust the paths.
 
 To ship Scala code as a Go module for Go programs, see
 [Calling Scala from Go](../interop/exports.md).
+
+## Limitations
+
+- Binaries are large: the repository's small examples are 16 to 50 MB with debug information
+  (`-ldflags=-s -w` drops it).
+- Go libraries that need cgo need a C compiler for the target, and rule out `CGO_ENABLED=0`
+  unless they have a fallback without cgo.
+- 64-bit little-endian targets only. Windows builds, but file paths are Unix paths and the tests
+  do not run there; WebAssembly is untested.
+- Not published yet: scala-go itself comes from `./mill __.publishLocal` (see
+  [Getting started](../getting-started.md)).
+
+[Limitations](limitations.md) lists all limitations.

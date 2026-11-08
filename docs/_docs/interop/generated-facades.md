@@ -79,15 +79,20 @@ get its functions, variables and constants (`"time"` for `time.Second`).
 ## What is left out
 
 Members that cannot be represented are left out, with a comment in the generated source saying
-why. The most common cases:
+why (`// not generated: Errors (type github.com/gin-gonic/gin.errorMsgs is not generated)`):
 
-- generic functions with type sets (`~int | string`, `comparable`) and generic types;
-- unnamed struct and interface types, arrays and complex numbers;
-- funcs stored inside Go data;
-- types of `internal` packages;
+- generic functions with type sets (`~int | string`, `comparable`), and members using a generic
+  type's parameters or instances (argus's `Bind[T]`, which returns a `*Bound[T]`);
+- unnamed struct and interface types (a `<-chan struct{}` result), arrays and complex numbers;
+- unexported types in exported APIs, and types of `internal` packages;
+- funcs stored inside Go data (struct fields of func type, slices of funcs), variadic func types,
+  and returned funcs with more than 3 parameters;
 - constants that do not fit in a `Long`.
 
-To use such a member, add a [hand-written facade](facades.md) for it next to the generated ones.
+To use such a member, add a [hand-written facade](facades.md) for it next to the generated ones,
+where the [conversions](facades.md#conversions) can express it. The
+[examples](../examples/index.md) list what their generated facades leave out, and
+[Limitations](../user/limitations.md#go-interop) all limitations of Go interop.
 
 Generated facades are checked against Go at link time, like hand-written ones, but only where
 they are used: unused members cost nothing.

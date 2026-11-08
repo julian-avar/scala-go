@@ -21,10 +21,11 @@ object ServiceConfig:
     "features" -> Seq.empty[String]
   )
 
+  /** Key by key: argus.Bind[T] (onto a Go struct with `argus` tags) is not available from Scala. */
   def from(s: argus.Settings): ServiceConfig = ServiceConfig(
     s.GetString("server.host"),
     s.GetInt("server.port"),
-    java.time.Duration.ofNanos(s.GetDuration("server.timeout").Nanoseconds()),
+    java.time.Duration.ofNanos(s.GetDuration("server.timeout").Nanoseconds()), // a Go time.Duration is not a number
     s.GetString("log.level"),
     s.GetStringSlice("features").toSeq.map(_.toJavaString)
   )

@@ -7,7 +7,8 @@ title: Differences from the JVM
 scala-go keeps the JVM's semantics where programs can observe them: `String` is
 `java.lang.String`, integer overflow wraps, `==` and `hashCode` behave as on the JVM, and
 uncaught exceptions print JVM-style stack traces. This page lists the differences users meet
-most; the design document's [Status](../contributing/design.md#status) and
+most; [Limitations](limitations.md) collects all limitations, including those of Go interop and
+the tooling, and the design document's [Status](../contributing/design.md#status) and
 [Roadmap](../contributing/design.md#roadmap) have the complete list.
 
 ## Not available

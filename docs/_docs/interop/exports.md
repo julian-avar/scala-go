@@ -92,6 +92,13 @@ replace example.com/mylib => ../out/mylib/goLink.dest/go
 - **Go contexts.** To cancel Scala code when a caller's `context.Context` is done, see
   [Concurrency](../user/concurrency.md#go-contexts).
 
-Not supported yet: exported traits (Go code implementing Scala traits), exported `val`s and
-fields, secondary constructors, tuple results, overloads with the same Go name, and generic
-methods.
+## Limitations
+
+- Not supported yet: exported traits (Go code implementing Scala traits), exported `val`s and
+  fields, secondary constructors, tuple results, overloads with the same Go name, and generic
+  methods. Wrap them in exported methods.
+- Exported classes are Go interfaces: Go code sees their methods, never fields, so Go code that
+  reads struct fields by reflection (`encoding/json`) cannot see inside them.
+- One Scala library per Go binary, and no import cycles (see [Rules](#rules)).
+
+[Limitations](../user/limitations.md#go-interop) lists all limitations of Go interop.

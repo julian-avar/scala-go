@@ -25,7 +25,8 @@ object Main {
     println(s"${g.toJavaString}: ${g.byteLength} bytes as a Go string")
 
     // Calling Go through facades generated from the Go packages (goFacadePackages in build.mill):
-    // a standard library package, and a local Go module
+    // a standard library package, and a local Go module. Facades throw on the JVM, so from here
+    // on the program runs only as Go.
     val words = textstats.Words("It's a truth universally acknowledged...")
     println(s"${words.length} words, the longest is ${strconv.Quote(textstats.Longest(words))}")
     try textstats.Longest(GoSlice.empty[GoString])

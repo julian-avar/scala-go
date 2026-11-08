@@ -30,7 +30,10 @@ for any Scala 3 module.
 |---------------|-----------------------------------------------------------------------------|
 | `goLink`      | the generated Go module (`out/<module>/goLink.dest/go`)                      |
 | `goBuild`     | the executable (`out/<module>/goBuild.dest/app`); for a library, `go vet`s it |
-| `goRun args*` | builds and runs the executable; standard input and output are the terminal's |
+| `goRun args*` | builds and runs the executable, with Mill's standard input and output |
+
+Mill runs tasks in a background daemon, which has no terminal: run terminal UIs (such as the
+[gotui example](../examples/gotui.md)) from `goBuild`'s executable directly.
 
 ## Settings
 

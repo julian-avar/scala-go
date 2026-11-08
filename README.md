@@ -21,8 +21,10 @@ The documentation is at **https://julian-avar.github.io/scala-go/docs/**, with t
 `.github/workflows/docs.yml`; build it locally with `./mill docs.site`, then open
 `out/docs/site.dest/docs/index.html`. Its pages are in [docs/_docs](docs/_docs):
 [getting started](docs/_docs/getting-started.md), the [user's guide](docs/_docs/user/index.md),
-[Go interop](docs/_docs/interop/index.md), [libraries](docs/_docs/libraries/index.md). The
-[design document](docs/design.md) explains the architecture, and lists the status and roadmap.
+[Go interop](docs/_docs/interop/index.md), [libraries](docs/_docs/libraries/index.md),
+[examples](docs/_docs/examples/index.md). [Limitations](docs/_docs/user/limitations.md) lists what
+does not work yet, with workarounds. The [design document](docs/design.md) explains the
+architecture, and lists the status and roadmap.
 
 ## Quick start
 
@@ -70,11 +72,11 @@ final case class Counter(n: Int) extends tea.Model:   // a Go interface, impleme
 | `gears/`             | gears on goroutines (`scalago-gears`): an override and Go helpers       |
 | `gostd/`             | Generated facades of Go standard library packages (`scalago-gostd`)     |
 | `mill-build/src/`    | `ScalaGoModule`/`ScalaGoLibraryModule` and `TastyIR`, published as `mill-scalago` |
-| `examples/basics/`   | A program built with `ScalaGoModule`: `mill examples.basics.goRun Ada Grace` |
-| `examples/ecosystem/`| Popular Scala libraries compiled from TASTy (`mill examples.ecosystem.check`: JVM and Go agree) |
-| `examples/gotui/`    | A bubbletea/bubbles/lipgloss terminal app in Scala (`mill examples.gotui.goRun`; `mill examples.gotui.check`) |
-| `examples/gin/`      | A JSON API on gin (`mill examples.gin.goRun`; `mill examples.gin.check`) |
-| `examples/argus/`    | Configuration reloading with argus (`mill examples.argus.check`; needs cgo) |
+| [`examples/basics/`](examples/basics/README.md) | A program built with `ScalaGoModule`: `mill examples.basics.goRun Ada Grace` |
+| [`examples/ecosystem/`](examples/ecosystem/README.md) | Popular Scala libraries compiled from TASTy (`mill examples.ecosystem.check`: JVM and Go agree) |
+| [`examples/gotui/`](examples/gotui/README.md) | A bubbletea/bubbles/lipgloss terminal app in Scala (`mill examples.gotui.goBuild`, then run it; `mill examples.gotui.check`) |
+| [`examples/gin/`](examples/gin/README.md) | A JSON API on gin (`mill examples.gin.goRun`; `mill examples.gin.check`) |
+| [`examples/argus/`](examples/argus/README.md) | Configuration reloading with argus (`mill examples.argus.check`) |
 | `bench/`             | CPU benchmarks, run on the JVM (`mill bench.run`) and as Go (`mill bench.goRun`) |
 | `tests/published/`   | A project using only the published artifacts (`tests/published/check.sh` after `publishLocal`) |
 | `tests/cases/`       | End-to-end programs with their expected output                          |

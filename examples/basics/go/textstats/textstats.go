@@ -1,4 +1,5 @@
-// Package textstats is Go code called from the Scala example (see GoFacades.scala).
+// Package textstats is Go code called from the Scala example, through the facades generated
+// from it (goFacadePackages in build.mill).
 package textstats
 
 import (

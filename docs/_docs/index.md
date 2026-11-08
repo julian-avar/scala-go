@@ -35,13 +35,15 @@ final case class Counter(n: Int) extends tea.Model:   // a Go interface, impleme
   bubbletea; Go calls Scala libraries.
 
 What does not work: runtime reflection (beyond `getClass`), Java code in dependencies, and
-Scala 2 libraries. [Differences from the JVM](user/differences.md) lists the details.
+Scala 2 libraries. [Differences from the JVM](user/differences.md) lists the details, and
+[Limitations](user/limitations.md) all known limitations.
 
 ## Where to go next
 
 - [Getting started](getting-started.md): a first program, run as Go and on the JVM.
 - [Build setup](user/build.md): the Mill module and its settings.
 - [Calling Go](interop/facades.md) and [Calling Scala from Go](interop/exports.md).
+- [Examples](examples/index.md): complete programs, with bubbletea, gin and argus.
 - The API of [scalago.go](scalago.go) (facades and Go data types), [scalago.gears](scalago.gears)
   and [scalago.gostd](scalago.gostd).
 - The [specification](spec/index.md) of what scala-go guarantees, and the

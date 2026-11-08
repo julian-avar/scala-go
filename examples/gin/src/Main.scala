@@ -11,7 +11,10 @@ import scalago.gostd.context
 /** A todo, as the API stores and returns it. */
 final case class Todo(id: Long, title: String, done: Boolean, tags: Seq[String])
 
-/** The todos, shared by the requests that gin serves concurrently (on goroutines of its own). */
+/** The todos, shared by the requests that gin serves concurrently (on goroutines of its own).
+ *  An immutable map behind `synchronized`: `scala.collection.concurrent.TrieMap` does not link
+ *  (its nodes are Java classes of the Scala library, without TASTy).
+ */
 final class TodoStore:
   private var todos = TreeMap.empty[Long, Todo]
   private var lastId = 0L
@@ -62,7 +65,8 @@ object Api:
 
     val api = router.Group("/api", authorized(token))
     api.GET("/todos", c =>
-      // `?done=true` filters; GoData turns Scala data into what encoding/json understands.
+      // `?done=true` filters; GoData turns Scala data into what encoding/json understands
+      // (maps: fields come out sorted by name, with their Scala names).
       val todos = c.Query("done") match
         case ""   => store.all
         case done => store.all.filter(_.done == done.toBoolean)
@@ -70,7 +74,8 @@ object Api:
     )
     api.GET("/todos/:id", c => withTodo(store, c)(todo => c.JSON(http.StatusOK, GoData(todo))))
     api.POST("/todos", c =>
-      // The body is bound into a Go map (gin's ShouldBindJSON), then read as Scala data.
+      // The body is bound into a Go map (gin's ShouldBindJSON), then read as Scala data: Scala
+      // cannot declare a Go struct with `json`/`binding` tags for gin to bind into.
       val body = GoPtr.alloc[Any]
       try
         c.ShouldBindJSON(body)
