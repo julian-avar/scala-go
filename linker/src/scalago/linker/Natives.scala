@@ -917,16 +917,26 @@ object Natives:
   // ---- scalago.go: Go strings (library/) --------------------------------------------------------
 
   // A top-level opaque type's companion lives in the file's package object.
-  private val GoString = "scalago.go.GoString$package$GoString$"
-  private def goStr(e: String) = s"$e.(string)"
-  static(GoString, "apply(Ljava.lang.String;)Ljava.lang.Object;")(as => s"any(${as.head}.GoString())")
+  val GoString: ClassName = "scalago.go.GoString$package$GoString$"
+  /** The Go string in `e`, a `GoString` (an `any`). */
+  def goStr(e: String): String = if e == "nil" then "any(nil).(string)" else s"$e.(string)"
+  val GoStringApply: MethodName = parseMethod("apply(Ljava.lang.String;)Ljava.lang.Object;")
+  val GoStringConcat: MethodName = parseMethod("concat(Ljava.lang.Object;Ljava.lang.Object;)Ljava.lang.Object;")
+
+  /** The `GoString` methods that make a string, as Go `string` expressions (their natives box
+   *  them). `FunctionEmitter.genGoString` combines them without boxing intermediate strings.
+   */
+  val goStringMakers: Map[MethodName, List[String] => String] = Map(
+    GoStringApply -> (as => s"${as.head}.GoString()"),
+    parseMethod("valueOf(Ljava.lang.Object;)Ljava.lang.Object;") -> (as => s"rt.ToGoString(${as.head})"),
+    GoStringConcat -> (as => s"${goStr(as(0))} + ${goStr(as(1))}")
+  )
+  for (m, gen) <- goStringMakers do methods((GoString, m)) = Static(as => s"any(${gen(as)})")
   static(GoString, "toJavaString(Ljava.lang.Object;)Ljava.lang.String;")(as => s"rt.Str(${goStr(as.head)})")
   static(GoString, "byteLength(Ljava.lang.Object;)I")(as => s"int32(len(${goStr(as.head)}))")
   static(GoString, "byteAt(Ljava.lang.Object;I)B")(as => s"int8(${goStr(as(0))}[${as(1)}])")
-  static(GoString, "concat(Ljava.lang.Object;Ljava.lang.Object;)Ljava.lang.Object;")(as =>
-    s"any(${goStr(as(0))} + ${goStr(as(1))})"
-  )
   static(GoString, "sameAs(Ljava.lang.Object;Ljava.lang.Object;)Z")(as => s"(${goStr(as(0))} == ${goStr(as(1))})")
+  static(GoString, "compareBytes(Ljava.lang.Object;Ljava.lang.Object;)I")(as => s"rt.GoStringCompare(${goStr(as(0))}, ${goStr(as(1))})")
 
   // Go slices, maps, channels and pointers (library/src/scalago/go/internal/GoNatives.scala).
   private val GoNatives = "scalago.go.internal.GoNatives$"

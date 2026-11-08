@@ -13,6 +13,7 @@ object Main:
     // Functions, with numbers and strings converted at the boundary
     println(strings.Repeat("ab", 3))
     println(strings.ToUpper("grüße".toGoString).toJavaString)
+    println(strings.ToUpper(go"${3}× grüße 😀"))
     println(strings.Contains("seafood", "foo"))
     println(strings.Fields("  a b   c ").mkString("[", ",", "]"))
     println(strings.Join(Array("x", "y", "z"), "-"))

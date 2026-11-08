@@ -1,7 +1,5 @@
 package scalago.go.internal
 
-import java.nio.ByteBuffer
-
 import scala.collection.mutable
 
 /** The primitive operations behind `GoSlice`, `GoMap`, `GoChan`, `GoPtr` and `GoType`. Under
@@ -22,7 +20,7 @@ object GoNatives:
       case "int8" | "uint8"                                => 0.toByte
       case "float32"                                       => 0f
       case "float64"                                       => 0.0
-      case "string"                                        => new Array[Byte](0) // GoString on the JVM
+      case "string"                                        => scalago.go.GoString.empty
       case _                                               => null
     override def toString: String = name
 
@@ -104,16 +102,7 @@ object GoNatives:
 
   final class JvmMap(val key: JvmGoType, val value: JvmGoType):
     val entries = mutable.LinkedHashMap.empty[Any, Any]
-    override def toString: String = entries.map((k, v) => s"${unwrapKey(k)}:$v").mkString("map[", " ", "]")
-
-  /** GoStrings are byte arrays on the JVM: as keys, they compare by content. */
-  private def wrapKey(k: Any): Any = k match
-    case bytes: Array[Byte] => ByteBuffer.wrap(bytes)
-    case other              => other
-
-  private def unwrapKey(k: Any): Any = k match
-    case b: ByteBuffer => b.array()
-    case other         => other
+    override def toString: String = entries.map((k, v) => s"$k:$v").mkString("map[", " ", "]")
 
   private def jvmMap(m: AnyRef): JvmMap =
     if m == null then throw new NullPointerException()
@@ -121,11 +110,11 @@ object GoNatives:
 
   def makeMap(keyType: AnyRef, valueType: AnyRef): AnyRef = JvmMap(jvmType(keyType), jvmType(valueType))
   def mapSize(m: AnyRef): Int = jvmMap(m).entries.size
-  def mapLookup(m: AnyRef, key: Any, missing: AnyRef): Any = jvmMap(m).entries.getOrElse(wrapKey(key), missing)
-  def mapStore(m: AnyRef, key: Any, value: Any): Unit = jvmMap(m).entries(wrapKey(key)) = value
-  def mapDelete(m: AnyRef, key: Any): Unit = jvmMap(m).entries.remove(wrapKey(key))
+  def mapLookup(m: AnyRef, key: Any, missing: AnyRef): Any = jvmMap(m).entries.getOrElse(key, missing)
+  def mapStore(m: AnyRef, key: Any, value: Any): Unit = jvmMap(m).entries(key) = value
+  def mapDelete(m: AnyRef, key: Any): Unit = jvmMap(m).entries.remove(key)
   def mapEntries(m: AnyRef): Array[AnyRef] =
-    jvmMap(m).entries.toArray.flatMap((k, v) => Array(unwrapKey(k).asInstanceOf[AnyRef], v.asInstanceOf[AnyRef]))
+    jvmMap(m).entries.toArray.flatMap((k, v) => Array(k.asInstanceOf[AnyRef], v.asInstanceOf[AnyRef]))
 
   // ---- Channels -------------------------------------------------------------------------------
 
