@@ -144,6 +144,8 @@ object Natives:
   instance(S, "startsWith(Ljava.lang.String;)Z")((r, as) => s"rt.StringStartsWith($r, ${as.head}, 0)")
   instanceFn(S, "startsWith(Ljava.lang.String;I)Z", "rt.StringStartsWith")
   instanceFn(S, "endsWith(Ljava.lang.String;)Z", "rt.StringEndsWith")
+  instanceFn(S, "regionMatches(ZILjava.lang.String;II)Z", "rt.StringRegionMatches")
+  instance(S, "regionMatches(ILjava.lang.String;II)Z")((r, as) => s"rt.StringRegionMatches($r, false, ${as.mkString(", ")})")
   instanceFn(S, "contains(Ljava.lang.CharSequence;)Z", "rt.StringContains")
   instanceFn(S, "concat(Ljava.lang.String;)Ljava.lang.String;", "rt.StringConcat")
   instanceFn(S, "toUpperCase()Ljava.lang.String;", "rt.StringToUpperCase")
@@ -366,6 +368,8 @@ object Natives:
   static(Character, "digit(CI)I")(as => s"rt.CharDigit(int32(${as(0)}), ${as(1)})")
   staticFn(Character, "digit(II)I", "rt.CharDigit")
   staticFn(Character, "forDigit(II)C", "rt.CharForDigit")
+  static(Character, "isISOControl(C)Z")(as => s"(${as.head} <= 0x1f || (${as.head} >= 0x7f && ${as.head} <= 0x9f))")
+  static(Character, "isISOControl(I)Z")(as => s"(uint32(${as.head}) <= 0x1f || (${as.head} >= 0x7f && ${as.head} <= 0x9f))")
   static(Character, "isHighSurrogate(C)Z")(as => s"(${as.head} >= 0xd800 && ${as.head} <= 0xdbff)")
   static(Character, "isLowSurrogate(C)Z")(as => s"(${as.head} >= 0xdc00 && ${as.head} <= 0xdfff)")
   static(Character, "isSurrogate(C)Z")(as => s"(${as.head} >= 0xd800 && ${as.head} <= 0xdfff)")
@@ -632,10 +636,46 @@ object Natives:
   utilStatic(Objects, "requireNonNull(Ljava.lang.Object;)Ljava.lang.Object;")(as => s"rt.RequireNonNull(${as.head}, nil)")
   utilStaticFn(Objects, "requireNonNull(Ljava.lang.Object;Ljava.lang.String;)Ljava.lang.Object;", "rt.RequireNonNull")
 
-  // java.util.UUID's native side (javalib/src/scalago/runtime/Crypto.scala).
+  // java.util.UUID, java.security and javax.crypto's native side (javalib/src/scalago/runtime/Crypto.scala).
   private val Crypto = "scalago.runtime.Crypto$"
-  staticFn(Crypto, "secureRandomBytes(I)[B", "rt.SecureRandomBytes")
-  staticFn(Crypto, "md5([B)[B", "rt.MD5")
+  for (desc, fn) <- List(
+      "secureRandomBytes(I)[B" -> "rt.SecureRandomBytes",
+      "md5([B)[B" -> "rt.MD5",
+      "newDigest(Ljava.lang.String;)Ljava.lang.Object;" -> "rt.CryptoNewDigest",
+      "newMac(Ljava.lang.String;[B)Ljava.lang.Object;" -> "rt.CryptoNewMac",
+      "update(Ljava.lang.Object;[BII)V" -> "rt.CryptoUpdate",
+      "digest(Ljava.lang.Object;)[B" -> "rt.CryptoDigest",
+      "reset(Ljava.lang.Object;)V" -> "rt.CryptoReset",
+      "digestLength(Ljava.lang.Object;)I" -> "rt.CryptoDigestLength",
+      "copy(Ljava.lang.Object;)Ljava.lang.Object;" -> "rt.CryptoClone"
+    )
+  do staticFn(Crypto, desc, fn)
+
+  // java.util.zip's native side (javalib/src/scalago/runtime/Zip.scala).
+  private val Zip = "scalago.runtime.Zip$"
+  private val ZO = "Ljava.lang.Object;"
+  for (desc, fn) <- List(
+      "crc32(I[BII)I" -> "rt.ZipCRC32",
+      "crc32c(I[BII)I" -> "rt.ZipCRC32C",
+      "adler32(I[BII)I" -> "rt.ZipAdler32",
+      s"newDeflater(Z)$ZO" -> "rt.ZipNewDeflater",
+      s"deflate($ZO[BII[BIIIII)I" -> "rt.ZipDeflate",
+      s"pending($ZO)I" -> "rt.ZipPending",
+      s"newInflater(Z)$ZO" -> "rt.ZipNewInflater",
+      s"setInput($ZO[BII)V" -> "rt.ZipSetInput",
+      s"remaining($ZO)I" -> "rt.ZipRemaining",
+      s"inflate($ZO[BII)I" -> "rt.ZipInflate",
+      s"errorMessage($ZO)Ljava.lang.String;" -> "rt.ZipErrorMessage",
+      s"needsDictionary($ZO)Z" -> "rt.ZipNeedsDictionary",
+      s"finished($ZO)Z" -> "rt.ZipFinished",
+      s"setDictionary($ZO[BII)Z" -> "rt.ZipSetDictionary",
+      s"adler($ZO)I" -> "rt.ZipAdler",
+      s"bytesRead($ZO)J" -> "rt.ZipBytesRead",
+      s"bytesWritten($ZO)J" -> "rt.ZipBytesWritten",
+      s"reset($ZO)V" -> "rt.ZipReset",
+      s"end($ZO)V" -> "rt.ZipEnd"
+    )
+  do staticFn(Zip, desc, fn)
 
   // ---- Scala library --------------------------------------------------------------------------
 
@@ -829,6 +869,35 @@ object Natives:
       "parentPid()J" -> "rt.ParentPid"
     )
   do staticFn(Subprocesses, desc, fn)
+
+  // java.net's native side (javalib/src/scalago/runtime/Net.scala).
+  private val Net = "scalago.runtime.Net$"
+  for (desc, fn) <- List(
+      s"lookup($JS)$JO" -> "rt.NetLookup",
+      s"reverseLookup([B)$JS" -> "rt.NetReverseLookup",
+      s"hostname()$JS" -> "rt.NetHostname",
+      s"connect([BI[BII)$JO" -> "rt.NetConnect",
+      s"listen([BII)$JO" -> "rt.NetListen",
+      s"accept(${JO}I)$JO" -> "rt.NetAccept",
+      s"read($JO[BIII)I" -> "rt.NetRead",
+      s"failure($JO)$JO" -> "rt.NetFailure",
+      s"write($JO[BII)$JO" -> "rt.NetWrite",
+      s"shutdown(${JO}Z)$JO" -> "rt.NetShutdown",
+      s"close($JO)V" -> "rt.NetClose",
+      s"address(${JO}Z)[B" -> "rt.NetAddress",
+      s"port(${JO}Z)I" -> "rt.NetPort",
+      s"setOption(${JO}II)$JO" -> "rt.NetSetOption",
+      s"bufferSize(${JO}Z)I" -> "rt.NetBufferSize",
+      s"errorKind($JO)I" -> "rt.NetErrorKind",
+      s"errorMessage($JO)$JS" -> "rt.NetErrorMessage",
+      s"httpSend($JS$JS[$JS[BIIII)$JO" -> "rt.HttpSend",
+      s"httpStatus($JO)I" -> "rt.HttpStatus",
+      s"httpReason($JO)$JS" -> "rt.HttpReason",
+      s"httpVersion($JO)I" -> "rt.HttpVersion",
+      s"httpHeaders($JO)[$JS" -> "rt.HttpHeaders",
+      s"httpURL($JO)$JS" -> "rt.HttpURL"
+    )
+  do staticFn(Net, desc, fn)
 
   // java.time's native side (javalib/src/scalago/runtime/Time.scala).
   private val Time = "scalago.runtime.Time$"

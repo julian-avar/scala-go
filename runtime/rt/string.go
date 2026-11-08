@@ -257,6 +257,26 @@ func StringStartsWith(s *String, prefix *String, offset int32) bool {
 	return true
 }
 
+// StringRegionMatches compares s[toffset:toffset+n] with other[ooffset:ooffset+n], ignoring
+// case if asked (chars equal after toUpperCase or toLowerCase, as Java's).
+func StringRegionMatches(s *String, ignoreCase bool, toffset int32, other *String, ooffset int32, n int32) bool {
+	if ooffset < 0 || toffset < 0 || int64(toffset) > int64(len(s.chars))-int64(n) ||
+		int64(ooffset) > int64(len(other.chars))-int64(n) {
+		return false
+	}
+	for i := int32(0); i < n; i++ {
+		c, d := s.chars[toffset+i], other.chars[ooffset+i]
+		if c == d {
+			continue
+		}
+		if !ignoreCase || (unicode.ToUpper(rune(c)) != unicode.ToUpper(rune(d)) &&
+			unicode.ToLower(rune(c)) != unicode.ToLower(rune(d))) {
+			return false
+		}
+	}
+	return true
+}
+
 func StringEndsWith(s *String, suffix *String) bool {
 	return StringStartsWith(s, suffix, int32(len(s.chars)-len(suffix.chars)))
 }

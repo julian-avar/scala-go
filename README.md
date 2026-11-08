@@ -15,9 +15,11 @@ and the standard collections run, as do `java.util` (collections, streams, `Opti
 regex, ...), `java.util.concurrent` (executors, `ForkJoinPool`, `CompletableFuture`, locks,
 concurrent collections), `scala.concurrent.Future` and gears on goroutines, `BigDecimal` and
 `BigInt` (exact, as on the JDK), `java.io`/`java.nio` (files, buffers, channels), standard input,
-subprocesses (`ProcessBuilder`, `scala.sys.process`), and `java.time` with time zones from Go's tz
-database. Scala 3 libraries are compiled from the TASTy in their jars: cats, upickle, fastparse,
-pprint, mainargs and os-lib are checked against the JVM. Scala code calls Go packages, Go code
+subprocesses (`ProcessBuilder`, `scala.sys.process`), networking (`URI`, sockets,
+`HttpURLConnection` and `java.net.http.HttpClient` on Go's `net/http`), digests and compression
+(`MessageDigest`, `Mac`, `java.util.zip`: GZIP and zip files), and `java.time` with time zones
+from Go's tz database. Scala 3 libraries are compiled from the TASTy in their jars: cats,
+upickle, fastparse, pprint, mainargs and os-lib are checked against the JVM. Scala code calls Go packages, Go code
 calls Scala libraries, and the generated code is safe to call from any goroutine. Runtime
 reflection (beyond `getClass`/`isAssignableFrom`) and Java-only libraries do not work. See
 [docs/guide.md](docs/guide.md) for the differences from the JVM.

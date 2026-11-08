@@ -38,7 +38,10 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
    comes first on the link classpath (`scalago-gears` does this for one gears class).
 4. **javalib** (`javalib/`). JDK classes written in Scala: exceptions, `StringBuilder`,
    `System`, `java.io`, `java.nio` (buffers, channels, files, charsets; see [I/O](#io)),
-   `ProcessBuilder` and `Process` (see [Subprocesses](#subprocesses)), `java.util`
+   `ProcessBuilder` and `Process` (see [Subprocesses](#subprocesses)), `java.net` and
+   `java.net.http` (see [Networking](#networking)), `java.security`'s digests and `SecureRandom`,
+   `javax.crypto.Mac`, `java.util.zip` (see [Digests and compression](#digests-and-compression)),
+   `HexFormat`, `java.util`
    (collections, `Arrays`, `Collections`, `Optional`, `Random`, `UUID`,
    `java.util.function`, `java.util.stream`, ...), `java.util.concurrent` (see
    [Concurrency](#concurrency-and-the-memory-model)), `java.time` (see [java.time](#javatime)),
@@ -99,7 +102,8 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
    - **Natives** (`Natives.scala`): Go implementations of JDK methods (`String`, boxes, `Math`,
      `System`, `Character`, `BigInteger`, `BigDecimal`, `Arrays`, ...). They take precedence over IR.
      They also implement the `scalago.runtime` objects through which javalib reaches the Go
-     runtime (`Threads`, `AtomicArrays`, `Regexes`, `Console`, `OS`, `Process`, `Subprocesses`): Scala objects whose
+     runtime (`Threads`, `AtomicArrays`, `Regexes`, `Console`, `OS`, `Process`, `Subprocesses`, `Net`, `Crypto`,
+     `Zip`): Scala objects whose
      methods throw on the JVM and become Go calls when linked.
    - **Static constants of javalib objects.** Java's static fields (`Collections.EMPTY_LIST`,
      `Attributes.Name.MAIN_CLASS`) are usually members of the companion object in javalib's
@@ -475,6 +479,93 @@ library's, unchanged: its pumping threads are goroutine-backed `Thread`s, its pi
 `Properties` object as on the JDK. os-lib (`os.proc(...).call()`, `spawn`, and its file
 operations) runs unchanged too (see the `ecosystem` module).
 
+## Networking
+
+`java.net` and `java.net.http` are Scala (javalib) over a native layer on Go's `net` and
+`net/http` (`scalago.runtime.Net`, `rt/net.go`, `rt/http.go`), built like the file layer:
+addresses are byte arrays, connections, listeners and HTTP exchanges are handles, and failures
+are Go errors that the layer classifies (refused, reset, timed out, closed, unknown host, address
+in use, TLS, ...) and javalib turns into the JDK's exceptions and messages (`ConnectException:
+Connection refused`, `SocketTimeoutException: Read timed out`, `BindException: Address already
+in use`).
+
+- **URIs and URLs.** `URI` follows the JDK's parser: RFC 2396 with its deviations (IPv6 literals
+  with scope ids, empty authorities and paths), registry- and server-based authorities, the
+  JDK's messages and error indices, normalization, resolution, relativization, the quoting of
+  the component constructors, `toASCIIString`, and comparisons that ignore the case of escapes.
+  It was checked against JDK 21 and 25 on 1,700 cases. `URL` parses as the JDK's stream
+  handlers (context URLs, IPv6 hosts, ports, refs) for http, https, file, jar, ftp and mailto
+  URLs, and opens the first three. `URLEncoder` and `URLDecoder` take charsets or their names.
+- **Addresses.** `InetAddress` parses IPv4 literals (with the C library's short forms: `127.1`)
+  and IPv6 literals (IPv4-mapped ones are `Inet4Address`es) as the JDK does, prints and hashes as
+  it, and resolves names with Go's resolver (`/etc/hosts`, DNS), IPv4 addresses first as on the
+  JDK. `InetSocketAddress` is the JDK's, unresolved addresses included.
+- **Sockets.** `Socket` and `ServerSocket` are Go TCP connections and listeners. `setSoTimeout`
+  sets a deadline before each blocking read or accept, and the socket stays usable after a
+  timeout. Closing a socket from another thread closes the Go connection or listener, which
+  ends a blocked read or accept with `SocketException: Socket closed`, as on the JDK. Options
+  (`TCP_NODELAY`, off by default as on the JDK; keep-alive, linger, buffer sizes) go to the
+  connection. Listening on the wildcard address accepts IPv4 and IPv6 connections.
+- **HTTP.** `HttpURLConnection` (from `URL.openConnection`) and `java.net.http.HttpClient` share
+  one `net/http` transport: connections are kept alive and reused, requests are HTTP/1.1, no
+  proxy is used (the JDK ignores `HTTP_PROXY` too), responses are not decompressed, and TLS is
+  Go's `crypto/tls` with the system's root certificates. A request is sent whole when its
+  response is first needed (a request body is buffered). `HttpURLConnection` adds the JDK's
+  default headers (`User-Agent: Java/<version>`, `Accept: */*`, the form content type of a
+  POST), follows redirects within a protocol up to 20 times, and fails as the JDK does
+  (`FileNotFoundException` for a 404, "Server returned HTTP response code: 500 for URL: ...",
+  with the body in `getErrorStream`). Timeouts are timers that cancel the exchange: the connect
+  timeout, the read timeout (for the response's headers and each read of its body), and
+  `HttpRequest.timeout`, until the headers arrive (`HttpTimeoutException`). A response's body is
+  a stream of the same read native as sockets. `HttpClient` hands it to the response's
+  `BodySubscriber` (`BodyHandlers.ofString`, `ofByteArray`, `ofInputStream`, `ofLines`, `ofFile`,
+  `discarding`, `ofByteArrayConsumer`, `fromSubscriber`, `BodySubscribers.mapping`, or the
+  program's own) on demand: a chunk is read in the thread that requests it, so `send` needs no
+  thread of its own (`ofString` reads the body while it subscribes, `ofInputStream` as the
+  stream is read). `sendAsync` runs `send` on the client's executor, by default a cached pool of
+  daemon threads, as the JDK.
+
+Not like the JDK: requests are HTTP/1.1 even when HTTP/2 is asked for (`HttpClient.Version.HTTP_2`
+is the default; responses say `HTTP_1_1`, as the JDK's do from servers without HTTP/2); response
+header names are Go's canonical ones (`content-type` arrives as `Content-Type`, so `X-b` and
+`x-B` are one field) and come in name order; TLS trusts the system's certificates, not the JDK's
+`cacerts`, and `HttpsURLConnection`, `SSLContext`, socket factories and hostname verifiers are
+not available; proxies, `Authenticator`, `CookieHandler`, push promises and WebSockets are not
+implemented; streaming modes buffer the request body (`setChunkedStreamingMode` sends a
+`Content-Length`); `URL.equals` and `hashCode` compare host names without resolving them;
+`InetAddress` caches no lookups, resolves no interface names in scope ids (numeric ids work),
+and `isReachable` only tries a TCP connection to port 7; a socket stream's `available()` is 0;
+`Thread.interrupt` does not end blocking socket operations (on the JDK it closes the socket of a
+virtual thread); closing a socket does not interrupt its `connect`; `Socket.bind` takes effect
+at `connect`; UDP (`DatagramSocket`), `NetworkInterface`, socket channels and selectors are not
+implemented.
+
+## Digests and compression
+
+`MessageDigest` (MD5, SHA-1, SHA-224/256/384/512, SHA-512/224 and /256, with the JDK's names,
+aliases and OIDs), `Mac` (HMACs of those) and `SecureRandom` are Scala over Go's crypto packages
+(`scalago.runtime.Crypto`, `rt/crypto.go`). A digest in progress is a Go hash, cloned through its
+marshalled state; HMAC is written over those hashes so that `Mac.clone` works. `SecureRandom`
+reads Go's crypto/rand whatever its algorithm, so seeds add nothing (a seeded SHA1PRNG is not
+reproducible, unlike the JDK's).
+
+`java.util.zip` is Scala except for checksums (hash/crc32) and the deflate state machines on
+compress/flate (`scalago.runtime.Zip`, `rt/zip.go`). A `Deflater` writes through flate writers
+into a buffer of pending output, with the zlib header and trailer written by hand, so a level
+change mid-stream ends the current writer's blocks and continues the stream with a new one. Go's
+flate reader pulls its input and cannot resume after running out of it, while `Inflater` is fed
+piece by piece: the reader runs on a goroutine, as a coroutine of the `inflate` calls (control
+passes over channels, so the two never run at once). It reads a byte at a time, never beyond the
+compressed data, so `getRemaining()` is exact, which GZIP and zip trailers rely on. A finalizer
+stops the goroutine of an inflater that is dropped without `end()`. `GZIP*Stream`, `Zip*Stream`,
+`ZipEntry` and `ZipFile` follow the JDK: data descriptors, UTF-8 names, DOS times in the local
+zone with extended and NTFS timestamps, concatenated GZIP members, ZIP64 when reading.
+
+Not like the JDK: compressed bytes differ from zlib's (valid data that the JDK reads, but not the
+same bytes or sizes); corrupt deflate data gives Go's messages ("flate: corrupt input before
+offset N"); an inflater may deliver output at block ends rather than mid-block; `FULL_FLUSH` does
+not reset the dictionary; the `FILTERED` strategy is the default one.
+
 ## java.time
 
 `java.time` (`javalib/src/java/time`) is [scala-java-time](https://github.com/cquiroz/scala-java-time)
@@ -797,6 +888,18 @@ Supported and covered by end-to-end tests:
   java.nio buffers of every type with views and byte orders, the charset coders on buffers,
   file channels (positional I/O, transfers, locks, mappings), `Channels`, glob and regex path
   matchers
+- networking: `URI` (parsing, errors, resolution, relativization, normalization, component
+  constructors), `URL` (parsing, context URLs, `file:` and `http:` connections), `URLEncoder` and
+  `URLDecoder`, `InetAddress` literals and `InetSocketAddress`; sockets on the loopback interface
+  (echo, shutdowns, options, read and accept timeouts, closing from another thread, refused
+  connections, addresses in use, bulk transfers); `HttpURLConnection` (methods, request
+  properties, bodies, error statuses and streams, redirects, chunked responses, read timeouts)
+  and `HttpClient` (body publishers and handlers, redirects, timeouts, `sendAsync`, request
+  validation) against an HTTP server in the program; all also under Go's race detector
+- digests (`MessageDigest`, `DigestInput/OutputStream`), HMACs, `SecureRandom`, `HexFormat`;
+  `java.util.zip`: CRC32, CRC32C, Adler32, `Deflater`/`Inflater` (raw and zlib, flush modes,
+  dictionaries, level changes), the deflater and inflater streams, GZIP,
+  `ZipInputStream`/`ZipOutputStream`/`ZipFile`, and data compressed by the JDK
 - subprocesses: `ProcessBuilder` (redirects, environment, directory, merged errors), `Process`
   (pipes, interactive use, timeouts, exit statuses, signals), `Runtime.exec`, and
   `scala.sys.process` (`!`, `!!`, pipes, `lazyLines`, loggers, `#>`/`#<`, `#&&`/`#||`), also
@@ -835,6 +938,12 @@ Known gaps:
 - Reflection: `getClass`, `Class` names and `isAssignableFrom` work (for the latter, the linker
   gives the runtime the program's class hierarchy when the program uses it); nothing else.
 - `BigInteger` and `BigDecimal` cannot be subclassed (they are Go values).
+- Networking: the parts listed in [Networking](#networking) (HTTP/2, proxies, cookies,
+  authentication, `HttpsURLConnection` and the TLS configuration classes, WebSockets, UDP,
+  network interfaces, socket channels and selectors).
+- Security and compression: SHA-3 and MD2 digests, `Cipher` and the rest of `javax.crypto` beyond
+  `Mac`, providers (`getProvider`, `Provider`), reproducible seeded `SecureRandom`s; writing ZIP64
+  archives, encrypted zip entries, `java.util.jar`'s `JarFile`/`JarInputStream`.
 - Concurrency: the atomic field updaters (`AtomicIntegerFieldUpdater`, ... need reflection),
   `SubmissionPublisher`, thread groups beyond names and handlers (`activeCount`, `enumerate`),
   `Thread.getAllStackTraces`. Goroutines started by Go code that ask for their `Thread` (directly,
@@ -902,7 +1011,8 @@ earlier has to be redone:
    regular expressions on Go's `regexp` (`java.util.regex`, Scala's `Regex`),
    `java.util.concurrent` and `scala.concurrent`, `java.util` (collections and utilities), Scala
    library dependencies compiled from TASTy, `BigDecimal`, I/O (files, streams, charsets,
-   stdin), JVM-like stack traces, `java.util.stream` and `java.time`. Still to do: publishing
+   stdin), JVM-like stack traces, `java.util.stream`, `java.time`, networking (sockets, HTTP),
+   digests and compression. Still to do: publishing
    (organization `io.github.scalago` is a
    placeholder).
 

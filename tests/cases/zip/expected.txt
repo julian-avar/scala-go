@@ -1,0 +1,170 @@
+CRC32: cbf43926 cbf43926 0
+  reset: 0
+  range: java.lang.ArrayIndexOutOfBoundsException: Range [5, 5 + 5) out of bounds for length 9
+CRC32C: e3069283 e3069283 0
+  reset: 0
+  range: java.lang.ArrayIndexOutOfBoundsException: Range [5, 5 + 5) out of bounds for length 9
+Adler32: 91e01de 91e01de 0
+  reset: 1
+  range: java.lang.ArrayIndexOutOfBoundsException: Range [5, 5 + 5) out of bounds for length 9
+large: 2967858d b906c180
+checked input: true
+checked output: true
+data: 300000 bytes, adler 49aa2d8b
+nowrap=false level=-1 flush=0: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=false level=-1 flush=2: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=false level=-1 flush=3: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=false level=0 flush=0: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=false level=0 flush=2: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=false level=0 flush=3: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=false level=1 flush=0: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=false level=1 flush=2: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=false level=1 flush=3: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=false level=6 flush=0: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=false level=6 flush=2: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=false level=6 flush=3: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=false level=9 flush=0: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=false level=9 flush=2: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=false level=9 flush=3: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 49aa2d8b 49aa2d8b remaining 0
+nowrap=true level=-1 flush=0: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+nowrap=true level=-1 flush=2: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+nowrap=true level=-1 flush=3: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+nowrap=true level=0 flush=0: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+nowrap=true level=0 flush=2: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+nowrap=true level=0 flush=3: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+nowrap=true level=1 flush=0: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+nowrap=true level=1 flush=2: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+nowrap=true level=1 flush=3: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+nowrap=true level=6 flush=0: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+nowrap=true level=6 flush=2: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+nowrap=true level=6 flush=3: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+nowrap=true level=9 flush=0: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+nowrap=true level=9 flush=2: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+nowrap=true level=9 flush=3: true read 300000 300000 written=true inflated 300000 300000 consumed=true adler 1 0 remaining 0
+new: needsInput=true finished=false adler=1 raw 1 0
+input set: needsInput=false
+deflated: needsInput=true finished=false read=9
+finished=true needsInput=true adler=113d0373
+more: 0
+reset: finished=false read=0 written=0 adler=1
+ended: Deflater has been closed
+ended adler: Deflater has been closed
+ended: finished=false needsInput=false
+level: java.lang.IllegalArgumentException
+set level: java.lang.IllegalArgumentException: invalid compression level
+strategy: java.lang.IllegalArgumentException
+flush: java.lang.IllegalArgumentException
+range: java.lang.ArrayIndexOutOfBoundsException: Range [90, 90 + 20) out of bounds for length 100
+inflater: needsInput=true finished=false remaining=0 0
+first: 4 finished=false needsInput=false
+rest: 5 finished=true remaining=5 read=true written=9 adler=113d0373 again=0
+reset: finished=false read=0 adler=1
+ended: Inflater has been closed
+ended: finished=false needsInput=false remaining=100
+levels: true
+buffers: input position 6000 remaining 0
+  5000 finished=true input position=true
+jdk zlib: true 549 finished=true adler=fffffffffbccb3cd
+jdk raw with dictionary: true finished=true
+jdk zlib with dictionary: 0 needsDictionary=true adler=3d3c0623
+  wrong dictionary: java.lang.IllegalArgumentException
+  true finished=true adler=fffffffffbccb3cd
+dictionary adler: 142e03c9
+  0 true 142e03c9
+  true
+bad checksum: java.util.zip.DataFormatException: incorrect data check
+bad header: java.util.zip.DataFormatException: incorrect header check
+bad data: DataFormatException
+jdk gzip: true -1 0
+  small buffers: 563
+  closed: java.io.IOException: Stream closed
+flushed: first message
+flushed: second one
+flushed: third
+end: -1 0
+write after finish: java.io.IOException: write beyond end of stream
+deflater stream: true
+skip: 99990 97 9 -1
+truncated: java.io.EOFException: Unexpected end of ZLIB input stream
+not zlib: java.util.zip.ZipException: incorrect header check
+gzip header: 1f8b08000000000000ff
+gzip trailer: 3dc7e738 100000 crc 3dc7e738
+gzip: true
+concatenated: 100563 second member
+
+not gzip: java.util.zip.ZipException: Not in GZIP format
+empty: java.io.EOFException
+bad trailer: java.util.zip.ZipException: Corrupt GZIP trailer
+sync flushed gzip: 7 partial
+inflater output stream: true
+deflater input stream: true -1 0
+new entry: -1 -1 -1 -1 -1 null null false a/b.txt
+time: 1234567890123 2009-02-13T23:31:30.123Z 2009-02-13T23:31:30.123
+local: 981173107500 2001-02-03T04:05:07.500
+modified: 1000 1970-01-01T00:00:01Z
+size: java.lang.IllegalArgumentException: invalid entry size
+crc: java.lang.IllegalArgumentException: invalid entry crc-32
+method: java.lang.IllegalArgumentException: invalid compression method
+clone: a/b.txt 1 1000 true
+jdk zip, streamed:
+  dir/: dir=true method 8 size -1 crc ffffffffffffffff time 1700000000000 2023-11-14T22:13:20Z 2023-11-14T22:13:20 comment null extra null
+  -> 0 bytes, then 0, entry now: size 0 crc 0
+  dir/hello.txt: dir=false method 8 size -1 crc ffffffffffffffff time 1700000002000 2023-11-14T22:13:22Z 2023-11-14T22:13:22 comment null extra null
+  -> 549 bytes, then 0, entry now: size 549 crc 8db53e9c
+  stored.bin: dir=false method 0 size 100 csize 100 crc 821d3e85 time 1500000000000 2017-07-14T02:40:00Z 2017-07-14T02:40 comment null extra null
+  -> 100 bytes, then 0, entry now: size 100 crc 821d3e85
+  grüße/ünïcödé.txt: dir=false method 8 size -1 crc ffffffffffffffff time 1600000000000 2020-09-13T12:26:40Z 2020-09-13T12:26:40 comment null extra 555405000100105e5ffeca02002a2b
+  -> 12 bytes, then 0, entry now: size 12 crc 3e6fbf80
+after closeEntry: size 50000 crc b720862f time 1700000000123
+past the end: java.util.zip.ZipException: attempt to write past end of STORED entry
+duplicate: java.util.zip.ZipException: duplicate entry: data/
+stored without crc: java.util.zip.ZipException: STORED entry missing size, compressed size, or crc-32
+closed: java.io.IOException: Stream closed
+no entry: java.util.zip.ZipException: no current ZIP entry
+ours, streamed:
+  data/sample.txt: dir=false method 8 size 50000 crc b720862f time 1700000000000 2023-11-14T22:13:20Z 2023-11-14T22:13:20 comment null extra null
+  -> 50000 bytes
+  data/: dir=true method 8 size 0 crc 0 time 1700000000000 2023-11-14T22:13:20Z 2023-11-14T22:13:20 comment null extra null
+  -> 0 bytes
+  stored.bin: dir=false method 0 size 300 csize 300 crc 54eb2eb4 time 946684800000 2000-01-01T00:00:00Z 2000-01-01T00:00 comment null extra null
+  -> 300 bytes
+  old.txt: dir=false method 8 size 3 crc 3f5dd4e5 time 315000000000 1979-12-25T20:00:00Z 1979-12-25T20:00 comment null extra 5554050001c084c612
+  -> 3 bytes
+  future.txt: dir=false method 8 size 0 crc 0 time 4200000000000 2103-02-04T02:40:00Z 2103-02-04T02:40 comment null extra 0a00200000000000010018000080cfdda5e832020080ff44d138c1010000000000000080
+  -> 0 bytes
+  ünïcödé ✓.txt: dir=false method 8 size 3 crc e1d5da34 time 1700000000000 2023-11-14T22:13:20Z 2023-11-14T22:13:20 comment null extra feca010009
+  -> 3 bytes
+jdk.zip: 4 entries, comment made by the JDK, name true
+  dir/: dir=true method 8 size 0 crc 0 time 1700000000000 2023-11-14T22:13:20Z 2023-11-14T22:13:20 comment null extra null
+  -> 0 bytes, crc ok true
+  dir/hello.txt: dir=false method 8 size 549 crc 8db53e9c time 1700000002000 2023-11-14T22:13:22Z 2023-11-14T22:13:22 comment deflated extra null
+  -> 549 bytes, crc ok true
+  stored.bin: dir=false method 0 size 100 csize 100 crc 821d3e85 time 1500000000000 2017-07-14T02:40:00Z 2017-07-14T02:40 comment null extra null
+  -> 100 bytes, crc ok true
+  grüße/ünïcödé.txt: dir=false method 8 size 12 crc 3e6fbf80 time 1600000000000 2020-09-13T12:26:40Z 2020-09-13T12:26:40 comment null extra 555405000100105e5ffeca02002a2b
+  -> 12 bytes, crc ok true
+  stream: [dir/, dir/hello.txt, stored.bin, grüße/ünïcödé.txt]
+  missing: null
+  closed: java.lang.IllegalStateException: zip file closed
+test.zip: 6 entries, comment made by the test, name true
+  data/sample.txt: dir=false method 8 size 50000 crc b720862f time 1700000000000 2023-11-14T22:13:20Z 2023-11-14T22:13:20 comment sampled extra null
+  -> 50000 bytes, crc ok true
+  data/: dir=true method 8 size 0 crc 0 time 1700000000000 2023-11-14T22:13:20Z 2023-11-14T22:13:20 comment null extra null
+  -> 0 bytes, crc ok true
+  stored.bin: dir=false method 0 size 300 csize 300 crc 54eb2eb4 time 946684800000 2000-01-01T00:00:00Z 2000-01-01T00:00 comment null extra null
+  -> 300 bytes, crc ok true
+  old.txt: dir=false method 8 size 3 crc 3f5dd4e5 time 315000000000 1979-12-25T20:00:00Z 1979-12-25T20:00 comment null extra 5554050001c084c612
+  -> 3 bytes, crc ok true
+  future.txt: dir=false method 8 size 0 crc 0 time 4200000000000 2103-02-04T02:40:00Z 2103-02-04T02:40 comment null extra 0a00200000000000010018000080cfdda5e832020080ff44d138c1010000000000000080
+  -> 0 bytes, crc ok true
+  ünïcödé ✓.txt: dir=false method 8 size 3 crc e1d5da34 time 1700000000000 2023-11-14T22:13:20Z 2023-11-14T22:13:20 comment null extra feca010009
+  -> 3 bytes, crc ok true
+  stream: [data/sample.txt, data/, stored.bin, old.txt, future.txt, ünïcödé ✓.txt]
+  missing: null
+  closed: java.lang.IllegalStateException: zip file closed
+getEntry dir: dir/
+two streams: Hello Hello 544 544
+stored: 174 181 -1
+read after close: java.io.IOException: Stream closed
+not a zip: java.util.zip.ZipException: zip END header not found
+absent: java.nio.file.NoSuchFileException
