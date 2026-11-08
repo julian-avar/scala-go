@@ -305,7 +305,7 @@ object docs extends ScalaGoModule with UnidocModule {
     val root = Task.dest / "root"
     for (name <- Seq("_docs", "_assets", "sidebar.yml", "api-overview.md") if os.exists(siteSources().path / name))
       os.copy(siteSources().path / name, root / name, createFolders = true)
-    val design = os.read.lines(siteSources().path / "design.md").drop(1) // its title is the page's
+    val design = os.read.lines(siteSources().path / "design.md")
     os.write(root / "_docs" / "contributing" / "design.md", ("---" +: "title: Design" +: "---" +: design).mkString("", "\n", "\n"))
     PathRef(root)
   }
@@ -333,7 +333,24 @@ object docs extends ScalaGoModule with UnidocModule {
    */
   def site = Task {
     siteRoot() // the options only name its directory: rebuild when its contents change
-    unidocCommon(local = true)()
+    val out = unidocCommon(local = true)().path
+    // Scaladoc 3.9.0's ux.js loads pages it links to with jQuery's `$.get`, but Scaladoc no
+    // longer ships jQuery: served over HTTP (not from files), clicking a link did nothing. This
+    // `$.get` loads with fetch, and falls back to following the link.
+    val ux = out / "scripts" / "ux.js"
+    if (os.exists(ux) && os.read(ux).contains("$.get(")) os.write.over(ux,
+      """// scala-go: $.get for Scaladoc's page loading (jQuery is not included).
+        |if (typeof $ === "undefined") {
+        |  window.$ = {
+        |    get: (url, success) =>
+        |      fetch(url)
+        |        .then((r) => { if (!r.ok) throw new Error(r.status); return r.text(); })
+        |        .then(success)
+        |        .catch(() => { window.location.href = url; }),
+        |  };
+        |}
+        |""".stripMargin + os.read(ux))
+    PathRef(out)
   }
 }
 
