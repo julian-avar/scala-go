@@ -5,26 +5,27 @@ intermediate representation (`.goir`) next to the `.class` files. A whole-progra
 the program's IR into a Go module that `go build` compiles, together with IR for the Scala
 standard library (recompiled from its TASTy) and a Java standard library written in Scala.
 
-See [docs/guide.md](docs/guide.md) for using it (setup, dependencies, JVM differences, link
-errors, performance, shipping binaries) and [docs/design.md](docs/design.md) for the
-architecture, object model, status and roadmap.
+**Status:** real programs and popular libraries work; not yet published. The language, the
+standard collections, `scala.concurrent` and gears on goroutines, and most of the JDK that
+programs use (`java.util` with `concurrent` and streams, `java.io`, `java.nio`, `java.math`,
+`java.time`, `java.net` with HTTP, subprocesses, digests, `java.util.zip`) run with the JVM's
+semantics. Scala 3 libraries are compiled from the TASTy in their jars: cats, upickle,
+fastparse, pprint, mainargs and os-lib are checked against the JVM. Scala code calls Go packages
+(bubbletea, for example), and Go code calls Scala libraries. Runtime reflection, Java-only
+libraries and Scala 2 libraries do not work.
 
-**Status:** real programs and popular libraries work; not yet published. Classes, traits,
-objects, enums, exceptions (with JVM-style stack traces), pattern matching, lambdas, `lazy val`
-and the standard collections run, as do `java.util` (collections, streams, `Optional`, `Random`,
-regex, ...), `java.util.concurrent` (executors, `ForkJoinPool`, `CompletableFuture`, locks,
-concurrent collections), `scala.concurrent.Future` and gears on goroutines, `BigDecimal` and
-`BigInt` (exact, as on the JDK), `java.io`/`java.nio` (files, buffers, channels), standard input,
-subprocesses (`ProcessBuilder`, `scala.sys.process`), networking (`URI`, sockets,
-`HttpURLConnection` and `java.net.http.HttpClient` on Go's `net/http`), digests and compression
-(`MessageDigest`, `Mac`, `java.util.zip`: GZIP and zip files), and `java.time` with time zones
-from Go's tz database. Scala 3 libraries are compiled from the TASTy in their jars: cats,
-upickle, fastparse, pprint, mainargs and os-lib are checked against the JVM. Scala code calls Go packages, Go code
-calls Scala libraries, and the generated code is safe to call from any goroutine. Runtime
-reflection (beyond `getClass`/`isAssignableFrom`) and Java-only libraries do not work. See
-[docs/guide.md](docs/guide.md) for the differences from the JVM.
+## Documentation
 
-## Using it with Mill
+The documentation is a Scaladoc site, with the API: `./mill docs.site`, then open
+`out/docs/site.dest/docs/index.html`. Its pages are in [docs/_docs](docs/_docs):
+[getting started](docs/_docs/getting-started.md), the [user's guide](docs/_docs/user/index.md),
+[Go interop](docs/_docs/interop/index.md), [libraries](docs/_docs/libraries/index.md). The
+[design document](docs/design.md) explains the architecture, and lists the status and roadmap.
+
+## Quick start
+
+Requires a JDK (17+), Go (1.22+) and Mill. Nothing is published yet: `./mill __.publishLocal`
+publishes everything to the local Ivy repository. Then, in `build.mill`:
 
 ```scala
 //| mvnDeps: ["io.github.scalago:mill-scalago_mill1_3:0.1.0-SNAPSHOT"]
@@ -35,126 +36,23 @@ object app extends ScalaGoModule   // Scala 3.9.0
 
 ```sh
 mill app.goRun arg1 arg2    # compile, link, go build, run
-mill app.goLink             # just the Go module (out/app/goLink.dest/go)
+mill app.goBuild            # the executable: out/app/goBuild.dest/app
+mill app.run                # the same program on the JVM
 ```
 
-The output is a plain Go module (generated code and runtime are pure Go): `goBuildEnv` and
-`goBuildFlags` cross-compile (`Map("GOOS" -> "windows", "GOARCH" -> "amd64")`) or strip release
-binaries (`Seq("-trimpath", "-ldflags=-s -w")`).
-
-Nothing is published yet: `mill __.publishLocal` publishes everything to the local Ivy
-repository. Requires a JDK and Go ≥ 1.22 on the `PATH`.
-
-Strings are `java.lang.String` (UTF-16), so programs behave as on the JVM. `scalago.go.GoString`
-is the opt-in Go (UTF-8) string, like Scala Native's `CString`:
+Calling Go, from generated facades (`goFacadePackages = Seq("github.com/charmbracelet/bubbletea", ...)`):
 
 ```scala
-import scalago.go.*
-val g = "Grüße".toGoString    // a Go string on Go, a byte array on the JVM
-g.byteLength                  // 7
-```
+import gofacades.{lipgloss, tea}
 
-## Calling Go
-
-Declare the Go API you need as a facade. The linker checks it against the real Go package and
-converts values at the boundary:
-
-```scala
-import scalago.go.*
-
-@GoImport("strings")
-object strings:
-  def Repeat(s: String, count: Int): String = native          // count is a Go int
-  def FieldsFunc(s: String, f: Int => Boolean): Array[String] = native
-  class Builder:                                              // strings.Builder (new = zero value)
-    def WriteString(s: String): Int = native                  // the (int, error) error is checked
-    def String(): String = native
-
-@GoImport("strconv")
-object strconv:
-  def Atoi(s: String): Int = native                           // a non-nil error throws GoException
-  def ParseBool(s: String): (Boolean, GoError) = native       // or keep the error
-
-@GoImport("io")
-object io:
-  trait Writer:                                               // Go interfaces can be implemented in Scala
-    def Write(p: Array[Byte]): Int                            // ([]byte) (int, error)
-
-@GoImport("slices")
-object slices:
-  def Max(xs: GoSlice[GoInt]): GoInt = native                 // generic: Go infers [[]int, int]
-  def Sort(xs: GoSlice[Long]): Unit = native                  // sorts the shared []int64 in place
-```
-
-`GoSlice`, `GoMap`, `GoChan` and `GoPtr` are Go data shared without copying
-(`GoSlice.make[GoInt](n)` is an `[]int`, `GoMap.make[GoString, Long]` a `map[string]int64`). They
-also run on the JVM. Go funcs returned by facades are Scala functions.
-
-Facades can also be generated from the Go packages themselves: list them in `goFacadePackages`
-(their objects are in the Scala package `gofacades`), or depend on `scalago-gostd`, the generated
-facades of the most-used standard library packages (`scalago.gostd.strings`, `fmt`, `time`,
-`net/url`, `encoding/json`, ...).
-
-Go modules other than the standard library go in `goRequires` (`"module@version"`), or in
-`goLocalModules` for local directories with a `go.mod` (see `examples/basics/`). Facade members throw on
-the JVM. See [docs/design.md](docs/design.md#go-interop) for the conversion rules.
-
-Popular Go libraries work through generated facades. For example, `examples/gotui/` is a terminal app on
-[bubbletea](https://github.com/charmbracelet/bubbletea), [bubbles](https://github.com/charmbracelet/bubbles)
-and [lipgloss](https://github.com/charmbracelet/lipgloss), with its model in Scala:
-
-```scala
-final case class Counter(n: Int) extends tea.Model:
+final case class Counter(n: Int) extends tea.Model:   // a Go interface, implemented in Scala
   def Init(): tea.Cmd = null
   def Update(msg: tea.Msg): (tea.Model, tea.Cmd) = msg match
     case k: tea.KeyMsg if k.String() == "q" => (this, tea.Quit)
     case k: tea.KeyMsg if k.String() == "+" => (Counter(n + 1), null)
     case _                                  => (this, null)
-  def View(): String = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).Render(s"count: $n")
+  def View(): String = lipgloss.NewStyle().Bold(true).Render(s"count: $n")
 ```
-
-See [docs/guide.md](docs/guide.md#go-libraries).
-
-## Concurrency with gears
-
-[gears](https://github.com/lampepfl/gears) runs on goroutines, unchanged: add it as a normal
-dependency, plus `scalago-gears`. Scala library dependencies are compiled to Go from the TASTy
-in their jars.
-
-```scala
-import gears.async.*
-import gears.async.default.given
-
-Async.blocking:
-  val lengths = names.map(n => Future(n.length))   // each Future is a goroutine
-  println(lengths.awaitAll)
-```
-
-`scalago.gears` adds cancellable Go channel operations (`awaitReceive`, `awaitSend`) and
-`withGoContext(ctx)(body)`, which cancels `body` when a Go `context.Context` is done.
-
-## Calling Scala from Go
-
-Mark the API with `@GoExport` and link the module as a library (`ScalaGoLibraryModule`, with
-`goModulePath` set to the import path). `goLink` produces a Go module that Go code requires and
-imports:
-
-```scala
-object Api:
-  @GoExport def greet(name: String): String = s"Hello, $name!"     // func Greet(name string) string
-
-@GoExport class Counter(start: Int):                              // type Counter interface { ... }
-  private var count = start                                       // func NewCounter(start int32) Counter
-  @GoExport def increment(): Unit = synchronized { count += 1 }   // Increment()
-```
-
-```go
-c := mylib.NewCounter(1)
-go c.Increment() // Scala code is safe to call from any goroutine
-```
-
-Methods annotated with `@throws` return a Go `error`. Other exceptions are panics. See
-`tests/cases/go-library` and docs/design.md.
 
 ## Layout
 
@@ -176,6 +74,7 @@ Methods annotated with `@throws` return a Go `error`. Other exceptions are panic
 | `bench/`             | CPU benchmarks, run on the JVM (`mill bench.run`) and as Go (`mill bench.goRun`) |
 | `tests/published/`   | A project using only the published artifacts (`tests/published/check.sh` after `publishLocal`) |
 | `tests/cases/`       | End-to-end programs with their expected output                          |
+| `docs/`              | Documentation site (`_docs/`, `sidebar.yml`; `mill docs.site`) and the design document |
 
 The `stdlib` module produces the Scala standard library's IR (`mill stdlib.ir`).
 
@@ -191,6 +90,7 @@ cd runtime && go test ./...      # runtime unit tests
 mill examples.basics.goRun       # an example, through ScalaGoModule
 mill examples.__.check           # examples that check themselves (bubbletea, Scala libraries)
 mill bench.run 3; mill bench.goRun 3   # CPU benchmarks on the JVM and as Go
+mill docs.site                   # documentation site with the API: out/docs/site.dest
 ```
 
 Each directory in `tests/cases/` holds a program and an `expected.txt`. Cases with a
