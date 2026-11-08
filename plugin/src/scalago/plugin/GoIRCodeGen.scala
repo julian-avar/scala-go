@@ -300,8 +300,13 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
     case _                => tree.symbol.exists && tree.symbol.name.toString == "native" &&
                                tree.symbol.owner.showFullName.startsWith("scalago.go.")
 
-  /** The Scala type `tpe` (as seen before erasure), for Go interop. */
-  private def scalaType(tpe: Type): ir.ScalaType =
+  /** The Scala type `tpe` (as seen before erasure), for Go interop. Type aliases are followed as
+   *  seen before erasure too: afterwards, `type Cmd = () => Msg` is an alias of the erased
+   *  `Function0`, without its type arguments.
+   */
+  private def scalaType(tpe: Type): ir.ScalaType = atPhase(erasurePhase)(scalaTypeBeforeErasure(tpe))
+
+  private def scalaTypeBeforeErasure(tpe: Type)(using Context): ir.ScalaType =
     tpe match
       case tr: TypeRef if tr.symbol.isAliasType || tr.symbol.isOpaqueAlias =>
         goOpaqueType(tr.symbol) match
