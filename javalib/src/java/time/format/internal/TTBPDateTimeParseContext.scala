@@ -473,7 +473,7 @@ final class TTBPDateTimeParseContext(
     def toBuilder: DateTimeBuilder = {
       val builder: DateTimeBuilder = new DateTimeBuilder
       builder.fieldValues.putAll(
-        fieldValues.asInstanceOf[java.util.Map[_ <: TemporalField, _ <: java.lang.Long]]
+        fieldValues.asInstanceOf[java.util.Map[? <: TemporalField, ? <: java.lang.Long]]
       )
       builder.chrono = getEffectiveChronology
       if (zone != null)

@@ -20,7 +20,7 @@ object FutureTask {
   private final val INTERRUPTED = 6
 
   private[concurrent] final class WaitNode(@volatile var thread: Thread) {
-    @volatile var next: WaitNode = _
+    @volatile var next: WaitNode = scala.compiletime.uninitialized
     def this() = this(Thread.currentThread())
   }
 }
@@ -33,11 +33,11 @@ class FutureTask[V <: AnyRef](@volatile private var callable: Callable[V])
 
   @volatile private var _state = NEW
 
-  @volatile private var runner: Thread = _
+  @volatile private var runner: Thread = scala.compiletime.uninitialized
 
-  @volatile private var waiters: WaitNode = _
+  @volatile private var waiters: WaitNode = scala.compiletime.uninitialized
 
-  private var outcome: AnyRef = _
+  private var outcome: AnyRef = scala.compiletime.uninitialized
 
   @throws[ExecutionException]
   private def report(s: Int): V = {

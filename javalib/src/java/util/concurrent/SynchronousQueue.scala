@@ -76,9 +76,9 @@ object SynchronousQueue {
         var item: Any // data; or null for REQUESTs
     ) extends ForkJoinPool.ManagedBlocker {
 
-      @volatile var next: SNode = _ // next node in stack
-      @volatile var `match`: SNode = _ // the node matched to this
-      @volatile var waiter: Thread = _ // to control park/unpark
+      @volatile var next: SNode = scala.compiletime.uninitialized // next node in stack
+      @volatile var `match`: SNode = scala.compiletime.uninitialized // the node matched to this
+      @volatile var waiter: Thread = scala.compiletime.uninitialized // to control park/unpark
 
 
       private[concurrent] var mode = 0
@@ -134,7 +134,7 @@ object SynchronousQueue {
       extends SynchronousQueue.Transferer[E] {
     import TransferStack._
 
-    @volatile private[concurrent] var head: SNode = _
+    @volatile private[concurrent] var head: SNode = scala.compiletime.uninitialized
 
     private[concurrent] def casHead(
         h: TransferStack.SNode,
@@ -299,8 +299,8 @@ object SynchronousQueue {
         @volatile var item: Object, // CAS'ed to or from null
         val isData: Boolean
     ) extends ForkJoinPool.ManagedBlocker {
-      @volatile private[concurrent] var next: QNode = _ // next node in queue
-      @volatile private[concurrent] var waiter: Thread = _
+      @volatile private[concurrent] var next: QNode = scala.compiletime.uninitialized // next node in queue
+      @volatile private[concurrent] var waiter: Thread = scala.compiletime.uninitialized
 
 
       private[concurrent] def casNext(cmp: QNode, `val`: QNode): Boolean =
@@ -343,7 +343,7 @@ object SynchronousQueue {
 
     @volatile private[concurrent] var tail: QNode = head
 
-    @volatile private[concurrent] var cleanMe: QNode = _
+    @volatile private[concurrent] var cleanMe: QNode = scala.compiletime.uninitialized
 
 
     private[concurrent] def advanceHead(h: QNode, nh: QNode): Unit =
@@ -598,10 +598,10 @@ class SynchronousQueue[E <: AnyRef](val fair: Boolean)
 
   override def remove(o: Any) = false
 
-  override def containsAll(c: util.Collection[_]): Boolean = c.isEmpty()
+  override def containsAll(c: util.Collection[?]): Boolean = c.isEmpty()
 
-  override def removeAll(c: util.Collection[_]) = false
-  override def retainAll(c: util.Collection[_]) = false
+  override def removeAll(c: util.Collection[?]) = false
+  override def retainAll(c: util.Collection[?]) = false
 
   override def peek(): E = null.asInstanceOf[E]
 
@@ -622,7 +622,7 @@ class SynchronousQueue[E <: AnyRef](val fair: Boolean)
    */
   override def toString = "[]"
 
-  override def drainTo(c: util.Collection[_ >: E]): Int = {
+  override def drainTo(c: util.Collection[? >: E]): Int = {
     Objects.requireNonNull(c)
     if (c eq this) throw new IllegalArgumentException
     var n = 0
@@ -634,7 +634,7 @@ class SynchronousQueue[E <: AnyRef](val fair: Boolean)
     n
   }
 
-  override def drainTo(c: util.Collection[_ >: E], maxElements: Int): Int = {
+  override def drainTo(c: util.Collection[? >: E], maxElements: Int): Int = {
     Objects.requireNonNull(c)
     if (c eq this) throw new IllegalArgumentException
     var n = 0

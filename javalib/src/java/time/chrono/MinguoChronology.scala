@@ -198,7 +198,7 @@ final class MinguoChronology private () extends Chronology with Serializable {
 
   def eraOf(eraValue: Int): MinguoEra = MinguoEra.of(eraValue)
 
-  def eras: java.util.List[Era] = Arrays.asList(Array[Era](MinguoEra.values: _*))
+  def eras: java.util.List[Era] = Arrays.asList(Array[Era](MinguoEra.values*))
 
   def range(field: ChronoField): ValueRange =
     field match {

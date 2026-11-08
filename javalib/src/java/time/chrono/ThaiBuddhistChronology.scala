@@ -232,7 +232,7 @@ final class ThaiBuddhistChronology private () extends Chronology with Serializab
 
   def eraOf(eraValue: Int): ThaiBuddhistEra = ThaiBuddhistEra.of(eraValue)
 
-  def eras: java.util.List[Era] = Arrays.asList(Array[Era](ThaiBuddhistEra.values: _*))
+  def eras: java.util.List[Era] = Arrays.asList(Array[Era](ThaiBuddhistEra.values*))
 
   def range(field: ChronoField): ValueRange =
     field match {

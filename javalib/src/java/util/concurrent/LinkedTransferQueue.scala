@@ -305,7 +305,7 @@ import java.util.{
    *    - it is permitted for tail to lag behind head, that is, for tail to not
    *      be reachable from head!
    */
-  @volatile private[concurrent] var head: Node = _
+  @volatile private[concurrent] var head: Node = scala.compiletime.uninitialized
 
   /** A node from which the last node on list (that is, the unique node with
    *  node.next == null) can be reached in O(1) time. Invariants:
@@ -316,10 +316,10 @@ import java.util.{
    *      be reachable from head!
    *    - tail.next may or may not be self-linked.
    */
-  @volatile private[concurrent] var tail: Node = _
+  @volatile private[concurrent] var tail: Node = scala.compiletime.uninitialized
 
   /** The number of apparent failures to unsplice cancelled nodes */
-  @volatile private[concurrent] var needSweep: Boolean = _
+  @volatile private[concurrent] var needSweep: Boolean = scala.compiletime.uninitialized
 
 
   private def casTail(cmp: Node, `val`: Node) =
@@ -719,7 +719,7 @@ import java.util.{
     }
 
     override def forEachRemaining(
-        action: function.Consumer[_ >: E]
+        action: function.Consumer[? >: E]
     ): Unit = {
       Objects.requireNonNull(action)
       var q: Node = null
@@ -846,7 +846,7 @@ import java.util.{
     }
 
     override def forEachRemaining(
-        action: function.Consumer[_ >: E]
+        action: function.Consumer[? >: E]
     ): Unit = {
       Objects.requireNonNull(action)
       val p = current()
@@ -857,7 +857,7 @@ import java.util.{
       }
     }
 
-    override def tryAdvance(action: function.Consumer[_ >: E]): Boolean = {
+    override def tryAdvance(action: function.Consumer[? >: E]): Boolean = {
       Objects.requireNonNull(action)
       var p = current()
       while (p != null) {
@@ -982,7 +982,7 @@ import java.util.{
 
   /* -------------- Constructors -------------- */
 
-  def this(c: Collection[_ <: E]) = {
+  def this(c: Collection[? <: E]) = {
     this()
     var h: Node = null
     var t: Node = null
@@ -1066,7 +1066,7 @@ import java.util.{
 
   override def poll(): E = xfer(null.asInstanceOf[E], false, NOW, 0L)
 
-  override def drainTo(c: Collection[_ >: E]): Int = {
+  override def drainTo(c: Collection[? >: E]): Int = {
     Objects.requireNonNull(c)
     if (c == this)
       throw new IllegalArgumentException()
@@ -1080,7 +1080,7 @@ import java.util.{
     n
   }
 
-  override def drainTo(c: Collection[_ >: E], maxElements: Int): Int = {
+  override def drainTo(c: Collection[? >: E], maxElements: Int): Int = {
     Objects.requireNonNull(c)
     if (c == this)
       throw new IllegalArgumentException()
@@ -1267,17 +1267,17 @@ import java.util.{
   // private def writeObject(s: java.io.ObjectOutputStream): Unit
   // private def readObject(s: java.io.ObjectInputStream): Unit
 
-  override def removeIf(filter: function.Predicate[_ >: E]): Boolean = {
+  override def removeIf(filter: function.Predicate[? >: E]): Boolean = {
     Objects.requireNonNull(filter)
     bulkRemove(filter)
   }
 
-  override def removeAll(c: Collection[_]): Boolean = {
+  override def removeAll(c: Collection[?]): Boolean = {
     Objects.requireNonNull(c)
     bulkRemove(e => c.contains(e))
   }
 
-  override def retainAll(c: Collection[_]): Boolean = {
+  override def retainAll(c: Collection[?]): Boolean = {
     Objects.requireNonNull(c)
     bulkRemove(e => !c.contains(e))
   }
@@ -1285,7 +1285,7 @@ import java.util.{
   override def clear(): Unit = bulkRemove(_ => true)
 
   /** Implementation of bulk remove methods. */
-  private def bulkRemove(filter: function.Predicate[_ >: E]): Boolean = {
+  private def bulkRemove(filter: function.Predicate[? >: E]): Boolean = {
     var removed = false
 
     var restartFromHead = true
@@ -1339,7 +1339,7 @@ import java.util.{
   /** Runs action on each element found during a traversal starting at p. If p
    *  is null, the action is not run.
    */
-  def forEachFrom(action: function.Consumer[_ >: E], p: Node): Unit = {
+  def forEachFrom(action: function.Consumer[? >: E], p: Node): Unit = {
     var _p = p
     var pred: Node = null
     var continueLoop = true
@@ -1376,7 +1376,7 @@ import java.util.{
     }
   }
 
-  override def forEach(action: function.Consumer[_ >: E]): Unit = {
+  override def forEach(action: function.Consumer[? >: E]): Unit = {
     Objects.requireNonNull(action)
     forEachFrom(action, head)
   }
@@ -1412,7 +1412,7 @@ import java.util.{
     @volatile var item: Object =
       null // initially non-null if isData; CASed to match
     @volatile var next: Node = null
-    @volatile var waiter: Thread = _ // null when not waiting for a match
+    @volatile var waiter: Thread = scala.compiletime.uninitialized // null when not waiting for a match
 
 
     /** Constructs a data node holding item if item is non-null, else a request

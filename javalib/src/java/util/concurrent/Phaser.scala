@@ -269,18 +269,18 @@ object Phaser {
   /** Wait nodes for Treiber stack representing wait queue.
    */
   final class QNode extends ForkJoinPool.ManagedBlocker {
-    var phaser: Phaser = _
-    var phase: Int = _
-    var interruptible: Boolean = _
-    var nanos: Long = _
+    var phaser: Phaser = scala.compiletime.uninitialized
+    var phase: Int = scala.compiletime.uninitialized
+    var interruptible: Boolean = scala.compiletime.uninitialized
+    var nanos: Long = scala.compiletime.uninitialized
 
-    var timed: Boolean = _
+    var timed: Boolean = scala.compiletime.uninitialized
     var wasInterrupted: Boolean = false
-    var deadline: Long = _
+    var deadline: Long = scala.compiletime.uninitialized
 
-    @volatile var thread: Thread = _ // nulled to cancel wait
+    @volatile var thread: Thread = scala.compiletime.uninitialized // nulled to cancel wait
 
-    var next: QNode = _
+    var next: QNode = scala.compiletime.uninitialized
 
     def this(
         phaser: Phaser,
@@ -376,11 +376,11 @@ class Phaser(_parent: Phaser, _parties: Int) {
   // SN: There is no @volatile for 'parent', 'root', 'evenQ', and 'odd' since
   //     each is set once in class constructor and never reset.
 
-  private var parent: Phaser = _
+  private var parent: Phaser = scala.compiletime.uninitialized
 
   /** The root of phaser tree. Equals this if not in a tree.
    */
-  private var root: Phaser = _
+  private var root: Phaser = scala.compiletime.uninitialized
 
   /** Heads of Treiber stacks for waiting threads. To eliminate contention when
    *  releasing some threads while adding others, we use two of them,
@@ -388,8 +388,8 @@ class Phaser(_parent: Phaser, _parties: Int) {
    *  to speed up releases.
    */
 
-  private var evenQ: AtomicReference[QNode] = _
-  private var oddQ: AtomicReference[QNode] = _
+  private var evenQ: AtomicReference[QNode] = scala.compiletime.uninitialized
+  private var oddQ: AtomicReference[QNode] = scala.compiletime.uninitialized
 
   initializePrimaryConstructor(_parent, _parties)
 

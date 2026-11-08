@@ -412,7 +412,7 @@ trait ChronoLocalDate extends Temporal with TemporalAdjuster with Ordered[Chrono
    * @return
    *   the local date-time formed from this date and the specified time, not null
    */
-  def atTime(localTime: LocalTime): ChronoLocalDateTime[_ <: ChronoLocalDate] =
+  def atTime(localTime: LocalTime): ChronoLocalDateTime[? <: ChronoLocalDate] =
     ChronoLocalDateTimeImpl.of(this, localTime)
 
   /**

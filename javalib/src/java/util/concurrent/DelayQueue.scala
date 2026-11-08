@@ -73,7 +73,7 @@ class DelayQueue[E <: Delayed] extends AbstractQueue[E] with BlockingQueue[E] {
    * signalled.  So waiting threads must be prepared to acquire
    * and lose leadership while waiting.
    */
-  private var leader: Thread = _
+  private var leader: Thread = scala.compiletime.uninitialized
 
   /*
    * Condition signalled when a newer element becomes available
@@ -90,7 +90,7 @@ class DelayQueue[E <: Delayed] extends AbstractQueue[E] with BlockingQueue[E] {
    * @throws NullPointerException if the specified collection or any
    *         of its elements are null
    */
-  def this(c: Collection[_ <: E]) = {
+  def this(c: Collection[? <: E]) = {
     this()
     this.addAll(c)
   }
@@ -302,7 +302,7 @@ class DelayQueue[E <: Delayed] extends AbstractQueue[E] with BlockingQueue[E] {
    * @throws NullPointerException          {@inheritDoc}
    * @throws IllegalArgumentException      {@inheritDoc}
    */
-  def drainTo(c: Collection[_ >: E]): Int =
+  def drainTo(c: Collection[? >: E]): Int =
     return drainTo(c, Integer.MAX_VALUE)
 
   /*

@@ -6,7 +6,7 @@ package scalago.javalib.lang
 class ThreadGroup private (parent: ThreadGroup, name: String, private var maxPriority: Int, private var daemon: scala.Boolean)
     extends Object with Thread.UncaughtExceptionHandler:
   def this(parent: ThreadGroup, name: String) =
-    this(java.util.Objects.requireNonNull(parent), name, parent.getMaxPriority(), parent.isDaemon())
+    this(java.util.Objects.requireNonNull(parent), name, parent.getMaxPriority(), parent.daemon)
   def this(name: String) = this(Thread.currentThread().getThreadGroup(), name)
 
   def getName(): String = name

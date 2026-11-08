@@ -21,11 +21,10 @@ abstract class ForkJoinTask[V]() extends Future[V] with Serializable {
   // Fields
   // accessed directly by pool and workers
   @volatile private[concurrent] var status: Int = 0
-  @volatile private var aux: Aux = _ // either waiters or thrown Exception
+  @volatile private var aux: Aux = scala.compiletime.uninitialized // either waiters or thrown Exception
 
   // Support for atomic operations
-  private def getAndBitwiseOrStatus(v: Int): Int =
-{
+  private def getAndBitwiseOrStatus(v: Int): Int = {
     var s = status
     while (!Intrinsics.compareAndSet(this.status, s, s | v)) s = status
     s
@@ -121,7 +120,7 @@ abstract class ForkJoinTask[V]() extends Future[V] with Serializable {
     Thread.currentThread() match {
       case wt: ForkJoinWorkerThread if wt.pool != null => // try helping
         p = wt.pool
-        if (isInstanceOf[CountedCompleter[_]]) {
+        if (isInstanceOf[CountedCompleter[?]]) {
           s = p.helpComplete(this, wt.workQueue, 0)
           if (s >= 0) { p.compensate(); s = UNCOMPENSATE }
         } else s = p.helpJoin(this, wt.workQueue)
@@ -430,7 +429,7 @@ object ForkJoinTask {
       val thread: Thread,
       val ex: Throwable // null if a waiter
   ) {
-    @volatile var next: Aux = _ // accessed only via memory-acquire chains
+    @volatile var next: Aux = scala.compiletime.uninitialized // accessed only via memory-acquire chains
     final def casNext(c: Aux, v: Aux) = Intrinsics.compareAndSet(this.next, c, v)
   }
 
@@ -448,7 +447,7 @@ object ForkJoinTask {
 
   private[concurrent] def isExceptionalStatus(s: Int) = (s & THROWN) != 0
 
-  private[concurrent] def cancelIgnoringExceptions(t: Future[_]): Unit = {
+  private[concurrent] def cancelIgnoringExceptions(t: Future[?]): Unit = {
     if (t != null)
       try t.cancel(true)
       catch { case _: Throwable => () }
@@ -469,7 +468,7 @@ object ForkJoinTask {
     }
   }
 
-  def invokeAll(t1: ForkJoinTask[_], t2: ForkJoinTask[_]): Unit = {
+  def invokeAll(t1: ForkJoinTask[?], t2: ForkJoinTask[?]): Unit = {
     if (t1 == null || t2 == null) throw new NullPointerException
     t2.fork()
     var s1 = t1.doExec()
@@ -487,7 +486,7 @@ object ForkJoinTask {
     }
   }
 
-  def invokeAll(tasks: Array[ForkJoinTask[_]]): Unit = {
+  def invokeAll(tasks: Array[ForkJoinTask[?]]): Unit = {
     var ex = null: Throwable
     val last = tasks.length - 1
     var i = last
@@ -530,8 +529,8 @@ object ForkJoinTask {
     }
   }
 
-  def invokeAll[T <: ForkJoinTask[_]](tasks: Collection[T]): Collection[T] = {
-    def invokeAllImpl(ts: java.util.List[_ <: ForkJoinTask[_]]): Unit = {
+  def invokeAll[T <: ForkJoinTask[?]](tasks: Collection[T]): Collection[T] = {
+    def invokeAllImpl(ts: java.util.List[? <: ForkJoinTask[?]]): Unit = {
       var ex: Throwable = null
       val last = ts.size() - 1 // nearly same as array version
       var i = last
@@ -575,10 +574,10 @@ object ForkJoinTask {
     }
 
     tasks match {
-      case list: java.util.List[T] with RandomAccess @unchecked =>
+      case list: (java.util.List[T] & RandomAccess @unchecked) =>
         invokeAllImpl(list)
       case _ =>
-        invokeAll(tasks.toArray(Array.empty[ForkJoinTask[_]]))
+        invokeAll(tasks.toArray(Array.empty[ForkJoinTask[?]]))
     }
     tasks
   }
@@ -611,27 +610,27 @@ object ForkJoinTask {
   // does not make a lot of sense in Scala. The most similar access would be `protected[concurrent]`
   // Scala Native frontend does not emit static forwards for protected methods for compliance with the Scala JVM backend
   // The usecase of `protected static` in ported Scala code shall be replaced with public access instead.
-  def peekNextLocalTask(): ForkJoinTask[_] = {
+  def peekNextLocalTask(): ForkJoinTask[?] = {
     Thread.currentThread() match {
       case t: ForkJoinWorkerThread => t.workQueue.peek(t.pool.getAsyncMode())
       case _                       => null
     }
   }
 
-  def pollNextLocalTask(): ForkJoinTask[_] = {
+  def pollNextLocalTask(): ForkJoinTask[?] = {
     Thread.currentThread() match {
       case t: ForkJoinWorkerThread => t.workQueue.nextLocalTask(t.pool.getAsyncMode())
       case _                       => null
     }
   }
 
-  def pollTask(): ForkJoinTask[_] =
+  def pollTask(): ForkJoinTask[?] =
     Thread.currentThread() match {
       case wt: ForkJoinWorkerThread => wt.pool.pollTaskFor(wt.workQueue)
       case _                        => null
     }
 
-  def pollSubmission(): ForkJoinTask[_] =
+  def pollSubmission(): ForkJoinTask[?] =
     Thread.currentThread() match {
       case t: ForkJoinWorkerThread => t.pool.pollSubmission()
       case _                       => null
@@ -704,7 +703,7 @@ object ForkJoinTask {
   ) extends ForkJoinTask[T]
       with RunnableFuture[T] {
     if (callable == null) throw new NullPointerException
-    private[concurrent] var result: T = _
+    private[concurrent] var result: T = scala.compiletime.uninitialized
     override final def getRawResult() = result
     override final def setRawResult(v: T): Unit = result = v
     override final def exec(): Boolean = try {
@@ -724,8 +723,8 @@ object ForkJoinTask {
   ) extends ForkJoinTask[T]
       with RunnableFuture[T] {
     if (callable == null) throw new NullPointerException
-    @volatile var runner: Thread = _
-    private var result: T = _
+    @volatile var runner: Thread = scala.compiletime.uninitialized
+    private var result: T = scala.compiletime.uninitialized
     override final def getRawResult(): T = result
     override final def setRawResult(v: T): Unit = result = v
     override final def exec(): Boolean = {

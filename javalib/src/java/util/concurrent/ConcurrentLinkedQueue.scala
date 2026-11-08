@@ -21,8 +21,8 @@ object ConcurrentLinkedQueue {
   private[concurrent] final class Node[E <: AnyRef] private[concurrent]
   /** Constructs a dead dummy node. */
   {
-    @volatile private[concurrent] var item: E = _
-    @volatile private[concurrent] var next: Node[E] = _
+    @volatile private[concurrent] var item: E = scala.compiletime.uninitialized
+    @volatile private[concurrent] var next: Node[E] = scala.compiletime.uninitialized
 
 
     def this(item: E) = {
@@ -64,7 +64,7 @@ class ConcurrentLinkedQueue[E <: AnyRef]
   @transient private var tail: Node[E] = head
 
 
-  def this(c: Collection[_ <: E]) = {
+  def this(c: Collection[? <: E]) = {
     this()
     var h, t: Node[E] = head
     c.forEach { e =>
@@ -320,7 +320,7 @@ class ConcurrentLinkedQueue[E <: AnyRef]
     false
   }
 
-  override def addAll(c: Collection[_ <: E]): Boolean = {
+  override def addAll(c: Collection[? <: E]): Boolean = {
     if (c eq this)
       throw new IllegalArgumentException // As historically specified in AbstractQueue#addAll
 
@@ -438,9 +438,9 @@ class ConcurrentLinkedQueue[E <: AnyRef]
   override def iterator(): Iterator[E] = new Itr()
 
   private class Itr() extends Iterator[E] {
-    private var nextNode: Node[E] = _
-    private var nextItem: E = _
-    private var lastRet: Node[E] = _
+    private var nextNode: Node[E] = scala.compiletime.uninitialized
+    private var nextItem: E = scala.compiletime.uninitialized
+    private var lastRet: Node[E] = scala.compiletime.uninitialized
 
     private def _init(): Unit = {
       var restartFromHead = true
@@ -546,7 +546,7 @@ class ConcurrentLinkedQueue[E <: AnyRef]
   }
 
   private[concurrent] final class CLQSpliterator extends Spliterator[E] {
-    private[concurrent] var current: Node[E] = _ // current node
+    private[concurrent] var current: Node[E] = scala.compiletime.uninitialized // current node
     private[concurrent] var batch = 0 // batch size for splits
     private[concurrent] var exhausted = false // true when no more nodes
 
@@ -580,7 +580,7 @@ class ConcurrentLinkedQueue[E <: AnyRef]
         )
     }
 
-    override def forEachRemaining(action: Consumer[_ >: E]): Unit = {
+    override def forEachRemaining(action: Consumer[? >: E]): Unit = {
       Objects.requireNonNull(action)
       val p: Node[E] = getCurrent()
       if (p != null) {
@@ -590,7 +590,7 @@ class ConcurrentLinkedQueue[E <: AnyRef]
       }
     }
 
-    override def tryAdvance(action: Consumer[_ >: E]): Boolean = {
+    override def tryAdvance(action: Consumer[? >: E]): Boolean = {
       Objects.requireNonNull(action)
       var p: Node[E] = getCurrent()
       if (p != null) {
@@ -627,17 +627,17 @@ class ConcurrentLinkedQueue[E <: AnyRef]
 
   override def spliterator(): Spliterator[E] = new CLQSpliterator
 
-  override def removeIf(filter: Predicate[_ >: E]): Boolean = {
+  override def removeIf(filter: Predicate[? >: E]): Boolean = {
     Objects.requireNonNull(filter)
     bulkRemove(filter)
   }
 
-  override def removeAll(c: Collection[_]): Boolean = {
+  override def removeAll(c: Collection[?]): Boolean = {
     Objects.requireNonNull(c)
     bulkRemove((e: E) => c.contains(e))
   }
 
-  override def retainAll(c: Collection[_]): Boolean = {
+  override def retainAll(c: Collection[?]): Boolean = {
     Objects.requireNonNull(c)
     bulkRemove((e: E) => !c.contains(e))
   }
@@ -646,7 +646,7 @@ class ConcurrentLinkedQueue[E <: AnyRef]
     bulkRemove((e: E) => true)
   }
 
-  private def bulkRemove(filter: Predicate[_ >: E]): Boolean = {
+  private def bulkRemove(filter: Predicate[? >: E]): Boolean = {
     var removed = false
     var restartFromHead = true
     while (restartFromHead) {
@@ -688,7 +688,7 @@ class ConcurrentLinkedQueue[E <: AnyRef]
    *  is null, the action is not run.
    */
   private[concurrent] def forEachFrom(
-      action: Consumer[_ >: E],
+      action: Consumer[? >: E],
       _p: Node[E]
   ): Unit = {
     var p = _p
@@ -719,7 +719,7 @@ class ConcurrentLinkedQueue[E <: AnyRef]
     }
   }
 
-  override def forEach(action: Consumer[_ >: E]): Unit = {
+  override def forEach(action: Consumer[? >: E]): Unit = {
     Objects.requireNonNull(action)
     forEachFrom(action, head)
   }

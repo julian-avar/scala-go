@@ -89,7 +89,7 @@ object LinkedBlockingDeque {
      * - this Node, meaning the predecessor is tail
      * - null, meaning there is no predecessor
      */
-    var prev: Node[E] = _
+    var prev: Node[E] = scala.compiletime.uninitialized
 
     /*
      * One of:
@@ -97,7 +97,7 @@ object LinkedBlockingDeque {
      * - this Node, meaning the successor is head
      * - null, meaning there is no successor
      */
-    var next: Node[E] = _
+    var next: Node[E] = scala.compiletime.uninitialized
   }
 }
 
@@ -136,7 +136,7 @@ class LinkedBlockingDeque[E <: AnyRef](
    * @throws NullPointerException if the specified collection or any
    *         of its elements are null
    */
-  def this(c: Collection[_ <: E]) = {
+  def this(c: Collection[? <: E]) = {
     this(Integer.MAX_VALUE)
     addAll(c)
   }
@@ -726,7 +726,7 @@ class LinkedBlockingDeque[E <: AnyRef](
    * @throws NullPointerException          {@inheritDoc}
    * @throws IllegalArgumentException      {@inheritDoc}
    */
-  def drainTo(c: Collection[_ >: E]): Int =
+  def drainTo(c: Collection[? >: E]): Int =
     drainTo(c, Integer.MAX_VALUE)
 
   /*
@@ -735,7 +735,7 @@ class LinkedBlockingDeque[E <: AnyRef](
    * @throws NullPointerException          {@inheritDoc}
    * @throws IllegalArgumentException      {@inheritDoc}
    */
-  def drainTo(c: Collection[_ >: E], maxElements: Int): Int = {
+  def drainTo(c: Collection[? >: E], maxElements: Int): Int = {
     Objects.requireNonNull(c)
     if (c == this)
       throw new IllegalArgumentException()
@@ -848,7 +848,7 @@ class LinkedBlockingDeque[E <: AnyRef](
    * @throws IllegalStateException if this deque is full
    * @see #add(Object)
    */
-  override def addAll(c: Collection[_ <: E]): Boolean = {
+  override def addAll(c: Collection[? <: E]): Boolean = {
     Objects.requireNonNull(c, "c")
 
     if (c == this)
@@ -1138,7 +1138,7 @@ class LinkedBlockingDeque[E <: AnyRef](
       x
     }
 
-    override def forEachRemaining(action: Consumer[_ >: E]): Unit = {
+    override def forEachRemaining(action: Consumer[? >: E]): Unit = {
       // A variant of forEachFrom
       Objects.requireNonNull(action, "action")
       var p = null.asInstanceOf[Node[E]]
@@ -1303,7 +1303,7 @@ class LinkedBlockingDeque[E <: AnyRef](
       return null
     }
 
-    def tryAdvance(action: Consumer[_ >: E]): Boolean = {
+    def tryAdvance(action: Consumer[? >: E]): Boolean = {
       Objects.requireNonNull(action)
       if (!exhausted) {
         var e = null.asInstanceOf[E]
@@ -1332,7 +1332,7 @@ class LinkedBlockingDeque[E <: AnyRef](
       false
     }
 
-    override def forEachRemaining(action: Consumer[_ >: E]): Unit = {
+    override def forEachRemaining(action: Consumer[? >: E]): Unit = {
       Objects.requireNonNull(action)
       if (!exhausted) {
         exhausted = true
@@ -1368,7 +1368,7 @@ class LinkedBlockingDeque[E <: AnyRef](
   /*
    * @throws NullPointerException {@inheritDoc}
    */
-  override def forEach(action: Consumer[_ >: E]): Unit = {
+  override def forEach(action: Consumer[? >: E]): Unit = {
     Objects.requireNonNull(action, "action")
     forEachFrom(action, null)
   }
@@ -1377,7 +1377,7 @@ class LinkedBlockingDeque[E <: AnyRef](
    * Runs action on each element found during a traversal starting at p.
    * If p is null, traversal starts at head.
    */
-  def forEachFrom(action: Consumer[_ >: E], _p: Node[E]): Unit = {
+  def forEachFrom(action: Consumer[? >: E], _p: Node[E]): Unit = {
     var p = _p
 
     // Extract batches of elements while holding the lock; then
@@ -1430,7 +1430,7 @@ class LinkedBlockingDeque[E <: AnyRef](
   /*
    * @throws NullPointerException {@inheritDoc}
    */
-  override def removeIf(filter: Predicate[_ >: E]): Boolean = {
+  override def removeIf(filter: Predicate[? >: E]): Boolean = {
     Objects.requireNonNull(filter, "filter")
     bulkRemove(filter)
   }
@@ -1438,7 +1438,7 @@ class LinkedBlockingDeque[E <: AnyRef](
   /*
    * @throws NullPointerException {@inheritDoc}
    */
-  override def removeAll(c: Collection[_]): Boolean = {
+  override def removeAll(c: Collection[?]): Boolean = {
     Objects.requireNonNull(c, "c")
     bulkRemove(e => c.contains(e))
   }
@@ -1446,13 +1446,13 @@ class LinkedBlockingDeque[E <: AnyRef](
   /*
    * @throws NullPointerException {@inheritDoc}
    */
-  override def retainAll(c: Collection[_]): Boolean = {
+  override def retainAll(c: Collection[?]): Boolean = {
     Objects.requireNonNull(c, "c")
     bulkRemove(e => !c.contains(e))
   }
 
   /* Implementation of bulk remove methods. */
-  private def bulkRemove(filter: Predicate[_ >: E]): Boolean = {
+  private def bulkRemove(filter: Predicate[? >: E]): Boolean = {
     var removed = false
     val lock = this.lock
     var p = null.asInstanceOf[Node[E]]

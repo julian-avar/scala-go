@@ -193,13 +193,13 @@ final class ChronoLocalDateTimeImpl[D <: ChronoLocalDate] private (
       `with`(adjuster.asInstanceOf[ChronoLocalDate], time)
     else if (adjuster.isInstanceOf[LocalTime])
       `with`(date, adjuster.asInstanceOf[LocalTime])
-    else if (adjuster.isInstanceOf[ChronoLocalDateTimeImpl[_ <: ChronoLocalDate]])
+    else if (adjuster.isInstanceOf[ChronoLocalDateTimeImpl[? <: ChronoLocalDate]])
       date.getChronology.ensureChronoLocalDateTime(
-        adjuster.asInstanceOf[ChronoLocalDateTimeImpl[_]]
+        adjuster.asInstanceOf[ChronoLocalDateTimeImpl[?]]
       )
     else
       date.getChronology.ensureChronoLocalDateTime(
-        adjuster.adjustInto(this).asInstanceOf[ChronoLocalDateTimeImpl[_]]
+        adjuster.adjustInto(this).asInstanceOf[ChronoLocalDateTimeImpl[?]]
       )
 
   def `with`(field: TemporalField, newValue: Long): ChronoLocalDateTimeImpl[D] =

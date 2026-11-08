@@ -151,21 +151,21 @@ object Exchanger {
    * bookkeeping. Padded via to reduce memory contention.
    */
   final class Node {
-    var index: Int = _ // Arena index
-    var bound: Int = _ // Last recorded value of Exchanger.bound
-    var collides: Int = _ // Number of CAS failures at current bound
-    var hash: Int = _ // Pseudo-random for spins
-    var item: Object = _ // This thread's current item
+    var index: Int = scala.compiletime.uninitialized // Arena index
+    var bound: Int = scala.compiletime.uninitialized // Last recorded value of Exchanger.bound
+    var collides: Int = scala.compiletime.uninitialized // Number of CAS failures at current bound
+    var hash: Int = scala.compiletime.uninitialized // Pseudo-random for spins
+    var item: Object = scala.compiletime.uninitialized // This thread's current item
 
     // Item provided by releasing thread
-    @volatile var `match`: Object = _
+    @volatile var `match`: Object = scala.compiletime.uninitialized
 
     def setMatchRelease(v: Object): Unit = {
       this.`match` = v
     }
 
     // Set to this thread when parked, else null
-    @volatile var parked: Thread = _
+    @volatile var parked: Thread = scala.compiletime.uninitialized
   }
 
   /* The corresponding thread local class */
@@ -328,7 +328,7 @@ class Exchanger[V <: AnyRef] {
    * Elimination array; null until enabled (within slotExchange).
    * Element accesses use emulation of volatile gets and CAS.
    */
-  @volatile private[Exchanger] var arena: VolatileArray[Node] = _
+  @volatile private[Exchanger] var arena: VolatileArray[Node] = scala.compiletime.uninitialized
 
   private def arrayCompareAndSet[E <: AnyRef](a: VolatileArray[E], i: Int, e: E, v: E): Boolean =
     a.compareAndSet(i, e, v)
@@ -338,7 +338,7 @@ class Exchanger[V <: AnyRef] {
   /*
    * Slot used until contention detected.
    */
-  @volatile private[Exchanger] var slot: Node = _
+  @volatile private[Exchanger] var slot: Node = scala.compiletime.uninitialized
 
   /*
    * The index of the largest valid arena position, OR'ed with SEQ
@@ -346,7 +346,7 @@ class Exchanger[V <: AnyRef] {
    * update from 0 to SEQ is used to ensure that the arena array is
    * constructed only once.
    */
-  @volatile private[Exchanger] var bound: Int = _
+  @volatile private[Exchanger] var bound: Int = scala.compiletime.uninitialized
 
   /*
    * Exchange function when arenas enabled. See above for explanation.

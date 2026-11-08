@@ -303,11 +303,11 @@ object ScheduledThreadPoolExecutor {
       } finally lock.unlock()
     }
 
-    override def drainTo(c: util.Collection[_ >: Runnable]): Int =
+    override def drainTo(c: util.Collection[? >: Runnable]): Int =
       drainTo(c, Integer.MAX_VALUE)
 
     override def drainTo(
-        c: util.Collection[_ >: Runnable],
+        c: util.Collection[? >: Runnable],
         maxElements: Int
     ): Int = {
       Objects.requireNonNull(c)
@@ -433,9 +433,9 @@ class ScheduledThreadPoolExecutor(
         return 0
       }
       if (other
-            .isInstanceOf[ScheduledFutureTask[_]]) {
+            .isInstanceOf[ScheduledFutureTask[?]]) {
         val x =
-          other.asInstanceOf[ScheduledFutureTask[_]]
+          other.asInstanceOf[ScheduledFutureTask[?]]
         val diff = time - x.time
         if (diff < 0) return -1
         else if (diff > 0) return 1
@@ -526,7 +526,7 @@ class ScheduledThreadPoolExecutor(
   }
 
   private[concurrent] def canRunInCurrentRunState(
-      task: RunnableScheduledFuture[_]
+      task: RunnableScheduledFuture[?]
   ): Boolean = {
     if (!isShutdown()) return true
     if (isStopped()) return false
@@ -536,7 +536,7 @@ class ScheduledThreadPoolExecutor(
         task.getDelay(NANOSECONDS) <= 0
   }
 
-  private def delayedExecute(task: RunnableScheduledFuture[_]): Unit = {
+  private def delayedExecute(task: RunnableScheduledFuture[?]): Unit = {
     if (isShutdown()) reject(task)
     else {
       super.getQueue().add(task)
@@ -546,7 +546,7 @@ class ScheduledThreadPoolExecutor(
   }
 
   private[concurrent] def reExecutePeriodic(
-      task: RunnableScheduledFuture[_]
+      task: RunnableScheduledFuture[?]
   ): Unit = {
     if (canRunInCurrentRunState(task)) {
       super.getQueue().add(task)
@@ -705,7 +705,7 @@ class ScheduledThreadPoolExecutor(
     schedule(command, 0, NANOSECONDS)
   }
 
-  override def submit(task: Runnable): Future[_] =
+  override def submit(task: Runnable): Future[?] =
     schedule(task, 0, NANOSECONDS)
 
   override def submit[T <: AnyRef](task: Runnable, result: T): Future[T] =

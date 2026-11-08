@@ -472,7 +472,7 @@ final class DateTimeBuilder() extends TemporalAccessor with Cloneable {
 
   private def mergeInstantFields0(selectedZone: ZoneId): Unit = {
     val instant: Instant                               = Instant.ofEpochSecond(fieldValues.remove(INSTANT_SECONDS))
-    val zdt: ChronoZonedDateTime[_ <: ChronoLocalDate] = chrono.zonedDateTime(instant, selectedZone)
+    val zdt: ChronoZonedDateTime[? <: ChronoLocalDate] = chrono.zonedDateTime(instant, selectedZone)
     if (date == null)
       addObject(zdt.toLocalDate)
     else

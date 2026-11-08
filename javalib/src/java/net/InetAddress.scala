@@ -168,7 +168,8 @@ object Inet4Address:
     var value = 0L
     var currByte = 0
     var newOctet = true
-    for i <- 0 until n do
+    var i = 0
+    while i < n do
       val c = src.charAt(i)
       if c == '.' then
         if newOctet || value > 0xff || currByte == 3 then return null
@@ -181,6 +182,7 @@ object Inet4Address:
         if digit < 0 then return null
         value = value * 10 + digit
         newOctet = false
+      i += 1
     if newOctet || value >= (1L << ((4 - currByte) * 8)) then return null
     // The last part fills the remaining bytes.
     for i <- currByte until 4 do res(i) = (value >> ((3 - i) * 8)).toByte

@@ -44,7 +44,7 @@ import java.time.temporal.UnsupportedTemporalTypeException
 import java.time.zone.ZoneRules
 import java.time.zone.ZoneRulesException
 import java.time.zone.ZoneRulesProvider
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object ZoneId {
 

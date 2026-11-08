@@ -307,15 +307,15 @@ class StampedLock extends Serializable {
    */
 
   /* Head of CLH queue */
-  @transient @volatile private var head: Node = _
+  @transient @volatile private var head: Node = scala.compiletime.uninitialized
 
   /* Tail (last) of CLH queue */
-  @transient @volatile private var tail: Node = _
+  @transient @volatile private var tail: Node = scala.compiletime.uninitialized
 
   // views
-  @transient var readLockView: ReadLockView = _
-  @transient var writeLockView: WriteLockView = _
-  @transient var readWriteLockView: ReadWriteLockView = _
+  @transient var readLockView: ReadLockView = scala.compiletime.uninitialized
+  @transient var writeLockView: WriteLockView = scala.compiletime.uninitialized
+  @transient var readWriteLockView: ReadWriteLockView = scala.compiletime.uninitialized
 
   /* Lock sequence/state */
 
@@ -1517,9 +1517,9 @@ object StampedLock {
 
   /* CLH nodes */
   abstract class Node {
-    @volatile var prev: Node = _ // initially attached via casTail
-    @volatile var next: Node = _ // visibly nonnull when signallable
-    @volatile var waiter: Thread = _ // visibly nonnull when enqueued (volatile: read by signallers)
+    @volatile var prev: Node = scala.compiletime.uninitialized // initially attached via casTail
+    @volatile var next: Node = scala.compiletime.uninitialized // visibly nonnull when signallable
+    @volatile var waiter: Thread = scala.compiletime.uninitialized // visibly nonnull when enqueued (volatile: read by signallers)
     @volatile var status: Int = 0 // written by owner, atomic bit ops by others
 
     final def casPrev(c: Node, v: Node): Boolean = // for cleanQueue
@@ -1548,7 +1548,7 @@ object StampedLock {
   final class WriterNode extends Node {} // node for writers
 
   final class ReaderNode extends Node { // node for readers
-    @volatile var cowaiters: ReaderNode = _ // list of linked readers
+    @volatile var cowaiters: ReaderNode = scala.compiletime.uninitialized // list of linked readers
 
     final def casCowaiters(c: ReaderNode, v: ReaderNode): Boolean =
       Intrinsics.compareAndSet(this.cowaiters, c, v)

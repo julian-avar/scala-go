@@ -72,7 +72,7 @@ class ArrayBlockingQueue[E <: AnyRef](val capacity: Int, val fair: Boolean)
 
   private[concurrent] var count = 0
 
-  private[concurrent] var itrs: Itrs = _
+  private[concurrent] var itrs: Itrs = scala.compiletime.uninitialized
 
   private[concurrent] final val lock: ReentrantLock = new ReentrantLock(fair)
 
@@ -139,7 +139,7 @@ class ArrayBlockingQueue[E <: AnyRef](val capacity: Int, val fair: Boolean)
 
   def this(capacity: Int) = this(capacity, false)
 
-  def this(capacity: Int, fair: Boolean, c: util.Collection[_ <: E]) = {
+  def this(capacity: Int, fair: Boolean, c: util.Collection[? <: E]) = {
     this(capacity, fair)
     val lock = this.lock
     lock.lock() // Lock only for visibility, not mutual exclusion
@@ -386,10 +386,10 @@ class ArrayBlockingQueue[E <: AnyRef](val capacity: Int, val fair: Boolean)
     } finally lock.unlock()
   }
 
-  override def drainTo(c: util.Collection[_ >: E]): Int =
+  override def drainTo(c: util.Collection[? >: E]): Int =
     drainTo(c, Integer.MAX_VALUE)
 
-  override def drainTo(c: util.Collection[_ >: E], maxElements: Int): Int = {
+  override def drainTo(c: util.Collection[? >: E], maxElements: Int): Int = {
     Objects.requireNonNull(c)
     if (c eq this) throw new IllegalArgumentException
     if (maxElements <= 0) return 0
@@ -490,9 +490,9 @@ class ArrayBlockingQueue[E <: AnyRef](val capacity: Int, val fair: Boolean)
   private[concurrent] class Itrs private[concurrent] (initial: Itr) {
     register(initial)
 
-    private var head: Node = _
+    private var head: Node = scala.compiletime.uninitialized
 
-    private var sweeper: Node = _
+    private var sweeper: Node = scala.compiletime.uninitialized
 
     private[concurrent] var cycles = 0
 
@@ -669,11 +669,11 @@ class ArrayBlockingQueue[E <: AnyRef](val capacity: Int, val fair: Boolean)
 
     private var cursor: Int = 0
 
-    private var nextItem: E = _
+    private var nextItem: E = scala.compiletime.uninitialized
 
     private var nextIndex: Int = 0
 
-    private var lastItem: E = _
+    private var lastItem: E = scala.compiletime.uninitialized
 
     private var lastRet: Int = NONE
 
@@ -829,7 +829,7 @@ class ArrayBlockingQueue[E <: AnyRef](val capacity: Int, val fair: Boolean)
       e
     }
 
-    override def forEachRemaining(action: Consumer[_ >: E]): Unit = {
+    override def forEachRemaining(action: Consumer[? >: E]): Unit = {
       Objects.requireNonNull(action)
       val lock = ArrayBlockingQueue.this.lock
       lock.lock()
@@ -1000,7 +1000,7 @@ class ArrayBlockingQueue[E <: AnyRef](val capacity: Int, val fair: Boolean)
     Spliterator.ORDERED | Spliterator.NONNULL | Spliterator.CONCURRENT
   )
 
-  override def forEach(action: Consumer[_ >: E]): Unit = {
+  override def forEach(action: Consumer[? >: E]): Unit = {
     Objects.requireNonNull(action)
     val lock = this.lock
     lock.lock()
@@ -1030,22 +1030,22 @@ class ArrayBlockingQueue[E <: AnyRef](val capacity: Int, val fair: Boolean)
     finally lock.unlock()
   }
 
-  override def removeIf(filter: Predicate[_ >: E]): Boolean = {
+  override def removeIf(filter: Predicate[? >: E]): Boolean = {
     Objects.requireNonNull(filter)
     bulkRemove(filter)
   }
 
-  override def removeAll(c: util.Collection[_]): Boolean = {
+  override def removeAll(c: util.Collection[?]): Boolean = {
     Objects.requireNonNull(c)
     bulkRemove((e: E) => c.contains(e))
   }
 
-  override def retainAll(c: util.Collection[_]): Boolean = {
+  override def retainAll(c: util.Collection[?]): Boolean = {
     Objects.requireNonNull(c)
     bulkRemove((e: E) => !c.contains(e))
   }
 
-  private def bulkRemove(filter: Predicate[_ >: E]): Boolean = {
+  private def bulkRemove(filter: Predicate[? >: E]): Boolean = {
     val lock = this.lock
     lock.lock()
     try
@@ -1079,7 +1079,7 @@ class ArrayBlockingQueue[E <: AnyRef](val capacity: Int, val fair: Boolean)
     case n           => n
   }
 
-  private def bulkRemoveModified(filter: Predicate[_ >: E], beg: Int) = {
+  private def bulkRemoveModified(filter: Predicate[? >: E], beg: Int) = {
     val es = items
     val capacity = items.length
     val end = putIndex

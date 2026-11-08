@@ -21,9 +21,9 @@ object AbstractQueuedSynchronizer { // Node status bits, also used as argument a
   private[locks] val COND = 2 // in a condition wait
 
   private[locks] abstract class Node {
-    @volatile var waiter: Thread = _ // visibly nonnull when enqueued (volatile: read by signallers)
-    @volatile var prev: Node = _ // initially attached via casTail
-    @volatile var next: Node = _ // visibly nonnull when signallable
+    @volatile var waiter: Thread = scala.compiletime.uninitialized // visibly nonnull when enqueued (volatile: read by signallers)
+    @volatile var prev: Node = scala.compiletime.uninitialized // initially attached via casTail
+    @volatile var next: Node = scala.compiletime.uninitialized // visibly nonnull when signallable
     @volatile var status: Int = 0 // written by owner, atomic bit ops by others
 
     // methods for atomic operations
@@ -60,7 +60,7 @@ object AbstractQueuedSynchronizer { // Node status bits, also used as argument a
       with ForkJoinPool.ManagedBlocker {
 
     // link to next waiting node
-    private[locks] var nextWaiter: ConditionNode = _
+    private[locks] var nextWaiter: ConditionNode = scala.compiletime.uninitialized
 
     override final def isReleasable(): Boolean =
       status <= 1 || Thread.currentThread().isInterrupted()
@@ -95,8 +95,8 @@ abstract class AbstractQueuedSynchronizer protected ()
     with Serializable {
   import AbstractQueuedSynchronizer._
 
-  @volatile private var head: Node = _
-  @volatile private var tail: Node = _
+  @volatile private var head: Node = scala.compiletime.uninitialized
+  @volatile private var tail: Node = scala.compiletime.uninitialized
   @volatile private var state: Int = 0
 
   // Support for atomic ops
@@ -542,9 +542,9 @@ abstract class AbstractQueuedSynchronizer protected ()
   @SerialVersionUID(1173984872572414699L)
   class ConditionObject() extends Condition with Serializable {
 
-    private var firstWaiter: ConditionNode = _
+    private var firstWaiter: ConditionNode = scala.compiletime.uninitialized
 
-    private var lastWaiter: ConditionNode = _
+    private var lastWaiter: ConditionNode = scala.compiletime.uninitialized
 
     @tailrec
     private def doSignal(

@@ -194,7 +194,7 @@ object ConcurrentLinkedDeque {
       null
     }
 
-    override def forEachRemaining(action: Consumer[_ >: E]): Unit = {
+    override def forEachRemaining(action: Consumer[? >: E]): Unit = {
       var p: Node[E] = null
       if (action == null) throw new NullPointerException
       val q = this.queue
@@ -210,7 +210,7 @@ object ConcurrentLinkedDeque {
       }
     }
 
-    override def tryAdvance(action: Consumer[_ >: E]): Boolean = {
+    override def tryAdvance(action: Consumer[? >: E]): Boolean = {
       var p: Node[E] = null
       if (action == null) throw new NullPointerException
       val q = this.queue
@@ -858,7 +858,7 @@ class ConcurrentLinkedDeque[E <: AnyRef]
    *    are null
    */
 
-  def this(c: util.Collection[_ <: E]) = {
+  def this(c: util.Collection[? <: E]) = {
     this()
     var h, t: Node[E] = null
 
@@ -1201,7 +1201,7 @@ class ConcurrentLinkedDeque[E <: AnyRef]
    *    NullPointerException if the specified collection or any of its elements
    *    are null throws IllegalArgumentException if the collection is this deque
    */
-  override def addAll(c: util.Collection[_ <: E]): Boolean = {
+  override def addAll(c: util.Collection[? <: E]): Boolean = {
     if (c eq this)
       throw new IllegalArgumentException // As historically specified in AbstractQueue#addAll
     // Copy c into a private chain of Nodes

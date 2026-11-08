@@ -12,7 +12,7 @@
 package java.util.concurrent
 
 abstract class RecursiveTask[V]() extends ForkJoinTask[V] {
-  private[concurrent] var result: V = _
+  private[concurrent] var result: V = scala.compiletime.uninitialized
 
   protected def compute(): V
   override final def getRawResult(): V = result

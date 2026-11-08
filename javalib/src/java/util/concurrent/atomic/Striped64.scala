@@ -57,7 +57,7 @@ private[atomic] object Striped64 {
 private[atomic] abstract class Striped64 private[atomic] () extends Number {
   import Striped64._
 
-  @transient @volatile private[atomic] var cells: VolatileArray[Striped64.Cell] = _
+  @transient @volatile private[atomic] var cells: VolatileArray[Striped64.Cell] = scala.compiletime.uninitialized
 
   @transient @volatile private[atomic] var base: Long = 0L
 

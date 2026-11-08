@@ -297,7 +297,7 @@ object ConcurrentHashMap {
       private[concurrent] val key: K,
       @volatile private[concurrent] var `val`: V
   ) extends util.Map.Entry[K, V] {
-    @volatile private[concurrent] var next: Node[K, V] = _
+    @volatile private[concurrent] var next: Node[K, V] = scala.compiletime.uninitialized
 
     def this(hash: Int, key: K, `val`: V, next: Node[K, V]) = {
       this(hash, key, `val`)
@@ -320,9 +320,9 @@ object ConcurrentHashMap {
       var k: AnyRef = null
       var v: AnyRef = null
       var u: AnyRef = null
-      var e: util.Map.Entry[_, _] = null
-      (o.isInstanceOf[util.Map.Entry[_, _]]) && {
-        k = { e = o.asInstanceOf[util.Map.Entry[_, _]]; e }.getKey().asInstanceOf[AnyRef]; k
+      var e: util.Map.Entry[?, ?] = null
+      (o.isInstanceOf[util.Map.Entry[?, ?]]) && {
+        k = { e = o.asInstanceOf[util.Map.Entry[?, ?]]; e }.getKey().asInstanceOf[AnyRef]; k
       } != null && { v = e.getValue().asInstanceOf[AnyRef]; v } != null && ((k eq key) || k.equals(key)) &&
         ((v eq { u = `val`; u }) || v.equals(u))
     }
@@ -350,7 +350,7 @@ object ConcurrentHashMap {
     else n + 1
   }
 
-  private[concurrent] def comparableClassFor(x: AnyRef): Class[_] = {
+  private[concurrent] def comparableClassFor(x: AnyRef): Class[?] = {
     val c = x.getClass()
     if (c == classOf[String]) c
     else
@@ -361,7 +361,7 @@ object ConcurrentHashMap {
   }
 
   private[concurrent] def compareComparables(
-      kc: Class[_],
+      kc: Class[?],
       k: AnyRef,
       x: AnyRef
   ): Int = {
@@ -443,7 +443,7 @@ object ConcurrentHashMap {
           if ({ eh = e.hash; eh } == h && (({ ek = e.key; ek } eq k) || (ek != null && k.equals(ek))))
             return e
           if (eh < 0) {
-            if (e.isInstanceOf[ForwardingNode[_, _]]) {
+            if (e.isInstanceOf[ForwardingNode[?, ?]]) {
               tab = e.asInstanceOf[ForwardingNode[K, V]].nextTable
               restart = true
             } else
@@ -500,9 +500,9 @@ object ConcurrentHashMap {
       next: Node[K, V],
       private[concurrent] var parent: TreeNode[K, V] // red-black tree links
   ) extends Node[K, V](hash, key, `val`, next) {
-    private[concurrent] var left: TreeNode[K, V] = _
-    private[concurrent] var right: TreeNode[K, V] = _
-    private[concurrent] var prev: TreeNode[K, V] = _ // needed to unlink next upon deletion
+    private[concurrent] var left: TreeNode[K, V] = scala.compiletime.uninitialized
+    private[concurrent] var right: TreeNode[K, V] = scala.compiletime.uninitialized
+    private[concurrent] var prev: TreeNode[K, V] = scala.compiletime.uninitialized // needed to unlink next upon deletion
 
     private[concurrent] var red = false
 
@@ -512,7 +512,7 @@ object ConcurrentHashMap {
     private[concurrent] final def findTreeNode(
         h: Int,
         k: AnyRef,
-        _kc: Class[_]
+        _kc: Class[?]
     ): TreeNode[K, V] = {
       var kc = _kc
       if (k != null) {
@@ -785,7 +785,7 @@ object ConcurrentHashMap {
   private[concurrent] final class TreeBin[K <: AnyRef, V <: AnyRef] private[concurrent] (
       @volatile private[concurrent] var first: TreeNode[K, V]
   ) extends Node[K, V](TREEBIN, null.asInstanceOf[K], null.asInstanceOf[V]) {
-    @volatile private[concurrent] var waiter: Thread = _
+    @volatile private[concurrent] var waiter: Thread = scala.compiletime.uninitialized
     @volatile private[concurrent] var lockState = 0
 
     private[concurrent] var root: TreeNode[K, V] = {
@@ -803,7 +803,7 @@ object ConcurrentHashMap {
         } else {
           val k = value.key
           val h = value.hash
-          var kc: Class[_] = null
+          var kc: Class[?] = null
           var p = r
           var break = false
           while (!break) {
@@ -895,7 +895,7 @@ object ConcurrentHashMap {
         k: K,
         v: V
     ): TreeNode[K, V] = {
-      var kc: Class[_] = null
+      var kc: Class[?] = null
       var searched = false
       var p = root
       var break = false
@@ -1032,8 +1032,8 @@ object ConcurrentHashMap {
   private[concurrent] final class TableStack[K <: AnyRef, V <: AnyRef] {
     private[concurrent] var length = 0
     private[concurrent] var index = 0
-    private[concurrent] var tab: VolatileArray[Node[K, V]] = _
-    private[concurrent] var next: TableStack[K, V] = _
+    private[concurrent] var tab: VolatileArray[Node[K, V]] = scala.compiletime.uninitialized
+    private[concurrent] var next: TableStack[K, V] = scala.compiletime.uninitialized
   }
 
   private[concurrent] class Traverser[K <: AnyRef, V <: AnyRef] private[concurrent] (
@@ -1043,10 +1043,10 @@ object ConcurrentHashMap {
       private[concurrent] var baseLimit: Int // index bound for initial table
   ) {
     private[concurrent] var baseIndex = index // current index of initial table
-    private[concurrent] var _next: Node[K, V] = _ // the next entry to use
+    private[concurrent] var _next: Node[K, V] = scala.compiletime.uninitialized // the next entry to use
 
-    private[concurrent] var stack: TableStack[K, V] = _
-    private[concurrent] var spare: TableStack[K, V] = _ // to save/restore on ForwardingNodes
+    private[concurrent] var stack: TableStack[K, V] = scala.compiletime.uninitialized
+    private[concurrent] var spare: TableStack[K, V] = scala.compiletime.uninitialized // to save/restore on ForwardingNodes
 
     private[concurrent] final def advance(): Node[K, V] = {
       var e: Node[K, V] = null
@@ -1065,12 +1065,12 @@ object ConcurrentHashMap {
           return { _next = null; _next }
         var continue = false
         if ({ e = tabAt(t, i); e } != null && e.hash < 0)
-          if (e.isInstanceOf[ForwardingNode[_, _]]) {
+          if (e.isInstanceOf[ForwardingNode[?, ?]]) {
             tab = e.asInstanceOf[ForwardingNode[K, V]].nextTable
             e = null
             pushState(t, i, n)
             continue = true
-          } else if (e.isInstanceOf[TreeBin[_, _]])
+          } else if (e.isInstanceOf[TreeBin[?, ?]])
             e = e.asInstanceOf[TreeBin[K, V]].first
           else e = null
         if (!continue) {
@@ -1130,7 +1130,7 @@ object ConcurrentHashMap {
       with Iterator[IterateType] {
     advance()
 
-    private[concurrent] var lastReturned: Node[K, V] = _
+    private[concurrent] var lastReturned: Node[K, V] = scala.compiletime.uninitialized
 
     final def hasNext(): Boolean = _next != null
     final def hasMoreElements(): Boolean = _next != null
@@ -1220,9 +1220,9 @@ object ConcurrentHashMap {
       val o = _o.asInstanceOf[AnyRef]
       var k: AnyRef = null
       var v: AnyRef = null
-      var e: util.Map.Entry[_, _] = null
-      (o.isInstanceOf[util.Map.Entry[_, _]]) && {
-        k = { e = o.asInstanceOf[util.Map.Entry[_, _]]; e }.getKey().asInstanceOf[AnyRef]; k
+      var e: util.Map.Entry[?, ?] = null
+      (o.isInstanceOf[util.Map.Entry[?, ?]]) && {
+        k = { e = o.asInstanceOf[util.Map.Entry[?, ?]]; e }.getKey().asInstanceOf[AnyRef]; k
       } != null && {
         v = e.getValue().asInstanceOf[AnyRef]; v
       } != null &&
@@ -1261,13 +1261,13 @@ object ConcurrentHashMap {
         )
     }
 
-    override def forEachRemaining(action: Consumer[_ >: K]): Unit = {
+    override def forEachRemaining(action: Consumer[? >: K]): Unit = {
       if (action == null) throw new NullPointerException
       var p: Node[K, V] = null
       while ({ p = advance(); p } != null) action.accept(p.key)
     }
 
-    override def tryAdvance(action: Consumer[_ >: K]): Boolean = {
+    override def tryAdvance(action: Consumer[? >: K]): Boolean = {
       if (action == null) throw new NullPointerException
       var p: Node[K, V] = null
       if ({ p = advance(); p } == null)
@@ -1305,13 +1305,13 @@ object ConcurrentHashMap {
         )
     }
 
-    override def forEachRemaining(action: Consumer[_ >: V]): Unit = {
+    override def forEachRemaining(action: Consumer[? >: V]): Unit = {
       if (action == null) throw new NullPointerException
       var p: Node[K, V] = null
       while ({ p = advance(); p } != null) action.accept(p.`val`)
     }
 
-    override def tryAdvance(action: Consumer[_ >: V]): Boolean = {
+    override def tryAdvance(action: Consumer[? >: V]): Boolean = {
       if (action == null) throw new NullPointerException
       var p: Node[K, V] = null
       if ({ p = advance(); p } == null)
@@ -1352,7 +1352,7 @@ object ConcurrentHashMap {
     }
 
     override def forEachRemaining(
-        action: Consumer[_ >: util.Map.Entry[K, V]]
+        action: Consumer[? >: util.Map.Entry[K, V]]
     ): Unit = {
       if (action == null) throw new NullPointerException
       var p: Node[K, V] = null
@@ -1360,7 +1360,7 @@ object ConcurrentHashMap {
         action.accept(new MapEntry[K, V](p.key, p.`val`, map))
     }
 
-    override def tryAdvance(action: Consumer[_ >: util.Map.Entry[K, V]]): Boolean = {
+    override def tryAdvance(action: Consumer[? >: util.Map.Entry[K, V]]): Boolean = {
       if (action == null) throw new NullPointerException
       var p: Node[K, V] = null
       if ({ p = advance(); p } == null)
@@ -1480,7 +1480,7 @@ object ConcurrentHashMap {
       sb.append(']').toString()
     }
 
-    override final def containsAll(c: Collection[_]): Boolean = {
+    override final def containsAll(c: Collection[?]): Boolean = {
       if (c ne this) {
         val it = c.iterator()
         while (it.hasNext()) {
@@ -1492,7 +1492,7 @@ object ConcurrentHashMap {
       true
     }
 
-    override def removeAll(c: Collection[_]): Boolean = {
+    override def removeAll(c: Collection[?]): Boolean = {
       if (c == null) throw new NullPointerException
       var modified = false
       // Use (c instanceof Set) as a hint that lookup in c is as
@@ -1500,7 +1500,7 @@ object ConcurrentHashMap {
       var t: VolatileArray[Node[K, V]] = null
       if ({ t = map.table; t } == null)
         return false
-      else if (c.isInstanceOf[Set[_]] && c.size() > t.length) {
+      else if (c.isInstanceOf[Set[?]] && c.size() > t.length) {
         val it = iterator()
         while (it.hasNext()) if (c.contains(it.next())) {
           it.remove()
@@ -1510,7 +1510,7 @@ object ConcurrentHashMap {
       modified
     }
 
-    override final def retainAll(c: Collection[_]): Boolean = {
+    override final def retainAll(c: Collection[?]): Boolean = {
       if (c == null) throw new NullPointerException
       var modified = false
       val it = iterator()
@@ -1551,7 +1551,7 @@ object ConcurrentHashMap {
       map.putVal(e, v, true) == null
     }
 
-    override def addAll(c: Collection[_ <: K]) = {
+    override def addAll(c: Collection[? <: K]) = {
       var added = false
       var v: V = null.asInstanceOf[V]
       if ({ v = value; v } == null) throw new UnsupportedOperationException
@@ -1567,9 +1567,9 @@ object ConcurrentHashMap {
     }
     override def equals(_o: Any) = {
       val o = _o.asInstanceOf[AnyRef]
-      var c: Set[_] = null
-      (o.isInstanceOf[Set[_]]) &&
-        (({ c = o.asInstanceOf[Set[_]]; c } eq this) ||
+      var c: Set[?] = null
+      (o.isInstanceOf[Set[?]]) &&
+        (({ c = o.asInstanceOf[Set[?]]; c } eq this) ||
         (containsAll(c) && c.containsAll(this)))
     }
     override def spliterator(): KeySpliterator[K, V] = {
@@ -1588,7 +1588,7 @@ object ConcurrentHashMap {
         else n
       )
     }
-    override def forEach(action: Consumer[_ >: K]): Unit = {
+    override def forEach(action: Consumer[? >: K]): Unit = {
       if (action == null) throw new NullPointerException
       var t: VolatileArray[Node[K, V]] = null
       if ({ t = map.table; t } != null) {
@@ -1628,10 +1628,10 @@ object ConcurrentHashMap {
 
     override final def add(e: V): scala.Boolean = throw new UnsupportedOperationException
 
-    override final def addAll(c: Collection[_ <: V]): scala.Boolean =
+    override final def addAll(c: Collection[? <: V]): scala.Boolean =
       throw new UnsupportedOperationException
 
-    override def removeAll(c: Collection[_]): Boolean = {
+    override def removeAll(c: Collection[?]): Boolean = {
       if (c == null) throw new NullPointerException
       var modified = false
       val it = iterator()
@@ -1642,7 +1642,7 @@ object ConcurrentHashMap {
       modified
     }
 
-    override def removeIf(filter: Predicate[_ >: V]): Boolean =
+    override def removeIf(filter: Predicate[? >: V]): Boolean =
       map.removeValueIf(filter)
 
     override def spliterator(): Spliterator[V] = {
@@ -1662,7 +1662,7 @@ object ConcurrentHashMap {
       )
     }
 
-    override def forEach(action: Consumer[_ >: V]): Unit = {
+    override def forEach(action: Consumer[? >: V]): Unit = {
       if (action == null) throw new NullPointerException
       var t: VolatileArray[Node[K, V]] = null
       if ({ t = map.table; t } != null) {
@@ -1684,9 +1684,9 @@ object ConcurrentHashMap {
       var k: AnyRef = null
       var v: AnyRef = null
       var r: AnyRef = null
-      var e: util.Map.Entry[_, _] = null
-      (o.isInstanceOf[util.Map.Entry[_, _]]) && {
-        e = o.asInstanceOf[util.Map.Entry[_, _]];
+      var e: util.Map.Entry[?, ?] = null
+      (o.isInstanceOf[util.Map.Entry[?, ?]]) && {
+        e = o.asInstanceOf[util.Map.Entry[?, ?]];
         k = e.getKey().asInstanceOf[AnyRef]; k
       } != null && { r = map.get(k); r } != null && {
         v = e.getValue().asInstanceOf[AnyRef]; v
@@ -1697,9 +1697,9 @@ object ConcurrentHashMap {
     override def remove(o: Any): Boolean = {
       var k: AnyRef = null
       var v: AnyRef = null
-      var e: util.Map.Entry[_, _] = null
-      (o.isInstanceOf[util.Map.Entry[_, _]]) && {
-        e = o.asInstanceOf[util.Map.Entry[_, _]]
+      var e: util.Map.Entry[?, ?] = null
+      (o.isInstanceOf[util.Map.Entry[?, ?]]) && {
+        e = o.asInstanceOf[util.Map.Entry[?, ?]]
         k = e.getKey().asInstanceOf[AnyRef]; k
       } != null && { v = e.getValue().asInstanceOf[AnyRef]; v } != null &&
         map.remove(k, v)
@@ -1717,14 +1717,14 @@ object ConcurrentHashMap {
     override def add(e: util.Map.Entry[K, V]): Boolean =
       map.putVal(e.getKey(), e.getValue(), false) == null
 
-    override def addAll(c: Collection[_ <: util.Map.Entry[K, V]]): Boolean = {
+    override def addAll(c: Collection[? <: util.Map.Entry[K, V]]): Boolean = {
       var added = false
       c.forEach { e => if (add(e)) added = true }
       added
     }
 
     override def removeIf(
-        filter: Predicate[_ >: util.Map.Entry[K, V]]
+        filter: Predicate[? >: util.Map.Entry[K, V]]
     ): Boolean = map.removeEntryIf(filter)
 
     override final def hashCode(): Int = {
@@ -1740,9 +1740,9 @@ object ConcurrentHashMap {
 
     override final def equals(_o: Any): Boolean = {
       val o = _o.asInstanceOf[AnyRef]
-      var c: Set[_] = null
-      (o.isInstanceOf[Set[_]]) &&
-        (({ c = o.asInstanceOf[Set[_]]; c } eq this) ||
+      var c: Set[?] = null
+      (o.isInstanceOf[Set[?]]) &&
+        (({ c = o.asInstanceOf[Set[?]]; c } eq this) ||
         (containsAll(c) && c.containsAll(this)))
     }
 
@@ -1764,7 +1764,7 @@ object ConcurrentHashMap {
       )
     }
 
-    override def forEach(action: Consumer[_ >: util.Map.Entry[K, V]]): Unit = {
+    override def forEach(action: Consumer[? >: util.Map.Entry[K, V]]): Unit = {
       if (action == null) throw new NullPointerException
       var t: VolatileArray[Node[K, V]] = null
       if ({ t = map.table; t } != null) {
@@ -1780,16 +1780,16 @@ object ConcurrentHashMap {
 
 // -------------------------------------------------------
   private[concurrent] abstract class BulkTask[K <: AnyRef, V <: AnyRef, R] private[concurrent] (
-      par: BulkTask[K, V, _],
+      par: BulkTask[K, V, ?],
       private[concurrent] var batch: Int, // split control
       i: Int,
       f: Int,
       t: VolatileArray[Node[K, V]]
   ) extends CountedCompleter[R](par) {
     private[concurrent] var tab: VolatileArray[Node[K, V]] = t // same as Traverser
-    private[concurrent] var next: Node[K, V] = _
-    private[concurrent] var stack: TableStack[K, V] = _
-    private[concurrent] var spare: TableStack[K, V] = _
+    private[concurrent] var next: Node[K, V] = scala.compiletime.uninitialized
+    private[concurrent] var stack: TableStack[K, V] = scala.compiletime.uninitialized
+    private[concurrent] var spare: TableStack[K, V] = scala.compiletime.uninitialized
     private[concurrent] var index = i
     private[concurrent] var baseIndex = i
     private[concurrent] var baseLimit = 0
@@ -1820,12 +1820,12 @@ object ConcurrentHashMap {
           return { next = null; null }
         var continue = false
         if ({ e = tabAt[K, V](t, i); e } != null && e.hash < 0)
-          if (e.isInstanceOf[ForwardingNode[_, _]]) {
+          if (e.isInstanceOf[ForwardingNode[?, ?]]) {
             tab = e.asInstanceOf[ForwardingNode[K, V]].nextTable
             e = null
             pushState(t, i, n)
             continue = true
-          } else if (e.isInstanceOf[TreeBin[_, _]])
+          } else if (e.isInstanceOf[TreeBin[?, ?]])
             e = e.asInstanceOf[TreeBin[K, V]].first
           else e = null
         if (!continue) {
@@ -1881,15 +1881,15 @@ object ConcurrentHashMap {
    * simplest hoisted bypass to help avoid convoluted traps.
    */
   private[concurrent] final class ForEachKeyTask[K <: AnyRef, V <: AnyRef] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
       t: VolatileArray[Node[K, V]],
-      private[concurrent] val action: Consumer[_ >: K]
+      private[concurrent] val action: Consumer[? >: K]
   ) extends BulkTask[K, V, Void](p, b, i, f, t) {
     override final def compute(): Unit = {
-      val action: Consumer[_ >: K] = this.action
+      val action: Consumer[? >: K] = this.action
       if (action != null) {
         val i = baseIndex
         var f = 0
@@ -1913,15 +1913,15 @@ object ConcurrentHashMap {
   }
 
   private[concurrent] final class ForEachValueTask[K <: AnyRef, V <: AnyRef] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
       t: VolatileArray[Node[K, V]],
-      private[concurrent] val action: Consumer[_ >: V]
+      private[concurrent] val action: Consumer[? >: V]
   ) extends BulkTask[K, V, Void](p, b, i, f, t) {
     override final def compute(): Unit = {
-      val action: Consumer[_ >: V] = this.action
+      val action: Consumer[? >: V] = this.action
       if (action != null) {
         val i = baseIndex
         var f = 0
@@ -1945,15 +1945,15 @@ object ConcurrentHashMap {
   }
 
   private[concurrent] final class ForEachEntryTask[K <: AnyRef, V <: AnyRef] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
       t: VolatileArray[Node[K, V]],
-      private[concurrent] val action: Consumer[_ >: util.Map.Entry[K, V]]
+      private[concurrent] val action: Consumer[? >: util.Map.Entry[K, V]]
   ) extends BulkTask[K, V, Void](p, b, i, f, t) {
     override final def compute(): Unit = {
-      val action: Consumer[_ >: util.Map.Entry[K, V]] = this.action
+      val action: Consumer[? >: util.Map.Entry[K, V]] = this.action
       if (action != null) {
         val i = baseIndex
         var f = 0
@@ -1980,15 +1980,15 @@ object ConcurrentHashMap {
       K <: AnyRef,
       V <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
       t: VolatileArray[Node[K, V]],
-      private[concurrent] val action: BiConsumer[_ >: K, _ >: V]
+      private[concurrent] val action: BiConsumer[? >: K, ? >: V]
   ) extends BulkTask[K, V, Void](p, b, i, f, t) {
     override final def compute(): Unit = {
-      val action: BiConsumer[_ >: K, _ >: V] = this.action
+      val action: BiConsumer[? >: K, ? >: V] = this.action
       if (action != null) {
         val i = baseIndex
         var f = 0
@@ -2016,17 +2016,17 @@ object ConcurrentHashMap {
       V <: AnyRef,
       U <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
       t: VolatileArray[Node[K, V]],
-      private[concurrent] val transformer: Function[_ >: K, _ <: U],
-      private[concurrent] val action: Consumer[_ >: U]
+      private[concurrent] val transformer: Function[? >: K, ? <: U],
+      private[concurrent] val action: Consumer[? >: U]
   ) extends BulkTask[K, V, Void](p, b, i, f, t) {
     override final def compute(): Unit = {
-      val transformer: Function[_ >: K, _ <: U] = this.transformer
-      val action: Consumer[_ >: U] = this.action
+      val transformer: Function[? >: K, ? <: U] = this.transformer
+      val action: Consumer[? >: U] = this.action
       if (transformer != null && action != null) {
         val i = baseIndex
         var f = 0
@@ -2058,17 +2058,17 @@ object ConcurrentHashMap {
       V <: AnyRef,
       U <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
       t: VolatileArray[Node[K, V]],
-      private[concurrent] val transformer: Function[_ >: V, _ <: U],
-      private[concurrent] val action: Consumer[_ >: U]
+      private[concurrent] val transformer: Function[? >: V, ? <: U],
+      private[concurrent] val action: Consumer[? >: U]
   ) extends BulkTask[K, V, Void](p, b, i, f, t) {
     override final def compute(): Unit = {
-      val transformer: Function[_ >: V, _ <: U] = this.transformer
-      val action: Consumer[_ >: U] = this.action
+      val transformer: Function[? >: V, ? <: U] = this.transformer
+      val action: Consumer[? >: U] = this.action
       if (transformer != null && action != null) {
         val i = baseIndex
         var f = 0
@@ -2100,20 +2100,20 @@ object ConcurrentHashMap {
       V <: AnyRef,
       U <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
       t: VolatileArray[Node[K, V]],
       private[concurrent] val transformer: Function[
         util.Map.Entry[K, V],
-        _ <: U
+        ? <: U
       ],
-      private[concurrent] val action: Consumer[_ >: U]
+      private[concurrent] val action: Consumer[? >: U]
   ) extends BulkTask[K, V, Void](p, b, i, f, t) {
     override final def compute(): Unit = {
-      val transformer: Function[util.Map.Entry[K, V], _ <: U] = this.transformer
-      val action: Consumer[_ >: U] = this.action
+      val transformer: Function[util.Map.Entry[K, V], ? <: U] = this.transformer
+      val action: Consumer[? >: U] = this.action
       if (transformer != null && action != null) {
         val i = baseIndex
         var f = 0
@@ -2145,17 +2145,17 @@ object ConcurrentHashMap {
       V <: AnyRef,
       U <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
       t: VolatileArray[Node[K, V]],
-      private[concurrent] val transformer: BiFunction[_ >: K, _ >: V, _ <: U],
-      private[concurrent] val action: Consumer[_ >: U]
+      private[concurrent] val transformer: BiFunction[? >: K, ? >: V, ? <: U],
+      private[concurrent] val action: Consumer[? >: U]
   ) extends BulkTask[K, V, Void](p, b, i, f, t) {
     override final def compute(): Unit = {
-      val transformer: BiFunction[_ >: K, _ >: V, _ <: U] = this.transformer
-      val action: Consumer[_ >: U] = this.action
+      val transformer: BiFunction[? >: K, ? >: V, ? <: U] = this.transformer
+      val action: Consumer[? >: U] = this.action
       if (transformer != null && action != null) {
         val i = baseIndex
         var f = 0
@@ -2187,18 +2187,18 @@ object ConcurrentHashMap {
       V <: AnyRef,
       U <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
       t: VolatileArray[Node[K, V]],
-      private[concurrent] val searchFunction: Function[_ >: K, _ <: U],
+      private[concurrent] val searchFunction: Function[? >: K, ? <: U],
       private[concurrent] val result: AtomicReference[U]
   ) extends BulkTask[K, V, U](p, b, i, f, t) {
     override final def getRawResult(): U = result.get()
 
     override final def compute(): Unit = {
-      val searchFunction: Function[_ >: K, _ <: U] = this.searchFunction
+      val searchFunction: Function[? >: K, ? <: U] = this.searchFunction
       val result: AtomicReference[U] = this.result
       if (searchFunction != null && result != null) {
         val i = baseIndex
@@ -2242,18 +2242,18 @@ object ConcurrentHashMap {
       V <: AnyRef,
       U <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
       t: VolatileArray[Node[K, V]],
-      private[concurrent] val searchFunction: Function[_ >: V, _ <: U],
+      private[concurrent] val searchFunction: Function[? >: V, ? <: U],
       private[concurrent] val result: AtomicReference[U]
   ) extends BulkTask[K, V, U](p, b, i, f, t) {
     override final def getRawResult(): U = result.get()
 
     override final def compute(): Unit = {
-      val searchFunction: Function[_ >: V, _ <: U] = this.searchFunction
+      val searchFunction: Function[? >: V, ? <: U] = this.searchFunction
       val result: AtomicReference[U] = this.result
       if (searchFunction != null && result != null) {
         val i = baseIndex
@@ -2297,21 +2297,21 @@ object ConcurrentHashMap {
       V <: AnyRef,
       U <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
       t: VolatileArray[Node[K, V]],
       private[concurrent] val searchFunction: Function[
         util.Map.Entry[K, V],
-        _ <: U
+        ? <: U
       ],
       private[concurrent] val result: AtomicReference[U]
   ) extends BulkTask[K, V, U](p, b, i, f, t) {
     override final def getRawResult(): U = result.get()
 
     override final def compute(): Unit = {
-      val searchFunction: Function[util.Map.Entry[K, V], _ <: U] = this.searchFunction
+      val searchFunction: Function[util.Map.Entry[K, V], ? <: U] = this.searchFunction
       val result: AtomicReference[U] = this.result
       if (searchFunction != null && result != null) {
         val i = baseIndex
@@ -2355,22 +2355,22 @@ object ConcurrentHashMap {
       V <: AnyRef,
       U <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
       t: VolatileArray[Node[K, V]],
       private[concurrent] val searchFunction: BiFunction[
-        _ >: K,
-        _ >: V,
-        _ <: U
+        ? >: K,
+        ? >: V,
+        ? <: U
       ],
       private[concurrent] val result: AtomicReference[U]
   ) extends BulkTask[K, V, U](p, b, i, f, t) {
     override final def getRawResult(): U = result.get()
 
     override final def compute(): Unit = {
-      val searchFunction: BiFunction[_ >: K, _ >: V, _ <: U] = this.searchFunction
+      val searchFunction: BiFunction[? >: K, ? >: V, ? <: U] = this.searchFunction
       val result: AtomicReference[U] = this.result
       if (searchFunction != null && result != null) {
         val i = baseIndex
@@ -2410,21 +2410,21 @@ object ConcurrentHashMap {
   }
 
   private[concurrent] final class ReduceKeysTask[K <: AnyRef, V <: AnyRef] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
       t: VolatileArray[Node[K, V]],
       private[concurrent] val nextRight: ReduceKeysTask[K, V],
-      private[concurrent] val reducer: BiFunction[_ >: K, _ >: K, _ <: K]
+      private[concurrent] val reducer: BiFunction[? >: K, ? >: K, ? <: K]
   ) extends BulkTask[K, V, K](p, b, i, f, t) {
-    private[concurrent] var result: K = _
-    private[concurrent] var rights: ReduceKeysTask[K, V] = _
+    private[concurrent] var result: K = scala.compiletime.uninitialized
+    private[concurrent] var rights: ReduceKeysTask[K, V] = scala.compiletime.uninitialized
 
     override final def getRawResult(): K = result
 
     override final def compute(): Unit = {
-      val reducer: BiFunction[_ >: K, _ >: K, _ <: K] = this.reducer
+      val reducer: BiFunction[? >: K, ? >: K, ? <: K] = this.reducer
       if (reducer != null) {
         val i = baseIndex
         var f = 0
@@ -2452,7 +2452,7 @@ object ConcurrentHashMap {
             else reducer.apply(r, u)
         }
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -2475,7 +2475,7 @@ object ConcurrentHashMap {
   }
 
   private[concurrent] final class ReduceValuesTask[K <: AnyRef, V <: AnyRef] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -2484,15 +2484,15 @@ object ConcurrentHashMap {
         K,
         V
       ],
-      private[concurrent] val reducer: BiFunction[_ >: V, _ >: V, _ <: V]
+      private[concurrent] val reducer: BiFunction[? >: V, ? >: V, ? <: V]
   ) extends BulkTask[K, V, V](p, b, i, f, t) {
-    private[concurrent] var result: V = _
-    private[concurrent] var rights: ReduceValuesTask[K, V] = _
+    private[concurrent] var result: V = scala.compiletime.uninitialized
+    private[concurrent] var rights: ReduceValuesTask[K, V] = scala.compiletime.uninitialized
 
     override final def getRawResult(): V = result
 
     override final def compute(): Unit = {
-      var reducer: BiFunction[_ >: V, _ >: V, _ <: V] = null
+      var reducer: BiFunction[? >: V, ? >: V, ? <: V] = null
       if ({ reducer = this.reducer; reducer } != null) {
         val i = baseIndex
         var f = 0
@@ -2519,7 +2519,7 @@ object ConcurrentHashMap {
             else reducer.apply(r, v)
         }
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -2546,7 +2546,7 @@ object ConcurrentHashMap {
       K <: AnyRef,
       V <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -2558,11 +2558,11 @@ object ConcurrentHashMap {
       private[concurrent] val reducer: BiFunction[
         util.Map.Entry[K, V],
         util.Map.Entry[K, V],
-        _ <: util.Map.Entry[K, V]
+        ? <: util.Map.Entry[K, V]
       ]
   ) extends BulkTask[K, V, util.Map.Entry[K, V]](p, b, i, f, t) {
-    private[concurrent] var result: util.Map.Entry[K, V] = _
-    private[concurrent] var rights: ReduceEntriesTask[K, V] = _
+    private[concurrent] var result: util.Map.Entry[K, V] = scala.compiletime.uninitialized
+    private[concurrent] var rights: ReduceEntriesTask[K, V] = scala.compiletime.uninitialized
 
     override final def getRawResult(): util.Map.Entry[K, V] = result
 
@@ -2570,7 +2570,7 @@ object ConcurrentHashMap {
       var reducer: BiFunction[
         util.Map.Entry[K, V],
         util.Map.Entry[K, V],
-        _ <: util.Map.Entry[K, V]
+        ? <: util.Map.Entry[K, V]
       ] = null
       if ({ reducer = this.reducer; reducer } != null) {
         val i = baseIndex
@@ -2596,7 +2596,7 @@ object ConcurrentHashMap {
             if (r == null) p
             else reducer.apply(r, p)
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -2624,7 +2624,7 @@ object ConcurrentHashMap {
       V <: AnyRef,
       U <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -2634,17 +2634,17 @@ object ConcurrentHashMap {
         V,
         U
       ],
-      private[concurrent] val transformer: Function[_ >: K, _ <: U],
-      private[concurrent] val reducer: BiFunction[_ >: U, _ >: U, _ <: U]
+      private[concurrent] val transformer: Function[? >: K, ? <: U],
+      private[concurrent] val reducer: BiFunction[? >: U, ? >: U, ? <: U]
   ) extends BulkTask[K, V, U](p, b, i, f, t) {
-    private[concurrent] var result: U = _
-    private[concurrent] var rights: MapReduceKeysTask[K, V, U] = _
+    private[concurrent] var result: U = scala.compiletime.uninitialized
+    private[concurrent] var rights: MapReduceKeysTask[K, V, U] = scala.compiletime.uninitialized
 
     override final def getRawResult(): U = result
 
     override final def compute(): Unit = {
-      var transformer: Function[_ >: K, _ <: U] = null
-      var reducer: BiFunction[_ >: U, _ >: U, _ <: U] = null
+      var transformer: Function[? >: K, ? <: U] = null
+      var reducer: BiFunction[? >: U, ? >: U, ? <: U] = null
       if ({ transformer = this.transformer; transformer } != null && { reducer = this.reducer; reducer } != null) {
         val i = baseIndex
         var f = 0
@@ -2673,7 +2673,7 @@ object ConcurrentHashMap {
               else reducer.apply(r, u)
         }
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -2701,7 +2701,7 @@ object ConcurrentHashMap {
       V <: AnyRef,
       U <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -2711,17 +2711,17 @@ object ConcurrentHashMap {
         V,
         U
       ],
-      private[concurrent] val transformer: Function[_ >: V, _ <: U],
-      private[concurrent] val reducer: BiFunction[_ >: U, _ >: U, _ <: U]
+      private[concurrent] val transformer: Function[? >: V, ? <: U],
+      private[concurrent] val reducer: BiFunction[? >: U, ? >: U, ? <: U]
   ) extends BulkTask[K, V, U](p, b, i, f, t) {
-    private[concurrent] var result: U = _
-    private[concurrent] var rights: MapReduceValuesTask[K, V, U] = _
+    private[concurrent] var result: U = scala.compiletime.uninitialized
+    private[concurrent] var rights: MapReduceValuesTask[K, V, U] = scala.compiletime.uninitialized
 
     override final def getRawResult(): U = result
 
     override final def compute(): Unit = {
-      var transformer: Function[_ >: V, _ <: U] = null
-      var reducer: BiFunction[_ >: U, _ >: U, _ <: U] = null
+      var transformer: Function[? >: V, ? <: U] = null
+      var reducer: BiFunction[? >: U, ? >: U, ? <: U] = null
       if ({ transformer = this.transformer; transformer } != null && { reducer = this.reducer; reducer } != null) {
         val i = baseIndex
         var f = 0
@@ -2750,7 +2750,7 @@ object ConcurrentHashMap {
               else reducer.apply(r, u)
         }
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -2778,7 +2778,7 @@ object ConcurrentHashMap {
       V <: AnyRef,
       U <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -2790,9 +2790,9 @@ object ConcurrentHashMap {
       ],
       private[concurrent] val transformer: Function[
         util.Map.Entry[K, V],
-        _ <: U
+        ? <: U
       ],
-      private[concurrent] val reducer: BiFunction[_ >: U, _ >: U, _ <: U]
+      private[concurrent] val reducer: BiFunction[? >: U, ? >: U, ? <: U]
   ) extends BulkTask[K, V, U](p, b, i, f, t) {
     private[concurrent] var result: U = null.asInstanceOf[U]
     private[concurrent] var rights: MapReduceEntriesTask[K, V, U] = null
@@ -2800,8 +2800,8 @@ object ConcurrentHashMap {
     override final def getRawResult(): U = result
 
     override final def compute(): Unit = {
-      var transformer: Function[util.Map.Entry[K, V], _ <: U] = null
-      var reducer: BiFunction[_ >: U, _ >: U, _ <: U] = null
+      var transformer: Function[util.Map.Entry[K, V], ? <: U] = null
+      var reducer: BiFunction[? >: U, ? >: U, ? <: U] = null
       if ({ transformer = this.transformer; transformer } != null && { reducer = this.reducer; reducer } != null) {
         val i = baseIndex
         var f = 0
@@ -2830,7 +2830,7 @@ object ConcurrentHashMap {
               else reducer.apply(r, u)
         }
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -2858,7 +2858,7 @@ object ConcurrentHashMap {
       V <: AnyRef,
       U <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -2868,8 +2868,8 @@ object ConcurrentHashMap {
         V,
         U
       ],
-      private[concurrent] val transformer: BiFunction[_ >: K, _ >: V, _ <: U],
-      private[concurrent] val reducer: BiFunction[_ >: U, _ >: U, _ <: U]
+      private[concurrent] val transformer: BiFunction[? >: K, ? >: V, ? <: U],
+      private[concurrent] val reducer: BiFunction[? >: U, ? >: U, ? <: U]
   ) extends BulkTask[K, V, U](p, b, i, f, t) {
     private[concurrent] var result: U = null.asInstanceOf[U]
     private[concurrent] var rights: MapReduceMappingsTask[K, V, U] = null
@@ -2877,8 +2877,8 @@ object ConcurrentHashMap {
     override final def getRawResult(): U = result
 
     override final def compute(): Unit = {
-      val transformer: BiFunction[_ >: K, _ >: V, _ <: U] = this.transformer
-      val reducer: BiFunction[_ >: U, _ >: U, _ <: U] = this.reducer
+      val transformer: BiFunction[? >: K, ? >: V, ? <: U] = this.transformer
+      val reducer: BiFunction[? >: U, ? >: U, ? <: U] = this.reducer
       if (transformer != null && reducer != null) {
         val i = baseIndex
         var f = 0
@@ -2907,7 +2907,7 @@ object ConcurrentHashMap {
               else reducer.apply(r, u)
         }
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -2934,7 +2934,7 @@ object ConcurrentHashMap {
       K <: AnyRef,
       V <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -2943,7 +2943,7 @@ object ConcurrentHashMap {
         K,
         V
       ],
-      private[concurrent] val transformer: ToDoubleFunction[_ >: K],
+      private[concurrent] val transformer: ToDoubleFunction[? >: K],
       private[concurrent] val basis: Double,
       private[concurrent] val reducer: DoubleBinaryOperator
   ) extends BulkTask[K, V, Double](p, b, i, f, t) {
@@ -2953,7 +2953,7 @@ object ConcurrentHashMap {
     override final def getRawResult(): Double = result
 
     override final def compute(): Unit = {
-      var transformer: ToDoubleFunction[_ >: K] = null
+      var transformer: ToDoubleFunction[? >: K] = null
       var reducer: DoubleBinaryOperator = null
       if ({ transformer = this.transformer; transformer } != null && { reducer = this.reducer; reducer } != null) {
         var r = this.basis
@@ -2979,7 +2979,7 @@ object ConcurrentHashMap {
         while ({ p = advance(); p } != null)
           r = reducer.applyAsDouble(r, transformer.applyAsDouble(p.key))
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -3001,7 +3001,7 @@ object ConcurrentHashMap {
       K <: AnyRef,
       V <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -3010,7 +3010,7 @@ object ConcurrentHashMap {
         K,
         V
       ],
-      private[concurrent] val transformer: ToDoubleFunction[_ >: V],
+      private[concurrent] val transformer: ToDoubleFunction[? >: V],
       private[concurrent] val basis: Double,
       private[concurrent] val reducer: DoubleBinaryOperator
   ) extends BulkTask[K, V, Double](p, b, i, f, t) {
@@ -3020,7 +3020,7 @@ object ConcurrentHashMap {
     override final def getRawResult(): Double = result
 
     override final def compute(): Unit = {
-      var transformer: ToDoubleFunction[_ >: V] = null
+      var transformer: ToDoubleFunction[? >: V] = null
       var reducer: DoubleBinaryOperator = null
       if ({ transformer = this.transformer; transformer } != null && { reducer = this.reducer; reducer } != null) {
         var r = this.basis
@@ -3046,7 +3046,7 @@ object ConcurrentHashMap {
         while ({ p = advance(); p } != null)
           r = reducer.applyAsDouble(r, transformer.applyAsDouble(p.`val`))
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -3068,7 +3068,7 @@ object ConcurrentHashMap {
       K <: AnyRef,
       V <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -3115,7 +3115,7 @@ object ConcurrentHashMap {
         while ({ p = advance(); p } != null)
           r = reducer.applyAsDouble(r, transformer.applyAsDouble(p))
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -3137,7 +3137,7 @@ object ConcurrentHashMap {
       K <: AnyRef,
       V <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -3146,7 +3146,7 @@ object ConcurrentHashMap {
         K,
         V
       ],
-      private[concurrent] val transformer: ToDoubleBiFunction[_ >: K, _ >: V],
+      private[concurrent] val transformer: ToDoubleBiFunction[? >: K, ? >: V],
       private[concurrent] val basis: Double,
       private[concurrent] val reducer: DoubleBinaryOperator
   ) extends BulkTask[K, V, Double](p, b, i, f, t) {
@@ -3156,7 +3156,7 @@ object ConcurrentHashMap {
     override final def getRawResult(): Double = result
 
     override final def compute(): Unit = {
-      var transformer: ToDoubleBiFunction[_ >: K, _ >: V] = null
+      var transformer: ToDoubleBiFunction[? >: K, ? >: V] = null
       var reducer: DoubleBinaryOperator = null
       if ({ transformer = this.transformer; transformer } != null && { reducer = this.reducer; reducer } != null) {
         var r = this.basis
@@ -3182,7 +3182,7 @@ object ConcurrentHashMap {
         while ({ p = advance(); p } != null)
           r = reducer.applyAsDouble(r, transformer.applyAsDouble(p.key, p.`val`))
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t = c
@@ -3204,7 +3204,7 @@ object ConcurrentHashMap {
       K <: AnyRef,
       V <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -3213,7 +3213,7 @@ object ConcurrentHashMap {
         K,
         V
       ],
-      private[concurrent] val transformer: ToLongFunction[_ >: K],
+      private[concurrent] val transformer: ToLongFunction[? >: K],
       private[concurrent] val basis: Long,
       private[concurrent] val reducer: LongBinaryOperator
   ) extends BulkTask[K, V, Long](p, b, i, f, t) {
@@ -3223,7 +3223,7 @@ object ConcurrentHashMap {
     override final def getRawResult(): Long = result
 
     override final def compute(): Unit = {
-      var transformer: ToLongFunction[_ >: K] = null
+      var transformer: ToLongFunction[? >: K] = null
       var reducer: LongBinaryOperator = null
       if ({ transformer = this.transformer; transformer } != null && { reducer = this.reducer; reducer } != null) {
         var r = this.basis
@@ -3249,7 +3249,7 @@ object ConcurrentHashMap {
         while ({ p = advance(); p } != null)
           r = reducer.applyAsLong(r, transformer.applyAsLong(p.key))
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -3271,7 +3271,7 @@ object ConcurrentHashMap {
       K <: AnyRef,
       V <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -3280,7 +3280,7 @@ object ConcurrentHashMap {
         K,
         V
       ],
-      private[concurrent] val transformer: ToLongFunction[_ >: V],
+      private[concurrent] val transformer: ToLongFunction[? >: V],
       private[concurrent] val basis: Long,
       private[concurrent] val reducer: LongBinaryOperator
   ) extends BulkTask[K, V, Long](p, b, i, f, t) {
@@ -3290,7 +3290,7 @@ object ConcurrentHashMap {
     override final def getRawResult(): Long = result
 
     override final def compute(): Unit = {
-      var transformer: ToLongFunction[_ >: V] = null
+      var transformer: ToLongFunction[? >: V] = null
       var reducer: LongBinaryOperator = null
       if ({ transformer = this.transformer; transformer } != null && { reducer = this.reducer; reducer } != null) {
         var r = this.basis
@@ -3316,7 +3316,7 @@ object ConcurrentHashMap {
         while ({ p = advance(); p } != null)
           r = reducer.applyAsLong(r, transformer.applyAsLong(p.`val`))
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -3338,7 +3338,7 @@ object ConcurrentHashMap {
       K <: AnyRef,
       V <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -3383,7 +3383,7 @@ object ConcurrentHashMap {
         while ({ p = advance(); p } != null)
           r = reducer.applyAsLong(r, transformer.applyAsLong(p))
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -3405,7 +3405,7 @@ object ConcurrentHashMap {
       K <: AnyRef,
       V <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -3414,7 +3414,7 @@ object ConcurrentHashMap {
         K,
         V
       ],
-      private[concurrent] val transformer: ToLongBiFunction[_ >: K, _ >: V],
+      private[concurrent] val transformer: ToLongBiFunction[? >: K, ? >: V],
       private[concurrent] val basis: Long,
       private[concurrent] val reducer: LongBinaryOperator
   ) extends BulkTask[K, V, Long](p, b, i, f, t) {
@@ -3424,7 +3424,7 @@ object ConcurrentHashMap {
     override final def getRawResult(): Long = result
 
     override final def compute(): Unit = {
-      var transformer: ToLongBiFunction[_ >: K, _ >: V] = null
+      var transformer: ToLongBiFunction[? >: K, ? >: V] = null
       var reducer: LongBinaryOperator = null
       if ({ transformer = this.transformer; transformer } != null && { reducer = this.reducer; reducer } != null) {
         var r = this.basis
@@ -3450,7 +3450,7 @@ object ConcurrentHashMap {
         while ({ p = advance(); p } != null)
           r = reducer.applyAsLong(r, transformer.applyAsLong(p.key, p.`val`))
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -3472,7 +3472,7 @@ object ConcurrentHashMap {
       K <: AnyRef,
       V <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -3481,7 +3481,7 @@ object ConcurrentHashMap {
         K,
         V
       ],
-      private[concurrent] val transformer: ToIntFunction[_ >: K],
+      private[concurrent] val transformer: ToIntFunction[? >: K],
       private[concurrent] val basis: Int,
       private[concurrent] val reducer: IntBinaryOperator
   ) extends BulkTask[K, V, Integer](p, b, i, f, t) {
@@ -3491,7 +3491,7 @@ object ConcurrentHashMap {
     override final def getRawResult(): Integer = result
 
     override final def compute(): Unit = {
-      var transformer: ToIntFunction[_ >: K] = null
+      var transformer: ToIntFunction[? >: K] = null
       var reducer: IntBinaryOperator = null
       if ({ transformer = this.transformer; transformer } != null && { reducer = this.reducer; reducer } != null) {
         var r = this.basis
@@ -3517,7 +3517,7 @@ object ConcurrentHashMap {
         while ({ p = advance(); p } != null)
           r = reducer.applyAsInt(r, transformer.applyAsInt(p.key))
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -3539,7 +3539,7 @@ object ConcurrentHashMap {
       K <: AnyRef,
       V <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -3548,7 +3548,7 @@ object ConcurrentHashMap {
         K,
         V
       ],
-      private[concurrent] val transformer: ToIntFunction[_ >: V],
+      private[concurrent] val transformer: ToIntFunction[? >: V],
       private[concurrent] val basis: Int,
       private[concurrent] val reducer: IntBinaryOperator
   ) extends BulkTask[K, V, Integer](p, b, i, f, t) {
@@ -3558,7 +3558,7 @@ object ConcurrentHashMap {
     override final def getRawResult(): Integer = result
 
     override final def compute(): Unit = {
-      var transformer: ToIntFunction[_ >: V] = null
+      var transformer: ToIntFunction[? >: V] = null
       var reducer: IntBinaryOperator = null
       if ({ transformer = this.transformer; transformer } != null && { reducer = this.reducer; reducer } != null) {
         var r = this.basis
@@ -3584,7 +3584,7 @@ object ConcurrentHashMap {
         while ({ p = advance(); p } != null)
           r = reducer.applyAsInt(r, transformer.applyAsInt(p.`val`))
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -3606,7 +3606,7 @@ object ConcurrentHashMap {
       K <: AnyRef,
       V <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -3648,7 +3648,7 @@ object ConcurrentHashMap {
         while ({ p = advance(); p } != null)
           r = reducer.applyAsInt(r, transformer.applyAsInt(p))
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -3670,7 +3670,7 @@ object ConcurrentHashMap {
       K <: AnyRef,
       V <: AnyRef
   ] private[concurrent] (
-      p: BulkTask[K, V, _],
+      p: BulkTask[K, V, ?],
       b: Int,
       i: Int,
       f: Int,
@@ -3679,7 +3679,7 @@ object ConcurrentHashMap {
         K,
         V
       ],
-      private[concurrent] val transformer: ToIntBiFunction[_ >: K, _ >: V],
+      private[concurrent] val transformer: ToIntBiFunction[? >: K, ? >: V],
       private[concurrent] val basis: Int,
       private[concurrent] val reducer: IntBinaryOperator
   ) extends BulkTask[K, V, Integer](p, b, i, f, t) {
@@ -3689,7 +3689,7 @@ object ConcurrentHashMap {
     override final def getRawResult(): Integer = result
 
     override final def compute(): Unit = {
-      var transformer: ToIntBiFunction[_ >: K, _ >: V] = null
+      var transformer: ToIntBiFunction[? >: K, ? >: V] = null
       var reducer: IntBinaryOperator = null
       if ({ transformer = this.transformer; transformer } != null && { reducer = this.reducer; reducer } != null) {
         var r = this.basis
@@ -3715,7 +3715,7 @@ object ConcurrentHashMap {
         while ({ p = advance(); p } != null)
           r = reducer.applyAsInt(r, transformer.applyAsInt(p.key, p.`val`))
         result = r
-        var c: CountedCompleter[_] = null
+        var c: CountedCompleter[?] = null
         c = firstComplete()
         while (c != null) {
           val t =
@@ -3750,10 +3750,10 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   /* ---------------- Fields -------------- */
   @volatile
-  @transient private[concurrent] var table: VolatileArray[Node[K, V]] = _
+  @transient private[concurrent] var table: VolatileArray[Node[K, V]] = scala.compiletime.uninitialized
 
   @volatile
-  @transient private var nextTable: VolatileArray[Node[K, V]] = _
+  @transient private var nextTable: VolatileArray[Node[K, V]] = scala.compiletime.uninitialized
 
   @volatile
   @transient private var baseCount = 0L
@@ -3768,11 +3768,11 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
   @transient private var cellsBusy = 0
 
   @volatile
-  @transient private var counterCells: VolatileArray[CounterCell] = _
+  @transient private var counterCells: VolatileArray[CounterCell] = scala.compiletime.uninitialized
   // views
-  @transient private var _keySet: KeySetView[K, V] = _
-  @transient private var _values: ValuesView[K, V] = _
-  @transient private var _entrySet: EntrySetView[K, V] = _
+  @transient private var _keySet: KeySetView[K, V] = scala.compiletime.uninitialized
+  @transient private var _values: ValuesView[K, V] = scala.compiletime.uninitialized
+  @transient private var _entrySet: EntrySetView[K, V] = scala.compiletime.uninitialized
 
   // Unsafe mechanics
 
@@ -3794,7 +3794,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
     this(initialCapacity, ConcurrentHashMap.LOAD_FACTOR, 1)
   }
 
-  def this(m: Map[_ <: K, _ <: V]) = {
+  def this(m: Map[? <: K, ? <: V]) = {
     this()
     this.sizeCtl = ConcurrentHashMap.DEFAULT_CAPACITY
     putAll(m)
@@ -3907,7 +3907,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
               }
               if (!break) binCount += 1
             }
-          } else if (f.isInstanceOf[TreeBin[_, _]]) {
+          } else if (f.isInstanceOf[TreeBin[?, ?]]) {
             var p: Node[K, V] = null
             binCount = 2
             if ({
@@ -3919,7 +3919,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
               oldVal = p.`val`
               if (!onlyIfAbsent) p.`val` = value
             }
-          } else if (f.isInstanceOf[ReservationNode[_, _]]) throw new IllegalStateException("Recursive update")
+          } else if (f.isInstanceOf[ReservationNode[?, ?]]) throw new IllegalStateException("Recursive update")
         }
         if (binCount != 0) {
           if (binCount >= TREEIFY_THRESHOLD)
@@ -3934,7 +3934,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
     null.asInstanceOf[V]
   }
 
-  override def putAll(m: Map[_ <: K, _ <: V]): Unit = {
+  override def putAll(m: Map[? <: K, ? <: V]): Unit = {
     tryPresize(m.size())
     m.entrySet().forEach { e =>
       putVal(e.getKey(), e.getValue(), false)
@@ -3985,7 +3985,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
                 if ({ e = e.next; e } == null) break = true
               }
             }
-          } else if (f.isInstanceOf[TreeBin[_, _]]) {
+          } else if (f.isInstanceOf[TreeBin[?, ?]]) {
             validated = true
             val t = f.asInstanceOf[TreeBin[K, V]]
             var r: TreeNode[K, V] = null
@@ -4000,7 +4000,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
                     .setTabAt(tab, i, untreeify(t.first))
               }
             }
-          } else if (f.isInstanceOf[ReservationNode[_, _]]) throw new IllegalStateException("Recursive update")
+          } else if (f.isInstanceOf[ReservationNode[?, ?]]) throw new IllegalStateException("Recursive update")
         }
         if (validated) {
           if (oldVal != null) {
@@ -4032,7 +4032,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
           if (tabAt(tab, i) eq f) {
             var p =
               if (fh >= 0) f
-              else if ((f.isInstanceOf[TreeBin[_, _]]))
+              else if ((f.isInstanceOf[TreeBin[?, ?]]))
                 (f.asInstanceOf[TreeBin[K, V]]).first
               else null
             while (p != null) {
@@ -4117,9 +4117,9 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
   override def equals(_o: Any): Boolean = {
     val o = _o.asInstanceOf[AnyRef]
     if (o ne this) {
-      if (!o.isInstanceOf[Map[_, _]])
+      if (!o.isInstanceOf[Map[?, ?]])
         return false
-      val m = o.asInstanceOf[Map[_, _]]
+      val m = o.asInstanceOf[Map[?, ?]]
       var t: VolatileArray[Node[K, V]] = null
       val f =
         if ({ t = table; t } == null) 0
@@ -4165,7 +4165,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
     val segmentShift = 32 - sshift
     val segmentMask = ssize - 1
     val segments =
-      new Array[Segment[_, _]](
+      new Array[Segment[?, ?]](
         DEFAULT_CONCURRENCY_LEVEL
       ).asInstanceOf[Array[Segment[K, V]]]
     for (i <- 0 until segments.length) {
@@ -4328,7 +4328,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
     else v
   }
 
-  override def forEach(action: BiConsumer[_ >: K, _ >: V]): Unit = {
+  override def forEach(action: BiConsumer[? >: K, ? >: V]): Unit = {
     if (action == null) throw new NullPointerException
     var t: VolatileArray[Node[K, V]] = null
     if ({ t = table; t } != null) {
@@ -4339,7 +4339,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
   }
 
   override def replaceAll(
-      function: BiFunction[_ >: K, _ >: V, _ <: V]
+      function: BiFunction[? >: K, ? >: V, ? <: V]
   ): Unit = {
     if (function == null) throw new NullPointerException
     var t: VolatileArray[Node[K, V]] = null
@@ -4361,7 +4361,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
   }
 
   private[concurrent] def removeEntryIf(
-      function: Predicate[_ >: util.Map.Entry[K, V]]
+      function: Predicate[? >: util.Map.Entry[K, V]]
   ) = {
     if (function == null) throw new NullPointerException
     var t: VolatileArray[Node[K, V]] = null
@@ -4379,7 +4379,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
     removed
   }
 
-  private[concurrent] def removeValueIf(function: Predicate[_ >: V]) = {
+  private[concurrent] def removeValueIf(function: Predicate[? >: V]) = {
     if (function == null) throw new NullPointerException
     var t: VolatileArray[Node[K, V]] = null
     var removed = false
@@ -4397,7 +4397,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   override def computeIfAbsent(
       key: K,
-      mappingFunction: Function[_ >: K, _ <: V]
+      mappingFunction: Function[? >: K, ? <: V]
   ): V = {
     if (key == null || mappingFunction == null) throw new NullPointerException
     val h = spread(key.hashCode())
@@ -4458,7 +4458,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
               }
               if (!break) binCount += 1
             }
-          } else if (f.isInstanceOf[TreeBin[_, _]]) {
+          } else if (f.isInstanceOf[TreeBin[?, ?]]) {
             binCount = 2
             val t = f.asInstanceOf[TreeBin[K, V]]
             var r: TreeNode[K, V] = null
@@ -4468,7 +4468,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
               added = true
               t.putTreeVal(h, key, `val`)
             }
-          } else if (f.isInstanceOf[ReservationNode[_, _]]) throw new IllegalStateException("Recursive update")
+          } else if (f.isInstanceOf[ReservationNode[?, ?]]) throw new IllegalStateException("Recursive update")
         }
         if (binCount != 0) {
           if (binCount >= TREEIFY_THRESHOLD)
@@ -4485,7 +4485,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   override def computeIfPresent(
       key: K,
-      remappingFunction: BiFunction[_ >: K, _ >: V, _ <: V]
+      remappingFunction: BiFunction[? >: K, ? >: V, ? <: V]
   ): V = {
     if (key == null || remappingFunction == null) throw new NullPointerException
     val h = spread(key.hashCode())
@@ -4529,7 +4529,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
                 else binCount += 1
               }
             }
-          } else if (f.isInstanceOf[TreeBin[_, _]]) {
+          } else if (f.isInstanceOf[TreeBin[?, ?]]) {
             binCount = 2
             val t = f.asInstanceOf[TreeBin[K, V]]
             var r: TreeNode[K, V] = null
@@ -4544,7 +4544,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
                     .setTabAt(tab, i, untreeify(t.first))
               }
             }
-          } else if (f.isInstanceOf[ReservationNode[_, _]]) throw new IllegalStateException("Recursive update")
+          } else if (f.isInstanceOf[ReservationNode[?, ?]]) throw new IllegalStateException("Recursive update")
         }
         if (binCount != 0) break = true
       }
@@ -4555,7 +4555,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   override def compute(
       key: K,
-      remappingFunction: BiFunction[_ >: K, _ >: V, _ <: V]
+      remappingFunction: BiFunction[? >: K, ? >: V, ? <: V]
   ): V = {
     if (key == null || remappingFunction == null) throw new NullPointerException
     val h = spread(key.hashCode())
@@ -4620,7 +4620,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
                 } else binCount += 1
               }
             }
-          } else if (f.isInstanceOf[TreeBin[_, _]]) {
+          } else if (f.isInstanceOf[TreeBin[?, ?]]) {
             binCount = 1
             val t = f.asInstanceOf[TreeBin[K, V]]
             var r: TreeNode[K, V] = null
@@ -4643,7 +4643,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
                 ConcurrentHashMap
                   .setTabAt(tab, i, untreeify(t.first))
             }
-          } else if (f.isInstanceOf[ReservationNode[_, _]]) throw new IllegalStateException("Recursive update")
+          } else if (f.isInstanceOf[ReservationNode[?, ?]]) throw new IllegalStateException("Recursive update")
         }
         if (binCount != 0) {
           if (binCount >= TREEIFY_THRESHOLD)
@@ -4660,7 +4660,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
   override def merge(
       key: K,
       value: V,
-      remappingFunction: BiFunction[_ >: V, _ >: V, _ <: V]
+      remappingFunction: BiFunction[? >: V, ? >: V, ? <: V]
   ): V = {
     if (key == null || value == null || remappingFunction == null)
       throw new NullPointerException
@@ -4714,7 +4714,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
               }
               if (!break) binCount += 1
             }
-          } else if (f.isInstanceOf[TreeBin[_, _]]) {
+          } else if (f.isInstanceOf[TreeBin[?, ?]]) {
             binCount = 2
             val t = f.asInstanceOf[TreeBin[K, V]]
             val r = t.root
@@ -4736,7 +4736,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
                 ConcurrentHashMap
                   .setTabAt(tab, i, untreeify(t.first))
             }
-          } else if (f.isInstanceOf[ReservationNode[_, _]]) throw new IllegalStateException("Recursive update")
+          } else if (f.isInstanceOf[ReservationNode[?, ?]]) throw new IllegalStateException("Recursive update")
         }
         if (binCount != 0) {
           if (binCount >= TREEIFY_THRESHOLD)
@@ -4853,7 +4853,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
     var nextTab: VolatileArray[Node[K, V]] = null
     var sc = 0
     if (tab != null &&
-        f.isInstanceOf[ForwardingNode[_, _]] && {
+        f.isInstanceOf[ForwardingNode[?, ?]] && {
           nextTab = f.asInstanceOf[ForwardingNode[K, V]].nextTable; nextTab != null
         }) {
       val rs = resizeStamp(tab.length) << RESIZE_STAMP_SHIFT
@@ -5019,7 +5019,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
               setTabAt(nextTab, i + n, hn)
               setTabAt(tab, i, fwd)
               advance = true
-            } else if (f.isInstanceOf[TreeBin[_, _]]) {
+            } else if (f.isInstanceOf[TreeBin[?, ?]]) {
               val t = f.asInstanceOf[TreeBin[K, V]]
               var lo: TreeNode[K, V] = null
               var loTail: TreeNode[K, V] = null
@@ -5065,7 +5065,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
               setTabAt(nextTab, i + n, hn)
               setTabAt(tab, i, fwd)
               advance = true
-            } else if (f.isInstanceOf[ReservationNode[_, _]])
+            } else if (f.isInstanceOf[ReservationNode[?, ?]])
               throw new IllegalStateException("Recursive update")
           }
         }
@@ -5203,7 +5203,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def forEach(
       parallelismThreshold: Long,
-      action: BiConsumer[_ >: K, _ >: V]
+      action: BiConsumer[? >: K, ? >: V]
   ): Unit = {
     if (action == null) throw new NullPointerException
     new ForEachMappingTask[K, V](
@@ -5218,8 +5218,8 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def forEach[U <: AnyRef](
       parallelismThreshold: Long,
-      transformer: BiFunction[_ >: K, _ >: V, _ <: U],
-      action: Consumer[_ >: U]
+      transformer: BiFunction[? >: K, ? >: V, ? <: U],
+      action: Consumer[? >: U]
   ): Unit = {
     if (transformer == null || action == null) throw new NullPointerException
     new ForEachTransformedMappingTask[K, V, U](
@@ -5235,7 +5235,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def search[U <: AnyRef](
       parallelismThreshold: Long,
-      searchFunction: BiFunction[_ >: K, _ >: V, _ <: U]
+      searchFunction: BiFunction[? >: K, ? >: V, ? <: U]
   ): U = {
     if (searchFunction == null) throw new NullPointerException
     new SearchMappingsTask[K, V, U](
@@ -5251,8 +5251,8 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduce[U <: AnyRef](
       parallelismThreshold: Long,
-      transformer: BiFunction[_ >: K, _ >: V, _ <: U],
-      reducer: BiFunction[_ >: U, _ >: U, _ <: U]
+      transformer: BiFunction[? >: K, ? >: V, ? <: U],
+      reducer: BiFunction[? >: U, ? >: U, ? <: U]
   ): U = {
     if (transformer == null || reducer == null) throw new NullPointerException
     new MapReduceMappingsTask[K, V, U](
@@ -5269,7 +5269,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduceToDouble(
       parallelismThreshold: Long,
-      transformer: ToDoubleBiFunction[_ >: K, _ >: V],
+      transformer: ToDoubleBiFunction[? >: K, ? >: V],
       basis: Double,
       reducer: DoubleBinaryOperator
   ): Double = {
@@ -5289,7 +5289,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduceToLong(
       parallelismThreshold: Long,
-      transformer: ToLongBiFunction[_ >: K, _ >: V],
+      transformer: ToLongBiFunction[? >: K, ? >: V],
       basis: Long,
       reducer: LongBinaryOperator
   ): Long = {
@@ -5309,7 +5309,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduceToInt(
       parallelismThreshold: Long,
-      transformer: ToIntBiFunction[_ >: K, _ >: V],
+      transformer: ToIntBiFunction[? >: K, ? >: V],
       basis: Int,
       reducer: IntBinaryOperator
   ): Int = {
@@ -5327,7 +5327,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
     ).invoke()
   }
 
-  def forEachKey(parallelismThreshold: Long, action: Consumer[_ >: K]): Unit = {
+  def forEachKey(parallelismThreshold: Long, action: Consumer[? >: K]): Unit = {
     if (action == null) throw new NullPointerException
     new ForEachKeyTask[K, V](
       null,
@@ -5341,8 +5341,8 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def forEachKey[U <: AnyRef](
       parallelismThreshold: Long,
-      transformer: Function[_ >: K, _ <: U],
-      action: Consumer[_ >: U]
+      transformer: Function[? >: K, ? <: U],
+      action: Consumer[? >: U]
   ): Unit = {
     if (transformer == null || action == null) throw new NullPointerException
     new ForEachTransformedKeyTask[K, V, U](
@@ -5358,7 +5358,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def searchKeys[U <: AnyRef](
       parallelismThreshold: Long,
-      searchFunction: Function[_ >: K, _ <: U]
+      searchFunction: Function[? >: K, ? <: U]
   ): U = {
     if (searchFunction == null) throw new NullPointerException
     new SearchKeysTask[K, V, U](
@@ -5374,7 +5374,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduceKeys(
       parallelismThreshold: Long,
-      reducer: BiFunction[_ >: K, _ >: K, _ <: K]
+      reducer: BiFunction[? >: K, ? >: K, ? <: K]
   ): K = {
     if (reducer == null) throw new NullPointerException
     new ReduceKeysTask[K, V](
@@ -5390,8 +5390,8 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduceKeys[U <: AnyRef](
       parallelismThreshold: Long,
-      transformer: Function[_ >: K, _ <: U],
-      reducer: BiFunction[_ >: U, _ >: U, _ <: U]
+      transformer: Function[? >: K, ? <: U],
+      reducer: BiFunction[? >: U, ? >: U, ? <: U]
   ): U = {
     if (transformer == null || reducer == null) throw new NullPointerException
     new MapReduceKeysTask[K, V, U](
@@ -5408,7 +5408,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduceKeysToDouble(
       parallelismThreshold: Long,
-      transformer: ToDoubleFunction[_ >: K],
+      transformer: ToDoubleFunction[? >: K],
       basis: Double,
       reducer: DoubleBinaryOperator
   ): Double = {
@@ -5428,7 +5428,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduceKeysToLong(
       parallelismThreshold: Long,
-      transformer: ToLongFunction[_ >: K],
+      transformer: ToLongFunction[? >: K],
       basis: Long,
       reducer: LongBinaryOperator
   ): Long = {
@@ -5448,7 +5448,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduceKeysToInt(
       parallelismThreshold: Long,
-      transformer: ToIntFunction[_ >: K],
+      transformer: ToIntFunction[? >: K],
       basis: Int,
       reducer: IntBinaryOperator
   ): Int = {
@@ -5468,7 +5468,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def forEachValue(
       parallelismThreshold: Long,
-      action: Consumer[_ >: V]
+      action: Consumer[? >: V]
   ): Unit = {
     if (action == null) throw new NullPointerException
     new ForEachValueTask[K, V](
@@ -5483,8 +5483,8 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def forEachValue[U <: AnyRef](
       parallelismThreshold: Long,
-      transformer: Function[_ >: V, _ <: U],
-      action: Consumer[_ >: U]
+      transformer: Function[? >: V, ? <: U],
+      action: Consumer[? >: U]
   ): Unit = {
     if (transformer == null || action == null) throw new NullPointerException
     new ForEachTransformedValueTask[K, V, U](
@@ -5500,7 +5500,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def searchValues[U <: AnyRef](
       parallelismThreshold: Long,
-      searchFunction: Function[_ >: V, _ <: U]
+      searchFunction: Function[? >: V, ? <: U]
   ): U = {
     if (searchFunction == null) throw new NullPointerException
     new SearchValuesTask[K, V, U](
@@ -5516,7 +5516,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduceValues(
       parallelismThreshold: Long,
-      reducer: BiFunction[_ >: V, _ >: V, _ <: V]
+      reducer: BiFunction[? >: V, ? >: V, ? <: V]
   ): V = {
     if (reducer == null) throw new NullPointerException
     new ReduceValuesTask[K, V](
@@ -5532,8 +5532,8 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduceValues[U <: AnyRef](
       parallelismThreshold: Long,
-      transformer: Function[_ >: V, _ <: U],
-      reducer: BiFunction[_ >: U, _ >: U, _ <: U]
+      transformer: Function[? >: V, ? <: U],
+      reducer: BiFunction[? >: U, ? >: U, ? <: U]
   ): U = {
     if (transformer == null || reducer == null) throw new NullPointerException
     new MapReduceValuesTask[K, V, U](
@@ -5550,7 +5550,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduceValuesToDouble(
       parallelismThreshold: Long,
-      transformer: ToDoubleFunction[_ >: V],
+      transformer: ToDoubleFunction[? >: V],
       basis: Double,
       reducer: DoubleBinaryOperator
   ): Double = {
@@ -5570,7 +5570,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduceValuesToLong(
       parallelismThreshold: Long,
-      transformer: ToLongFunction[_ >: V],
+      transformer: ToLongFunction[? >: V],
       basis: Long,
       reducer: LongBinaryOperator
   ): Long = {
@@ -5590,7 +5590,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduceValuesToInt(
       parallelismThreshold: Long,
-      transformer: ToIntFunction[_ >: V],
+      transformer: ToIntFunction[? >: V],
       basis: Int,
       reducer: IntBinaryOperator
   ): Int = {
@@ -5610,7 +5610,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def forEachEntry(
       parallelismThreshold: Long,
-      action: Consumer[_ >: util.Map.Entry[K, V]]
+      action: Consumer[? >: util.Map.Entry[K, V]]
   ): Unit = {
     if (action == null) throw new NullPointerException
     new ForEachEntryTask[K, V](
@@ -5625,8 +5625,8 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def forEachEntry[U <: AnyRef](
       parallelismThreshold: Long,
-      transformer: Function[util.Map.Entry[K, V], _ <: U],
-      action: Consumer[_ >: U]
+      transformer: Function[util.Map.Entry[K, V], ? <: U],
+      action: Consumer[? >: U]
   ): Unit = {
     if (transformer == null || action == null) throw new NullPointerException
     new ForEachTransformedEntryTask[K, V, U](
@@ -5642,7 +5642,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def searchEntries[U <: AnyRef](
       parallelismThreshold: Long,
-      searchFunction: Function[util.Map.Entry[K, V], _ <: U]
+      searchFunction: Function[util.Map.Entry[K, V], ? <: U]
   ): U = {
     if (searchFunction == null) throw new NullPointerException
     new SearchEntriesTask[K, V, U](
@@ -5661,7 +5661,7 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
       reducer: BiFunction[
         util.Map.Entry[K, V],
         util.Map.Entry[K, V],
-        _ <: util.Map.Entry[K, V]
+        ? <: util.Map.Entry[K, V]
       ]
   ): util.Map.Entry[K, V] = {
     if (reducer == null) throw new NullPointerException
@@ -5678,8 +5678,8 @@ class ConcurrentHashMap[K <: AnyRef, V <: AnyRef]()
 
   def reduceEntries[U <: AnyRef](
       parallelismThreshold: Long,
-      transformer: Function[util.Map.Entry[K, V], _ <: U],
-      reducer: BiFunction[_ >: U, _ >: U, _ <: U]
+      transformer: Function[util.Map.Entry[K, V], ? <: U],
+      reducer: BiFunction[? >: U, ? >: U, ? <: U]
   ): U = {
     if (transformer == null || reducer == null) throw new NullPointerException
     new MapReduceEntriesTask[K, V, U](

@@ -75,13 +75,13 @@ object ChronoZonedDateTime {
    * @see
    *   #isEqual
    */
-  def timeLineOrder: Comparator[ChronoZonedDateTime[_]] = INSTANT_COMPARATOR
+  def timeLineOrder: Comparator[ChronoZonedDateTime[?]] = INSTANT_COMPARATOR
 
-  private lazy val INSTANT_COMPARATOR: Comparator[ChronoZonedDateTime[_]] =
-    new Comparator[ChronoZonedDateTime[_]] {
+  private lazy val INSTANT_COMPARATOR: Comparator[ChronoZonedDateTime[?]] =
+    new Comparator[ChronoZonedDateTime[?]] {
       override def compare(
-        datetime1: ChronoZonedDateTime[_],
-        datetime2: ChronoZonedDateTime[_]
+        datetime1: ChronoZonedDateTime[?],
+        datetime2: ChronoZonedDateTime[?]
       ): Int = {
         var cmp: Int = java.lang.Long.compare(datetime1.toEpochSecond, datetime2.toEpochSecond)
         if (cmp == 0)
@@ -115,10 +115,10 @@ object ChronoZonedDateTime {
    * @see
    *   Chronology#zonedDateTime(TemporalAccessor)
    */
-  def from(temporal: TemporalAccessor): ChronoZonedDateTime[_] = {
+  def from(temporal: TemporalAccessor): ChronoZonedDateTime[?] = {
     Objects.requireNonNull(temporal, "temporal")
-    if (temporal.isInstanceOf[ChronoZonedDateTime[_ <: ChronoLocalDate]])
-      temporal.asInstanceOf[ChronoZonedDateTime[_]]
+    if (temporal.isInstanceOf[ChronoZonedDateTime[? <: ChronoLocalDate]])
+      temporal.asInstanceOf[ChronoZonedDateTime[?]]
     else {
       val chrono: Chronology = temporal.query(TemporalQueries.chronology)
       if (chrono == null)
@@ -160,7 +160,7 @@ object ChronoZonedDateTime {
  */
 trait ChronoZonedDateTime[D <: ChronoLocalDate]
     extends Temporal
-    with Ordered[ChronoZonedDateTime[_]] {
+    with Ordered[ChronoZonedDateTime[?]] {
   override def range(field: TemporalField): ValueRange =
     field match {
       case INSTANT_SECONDS | OFFSET_SECONDS => field.range
@@ -414,7 +414,7 @@ trait ChronoZonedDateTime[D <: ChronoLocalDate]
    * @return
    *   the comparator value, negative if less, positive if greater
    */
-  def compare(other: ChronoZonedDateTime[_]): Int = {
+  def compare(other: ChronoZonedDateTime[?]): Int = {
     var cmp: Int = java.lang.Long.compare(toEpochSecond, other.toEpochSecond)
     if (cmp == 0) {
       cmp = toLocalTime.getNano - other.toLocalTime.getNano
@@ -444,7 +444,7 @@ trait ChronoZonedDateTime[D <: ChronoLocalDate]
    * @return
    *   true if this is after the specified date-time
    */
-  def isAfter(other: ChronoZonedDateTime[_]): Boolean = {
+  def isAfter(other: ChronoZonedDateTime[?]): Boolean = {
     val thisEpochSec: Long  = toEpochSecond
     val otherEpochSec: Long = other.toEpochSecond
     thisEpochSec > otherEpochSec || (thisEpochSec == otherEpochSec && toLocalTime.getNano > other.toLocalTime.getNano)
@@ -462,7 +462,7 @@ trait ChronoZonedDateTime[D <: ChronoLocalDate]
    * @return
    *   true if this point is before the specified date-time
    */
-  def isBefore(other: ChronoZonedDateTime[_]): Boolean = {
+  def isBefore(other: ChronoZonedDateTime[?]): Boolean = {
     val thisEpochSec: Long  = toEpochSecond
     val otherEpochSec: Long = other.toEpochSecond
     thisEpochSec < otherEpochSec || (thisEpochSec == otherEpochSec && toLocalTime.getNano < other.toLocalTime.getNano)
@@ -480,7 +480,7 @@ trait ChronoZonedDateTime[D <: ChronoLocalDate]
    * @return
    *   true if the instant equals the instant of the specified date-time
    */
-  def isEqual(other: ChronoZonedDateTime[_]): Boolean =
+  def isEqual(other: ChronoZonedDateTime[?]): Boolean =
     toEpochSecond == other.toEpochSecond && toLocalTime.getNano == other.toLocalTime.getNano
 
   /**

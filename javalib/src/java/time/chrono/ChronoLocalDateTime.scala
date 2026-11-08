@@ -72,13 +72,13 @@ object ChronoLocalDateTime {
    * @see
    *   #isEqual
    */
-  def timeLineOrder: Comparator[ChronoLocalDateTime[_ <: ChronoLocalDate]] = DATE_TIME_COMPARATOR
+  def timeLineOrder: Comparator[ChronoLocalDateTime[? <: ChronoLocalDate]] = DATE_TIME_COMPARATOR
 
-  private lazy val DATE_TIME_COMPARATOR: Comparator[ChronoLocalDateTime[_ <: ChronoLocalDate]] =
-    new Comparator[ChronoLocalDateTime[_ <: ChronoLocalDate]] {
+  private lazy val DATE_TIME_COMPARATOR: Comparator[ChronoLocalDateTime[? <: ChronoLocalDate]] =
+    new Comparator[ChronoLocalDateTime[? <: ChronoLocalDate]] {
       override def compare(
-        datetime1: ChronoLocalDateTime[_ <: ChronoLocalDate],
-        datetime2: ChronoLocalDateTime[_ <: ChronoLocalDate]
+        datetime1: ChronoLocalDateTime[? <: ChronoLocalDate],
+        datetime2: ChronoLocalDateTime[? <: ChronoLocalDate]
       ): Int = {
         var cmp: Int =
           java.lang.Long.compare(datetime1.toLocalDate.toEpochDay, datetime2.toLocalDate.toEpochDay)
@@ -113,10 +113,10 @@ object ChronoLocalDateTime {
    * @see
    *   Chronology#localDateTime(TemporalAccessor)
    */
-  def from(temporal: TemporalAccessor): ChronoLocalDateTime[_] = {
+  def from(temporal: TemporalAccessor): ChronoLocalDateTime[?] = {
     Objects.requireNonNull(temporal, "temporal")
-    if (temporal.isInstanceOf[ChronoLocalDateTime[_ <: ChronoLocalDate]])
-      return temporal.asInstanceOf[ChronoLocalDateTime[_]]
+    if (temporal.isInstanceOf[ChronoLocalDateTime[? <: ChronoLocalDate]])
+      return temporal.asInstanceOf[ChronoLocalDateTime[?]]
     val chrono: Chronology = temporal.query(TemporalQueries.chronology)
     if (chrono == null)
       throw new DateTimeException(
@@ -129,7 +129,7 @@ object ChronoLocalDateTime {
 abstract class ChronoLocalDateTime[D <: ChronoLocalDate]
     extends Temporal
     with TemporalAdjuster
-    with Ordered[ChronoLocalDateTime[_]] {
+    with Ordered[ChronoLocalDateTime[?]] {
 
   /**
    * Gets the chronology of this date-time.
@@ -294,7 +294,7 @@ abstract class ChronoLocalDateTime[D <: ChronoLocalDate]
    * @return
    *   the comparator value, negative if less, positive if greater
    */
-  def compare(other: ChronoLocalDateTime[_]): Int = {
+  def compare(other: ChronoLocalDateTime[?]): Int = {
     var cmp: Int = toLocalDate.compareTo(other.toLocalDate.asInstanceOf[ChronoLocalDate])
     if (cmp == 0) {
       cmp = toLocalTime.compareTo(other.toLocalTime)
@@ -316,7 +316,7 @@ abstract class ChronoLocalDateTime[D <: ChronoLocalDate]
    * @return
    *   true if this is after the specified date-time
    */
-  def isAfter(other: ChronoLocalDateTime[_ <: ChronoLocalDate]): Boolean = {
+  def isAfter(other: ChronoLocalDateTime[? <: ChronoLocalDate]): Boolean = {
     val thisEpDay: Long  = this.toLocalDate.toEpochDay
     val otherEpDay: Long = other.toLocalDate.toEpochDay
     thisEpDay > otherEpDay || (thisEpDay == otherEpDay && this.toLocalTime.toNanoOfDay > other.toLocalTime.toNanoOfDay)
@@ -334,7 +334,7 @@ abstract class ChronoLocalDateTime[D <: ChronoLocalDate]
    * @return
    *   true if this is before the specified date-time
    */
-  def isBefore(other: ChronoLocalDateTime[_ <: ChronoLocalDate]): Boolean = {
+  def isBefore(other: ChronoLocalDateTime[? <: ChronoLocalDate]): Boolean = {
     val thisEpDay: Long  = this.toLocalDate.toEpochDay
     val otherEpDay: Long = other.toLocalDate.toEpochDay
     thisEpDay < otherEpDay || (thisEpDay == otherEpDay && this.toLocalTime.toNanoOfDay < other.toLocalTime.toNanoOfDay)
@@ -352,7 +352,7 @@ abstract class ChronoLocalDateTime[D <: ChronoLocalDate]
    * @return
    *   true if the underlying date-time is equal to the specified date-time on the timeline
    */
-  def isEqual(other: ChronoLocalDateTime[_ <: ChronoLocalDate]): Boolean =
+  def isEqual(other: ChronoLocalDateTime[? <: ChronoLocalDate]): Boolean =
     this.toLocalTime.toNanoOfDay == other.toLocalTime.toNanoOfDay && this.toLocalDate.toEpochDay == other.toLocalDate.toEpochDay
 
   /**

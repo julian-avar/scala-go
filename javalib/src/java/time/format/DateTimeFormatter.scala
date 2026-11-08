@@ -761,7 +761,7 @@ object DateTimeFormatter {
    */
   private[format] class ClassicFormat(
     private val formatter: DateTimeFormatter,
-    private val query:     TemporalQuery[_ <: AnyRef]
+    private val query:     TemporalQuery[? <: AnyRef]
   ) extends Format {
 
     def format(obj: AnyRef, toAppendTo: StringBuffer, pos: FieldPosition): StringBuffer = {
@@ -1408,7 +1408,7 @@ final class DateTimeFormatter private[format] (
    *   if unable to parse the requested result
    */
   @scala.annotation.varargs
-  def parseBest(text: CharSequence, types: TemporalQuery[_]*): TemporalAccessor = {
+  def parseBest(text: CharSequence, types: TemporalQuery[?]*): TemporalAccessor = {
     Objects.requireNonNull(text, "text")
     Objects.requireNonNull(types, "types")
     if (types.length < 2)
@@ -1588,7 +1588,7 @@ final class DateTimeFormatter private[format] (
    * @return
    *   this formatter as a classic format instance, not null
    */
-  def toFormat(query: TemporalQuery[_ <: AnyRef]): Format = {
+  def toFormat(query: TemporalQuery[? <: AnyRef]): Format = {
     Objects.requireNonNull(query, "query")
     new DateTimeFormatter.ClassicFormat(this, query)
   }

@@ -44,9 +44,9 @@ object ReentrantReadWriteLock {
 
     setState(getState()) // ensures visibility of readHolds
 
-    @volatile private var cachedHoldCounter: Sync.HoldCounter = _ // volatile: read racily by other threads
+    @volatile private var cachedHoldCounter: Sync.HoldCounter = scala.compiletime.uninitialized // volatile: read racily by other threads
 
-    @volatile private var firstReader: Thread = _ // volatile: read racily by other threads
+    @volatile private var firstReader: Thread = scala.compiletime.uninitialized // volatile: read racily by other threads
     private var firstReaderHoldCount: Int = 0
 
     def readerShouldBlock: Boolean

@@ -12,7 +12,7 @@ abstract class AbstractOwnableSynchronizer protected ()
     extends java.io.Serializable {
 
   // Volatile: other threads read it (racily on the JVM, which Go does not allow for references).
-  @volatile private var exclusiveOwnerThread: Thread = _
+  @volatile private var exclusiveOwnerThread: Thread = scala.compiletime.uninitialized
 
   protected final def setExclusiveOwnerThread(t: Thread): Unit =
     exclusiveOwnerThread = t

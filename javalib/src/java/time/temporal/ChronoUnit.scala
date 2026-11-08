@@ -225,8 +225,8 @@ enum ChronoUnit private (name: String, ordinal: Int, private val duration: Durat
     if (temporal.isInstanceOf[ChronoLocalDate])
       return isDateBased
     if (
-      temporal.isInstanceOf[ChronoLocalDateTime[_]] || temporal
-        .isInstanceOf[ChronoZonedDateTime[_]]
+      temporal.isInstanceOf[ChronoLocalDateTime[?]] || temporal
+        .isInstanceOf[ChronoZonedDateTime[?]]
     )
       return true
     try {

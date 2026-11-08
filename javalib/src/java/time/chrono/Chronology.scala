@@ -547,7 +547,7 @@ trait Chronology extends Ordered[Chronology] {
    * @throws DateTimeException
    *   if unable to create the date-time
    */
-  def localDateTime(temporal: TemporalAccessor): ChronoLocalDateTime[_] =
+  def localDateTime(temporal: TemporalAccessor): ChronoLocalDateTime[?] =
     try {
       val clDate: ChronoLocalDate = date(temporal)
       clDate.atTime(LocalTime.from(temporal))
@@ -575,7 +575,7 @@ trait Chronology extends Ordered[Chronology] {
    * @throws DateTimeException
    *   if unable to create the date-time
    */
-  def zonedDateTime(temporal: TemporalAccessor): ChronoZonedDateTime[_] =
+  def zonedDateTime(temporal: TemporalAccessor): ChronoZonedDateTime[?] =
     try {
       val zone: ZoneId = ZoneId.from(temporal)
       try {
@@ -583,9 +583,9 @@ trait Chronology extends Ordered[Chronology] {
         zonedDateTime(instant, zone)
       } catch {
         case _: DateTimeException =>
-          val cldt: ChronoLocalDateTime[_] =
+          val cldt: ChronoLocalDateTime[?] =
             localDateTime(temporal) // / !!! was _ <: ChronoLocalDate
-          val cldtImpl: ChronoLocalDateTimeImpl[_ <: ChronoLocalDate] = ensureChronoLocalDateTime(
+          val cldtImpl: ChronoLocalDateTimeImpl[? <: ChronoLocalDate] = ensureChronoLocalDateTime(
             cldt
           )
           ChronoZonedDateTimeImpl.ofBest(cldtImpl, zone, null)
@@ -612,7 +612,7 @@ trait Chronology extends Ordered[Chronology] {
    * @throws DateTimeException
    *   if the result exceeds the supported range
    */
-  def zonedDateTime(instant: Instant, zone: ZoneId): ChronoZonedDateTime[_ <: ChronoLocalDate] =
+  def zonedDateTime(instant: Instant, zone: ZoneId): ChronoZonedDateTime[? <: ChronoLocalDate] =
     ChronoZonedDateTimeImpl.ofInstant(this, instant, zone)
 
   /**

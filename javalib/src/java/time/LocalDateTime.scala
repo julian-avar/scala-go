@@ -1722,7 +1722,7 @@ final class LocalDateTime private (private val date: LocalDate, private val time
    * @return
    *   the comparator value, negative if less, positive if greater
    */
-  override def compareTo(other: ChronoLocalDateTime[_]): Int =
+  override def compareTo(other: ChronoLocalDateTime[?]): Int =
     other match {
       case l: LocalDateTime => compareTo0(l)
       case _                => super.compareTo(other)
@@ -1753,7 +1753,7 @@ final class LocalDateTime private (private val date: LocalDate, private val time
    * @return
    *   true if this date-time is after the specified date-time
    */
-  override def isAfter(other: ChronoLocalDateTime[_ <: ChronoLocalDate]): Boolean =
+  override def isAfter(other: ChronoLocalDateTime[? <: ChronoLocalDate]): Boolean =
     other match {
       case l: LocalDateTime => compareTo0(l) > 0
       case _                => super.isAfter(other)
@@ -1777,7 +1777,7 @@ final class LocalDateTime private (private val date: LocalDate, private val time
    * @return
    *   true if this date-time is before the specified date-time
    */
-  override def isBefore(other: ChronoLocalDateTime[_ <: ChronoLocalDate]): Boolean =
+  override def isBefore(other: ChronoLocalDateTime[? <: ChronoLocalDate]): Boolean =
     other match {
       case l: LocalDateTime => compareTo0(l) < 0
       case _                => super.isBefore(other)
@@ -1801,7 +1801,7 @@ final class LocalDateTime private (private val date: LocalDate, private val time
    * @return
    *   true if this date-time is equal to the specified date-time
    */
-  override def isEqual(other: ChronoLocalDateTime[_ <: ChronoLocalDate]): Boolean =
+  override def isEqual(other: ChronoLocalDateTime[? <: ChronoLocalDate]): Boolean =
     other match {
       case l: LocalDateTime => compareTo0(l) == 0
       case _                => super.isEqual(other)

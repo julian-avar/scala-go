@@ -19,7 +19,7 @@ object LinkedBlockingQueue {
 
   private[concurrent] class Node[E] private[concurrent] (var item: E) {
 
-    private[concurrent] var next: Node[E] = _
+    private[concurrent] var next: Node[E] = scala.compiletime.uninitialized
   }
 }
 @SerialVersionUID(-6903933977591709194L)
@@ -92,7 +92,7 @@ class LinkedBlockingQueue[E <: AnyRef](
 
   def this() = this(Integer.MAX_VALUE)
 
-  def this(c: util.Collection[_ <: E]) = {
+  def this(c: util.Collection[? <: E]) = {
     this(Integer.MAX_VALUE)
     val putLock = this.putLock
     putLock.lock() // Never contended, but necessary for visibility
@@ -355,9 +355,9 @@ class LinkedBlockingQueue[E <: AnyRef](
     } finally fullyUnlock()
   }
 
-  override def drainTo(c: util.Collection[_ >: E]): Int =
+  override def drainTo(c: util.Collection[? >: E]): Int =
     drainTo(c, Integer.MAX_VALUE)
-  override def drainTo(c: util.Collection[_ >: E], maxElements: Int): Int = {
+  override def drainTo(c: util.Collection[? >: E], maxElements: Int): Int = {
     Objects.requireNonNull(c)
     if (c eq this) throw new IllegalArgumentException
     if (maxElements <= 0) return 0
@@ -412,10 +412,10 @@ class LinkedBlockingQueue[E <: AnyRef](
 
   private[concurrent] class Itr private[concurrent] ()
       extends util.Iterator[E] {
-    private var nextNode: Node[E] = _
-    private var nextItem: E = _
-    private var lastRet: Node[E] = _
-    private var ancestor: Node[E] = _ // Helps unlink lastRet on remove()
+    private var nextNode: Node[E] = scala.compiletime.uninitialized
+    private var nextItem: E = scala.compiletime.uninitialized
+    private var lastRet: Node[E] = scala.compiletime.uninitialized
+    private var ancestor: Node[E] = scala.compiletime.uninitialized // Helps unlink lastRet on remove()
 
     fullyLock()
     try if ({ nextNode = head.next; nextNode != null }) nextItem = nextNode.item
@@ -438,7 +438,7 @@ class LinkedBlockingQueue[E <: AnyRef](
       x
     }
 
-    override def forEachRemaining(action: Consumer[_ >: E]): Unit = {
+    override def forEachRemaining(action: Consumer[? >: E]): Unit = {
       // A variant of forEachFrom
       Objects.requireNonNull(action)
       var p: Node[E] = nextNode
@@ -506,7 +506,7 @@ class LinkedBlockingQueue[E <: AnyRef](
   }
   private[concurrent] final class LBQSpliterator private[concurrent] ()
       extends Spliterator[E] {
-    private[concurrent] var current: Node[E] = _
+    private[concurrent] var current: Node[E] = scala.compiletime.uninitialized
     private[concurrent] var batch = 0 // batch size for splits
     private[concurrent] var exhausted = false // true when no more nodes
     private[concurrent] var est: Long = size() // size estimate
@@ -545,7 +545,7 @@ class LinkedBlockingQueue[E <: AnyRef](
       null
     }
 
-    override def tryAdvance(action: Consumer[_ >: E]): Boolean = {
+    override def tryAdvance(action: Consumer[? >: E]): Boolean = {
       Objects.requireNonNull(action)
       if (!exhausted) {
         var e: E = null.asInstanceOf[E]
@@ -568,7 +568,7 @@ class LinkedBlockingQueue[E <: AnyRef](
       false
     }
 
-    override def forEachRemaining(action: Consumer[_ >: E]): Unit = {
+    override def forEachRemaining(action: Consumer[? >: E]): Unit = {
       Objects.requireNonNull(action)
       if (!exhausted) {
         exhausted = true
@@ -583,13 +583,13 @@ class LinkedBlockingQueue[E <: AnyRef](
 
   override def spliterator(): Spliterator[E] = new LBQSpliterator
 
-  override def forEach(action: Consumer[_ >: E]): Unit = {
+  override def forEach(action: Consumer[? >: E]): Unit = {
     Objects.requireNonNull(action)
     forEachFrom(action, null)
   }
 
   private[concurrent] def forEachFrom(
-      action: Consumer[_ >: E],
+      action: Consumer[? >: E],
       _p: Node[E]
   ): Unit = {
     // Extract batches of elements while holding the lock; then
@@ -630,15 +630,15 @@ class LinkedBlockingQueue[E <: AnyRef](
     }) ()
   }
 
-  override def removeIf(filter: Predicate[_ >: E]): Boolean = {
+  override def removeIf(filter: Predicate[? >: E]): Boolean = {
     Objects.requireNonNull(filter)
     bulkRemove(filter)
   }
-  override def removeAll(c: util.Collection[_]): Boolean = {
+  override def removeAll(c: util.Collection[?]): Boolean = {
     Objects.requireNonNull(c)
     bulkRemove((e: E) => c.contains(e))
   }
-  override def retainAll(c: util.Collection[_]): Boolean = {
+  override def retainAll(c: util.Collection[?]): Boolean = {
     Objects.requireNonNull(c)
     bulkRemove((e: E) => !c.contains(e))
   }
@@ -657,7 +657,7 @@ class LinkedBlockingQueue[E <: AnyRef](
   }
 
   private def bulkRemove(
-      filter: Predicate[_ >: E]
+      filter: Predicate[? >: E]
   ) = {
     var removed = false
     var p = null: Node[E]

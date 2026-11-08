@@ -220,7 +220,7 @@ final class HijrahChronology private () extends Chronology with Serializable {
         throw new DateTimeException("invalid Hijrah era")
     }
 
-  def eras: java.util.List[Era] = Arrays.asList(Array[Era](HijrahEra.values: _*))
+  def eras: java.util.List[Era] = Arrays.asList(Array[Era](HijrahEra.values*))
 
   def range(field: ChronoField): ValueRange = field.range
 

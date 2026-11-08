@@ -351,7 +351,7 @@ final class IsoChronology private () extends Chronology with Serializable {
   /** A period in this chronology (scala-go: the JDK's result type). */
   override def period(years: Int, months: Int, days: Int): Period = Period.of(years, months, days)
 
-  def eras: java.util.List[Era] = Arrays.asList(Array[Era](IsoEra.values: _*))
+  def eras: java.util.List[Era] = Arrays.asList(Array[Era](IsoEra.values*))
 
   def range(field: ChronoField): ValueRange = field.range
 

@@ -795,7 +795,7 @@ final class ZonedDateTime(
     this
   }
 
-  override def compareTo(other: ChronoZonedDateTime[_]): Int = super.compare(other)
+  override def compareTo(other: ChronoZonedDateTime[?]): Int = super.compare(other)
 
   /**
    * Gets the time-zone, such as 'Europe/Paris'.

@@ -283,7 +283,7 @@ abstract class ChronoLocalDateImpl[D <: ChronoLocalDate] private[chrono] ()
     if (daysToSubtract == Long.MinValue) plusDays(Long.MaxValue).plusDays(1)
     else plusDays(-daysToSubtract)
 
-  override def atTime(localTime: LocalTime): ChronoLocalDateTime[_ <: ChronoLocalDate] =
+  override def atTime(localTime: LocalTime): ChronoLocalDateTime[? <: ChronoLocalDate] =
     ChronoLocalDateTimeImpl.of(this, localTime)
 
   def until(endExclusive: Temporal, unit: TemporalUnit): Long = {

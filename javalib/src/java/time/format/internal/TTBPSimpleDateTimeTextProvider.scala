@@ -139,7 +139,7 @@ object TTBPSimpleDateTimeTextProvider {
       def get(index: Long): Option[String] = Option(underlying.get(index))
 
       def sorted: List[(Long, String)] = {
-        import scala.collection.JavaConverters._
+        import scala.jdk.CollectionConverters._
         underlying
           .entrySet()
           .asScala
