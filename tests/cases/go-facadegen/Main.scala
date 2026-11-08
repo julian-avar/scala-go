@@ -1,4 +1,5 @@
-import gofacades.{elm, time}
+import gofacades.elm
+import scalago.gostd.time
 import scalago.go.*
 
 /** A Scala message, which Go code passes around as an elm.Msg. */

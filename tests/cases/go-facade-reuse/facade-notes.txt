@@ -1,0 +1,2 @@
+Go package example.com/rw/text is not generated: dependencies provide its facades (textfacades.text)
+Go package strings is not generated: dependencies provide its facades (scalago.gostd.strings)

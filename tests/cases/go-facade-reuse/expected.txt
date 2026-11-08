@@ -1,0 +1,11 @@
+HELLO, REUSE
+12
+SCALA READER
+ababab
+1.5s
+named upper
+3
+3
+named unit km
+5 bytes in 1s
+5 unit kB 1.0s
