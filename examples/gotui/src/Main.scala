@@ -1,6 +1,7 @@
 import java.nio.charset.StandardCharsets.UTF_8
 
-import gofacades.{io, key, lipgloss, spinner, tea, textinput, time}
+import gofacades.{key, lipgloss, spinner, tea, textinput}
+import scalago.gostd.{io, time}
 import scalago.go.{GoByte, GoException, GoSlice}
 
 /** A todo list in the terminal, written in Scala on bubbletea (the Elm architecture: a model, an
@@ -23,7 +24,9 @@ object Main:
       case app: App => println(app.summary)
       case other    => println(s"unexpected final model: $other")
 
-/** Keys as a terminal delivers them, one per read: a Go io.Reader implemented in Scala. */
+/** Keys as a terminal delivers them, one per read: a Go io.Reader implemented in Scala (the facade
+ *  of scalago-gostd, which the generated facades of bubbletea use).
+ */
 final class ScriptedKeys(keys: Seq[String]) extends io.Reader:
   private var rest = keys.toList
 

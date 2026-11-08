@@ -79,19 +79,37 @@ class EndToEndTests extends munit.FunSuite:
     val goModules = Using.resource(Files.list(dir))(_.iterator.asScala.filter(d => Files.exists(d.resolve("go.mod"))).toList)
       .map(d => goModulePath(d.resolve("go.mod")) -> d.toAbsolutePath.toString)
     val goRequires = goModules.map((m, _) => m -> "v0.0.0")
-    // `facades.txt` lists Go packages whose facades are generated (package `gofacades`) and compiled.
+    // Generated facades: `facades.txt` lists Go packages whose facades are generated (package
+    // `gofacades`) and compiled with the program. Each `facades-<name>.txt` is a set of its own
+    // (package `<name>`), compiled first, in name order, as a dependency of the next ones and of
+    // the program, like a module of its own. Generated facades reuse those of their dependencies
+    // (the earlier sets, and scalago-gostd); `facade-notes.txt` lists notes that FacadeGen must
+    // give (on packages that dependencies provide).
+    val facadeSets = Using.resource(Files.list(dir))(_.iterator.asScala.toSeq)
+      .filter(_.getFileName.toString.matches("facades-.+\\.txt")).sortBy(_.toString)
+    val dependencies = facadeSets.foldLeft(Vector.empty[Path]) { (deps, file) =>
+      val name = file.getFileName.toString.stripPrefix("facades-").stripSuffix(".txt")
+      val result = generateFacades(file, name, deps, work, goRequires, goModules)
+      val out = Files.createDirectories(work.resolve(s"classes-$name"))
+      compile(result.files, out, deps)
+      deps :+ out
+    }
     val facadesFile = dir.resolve("facades.txt")
     val generated =
       if !Files.exists(facadesFile) then Nil
       else
-        val packages = Files.readAllLines(facadesFile, UTF_8).asScala.map(_.trim).filter(_.nonEmpty).toSeq
-        FacadeGen.run(FacadeGen.Config("gofacades", packages, goRequires, goModules), work.resolve("facades"))
-    compile(dir, classes, generated)
+        val result = generateFacades(facadesFile, "gofacades", dependencies, work, goRequires, goModules)
+        val notesFile = dir.resolve("facade-notes.txt")
+        if Files.exists(notesFile) then
+          for line <- Files.readAllLines(notesFile, UTF_8).asScala if line.trim.nonEmpty do
+            assert(result.notes.exists(_.contains(line.trim)), s"missing FacadeGen note: $line\nnotes:\n${result.notes.mkString("\n")}")
+        result.files
+    compile(sourcesIn(dir) ++ generated, classes, dependencies)
     // A library (`library.txt`) is linked and used by the Go module in `consumer/`.
     val isLibrary = Files.exists(dir.resolve("library.txt"))
     // Programs calling Go code (`go-only.txt` says why) cannot run on the JVM.
     if !Files.exists(dir.resolve("go-only.txt")) && !isLibrary then
-      val jvmClasspath = (classes.toString +: userLibrary +: (extraClasspath ++ scalaLibrary)).mkString(File.pathSeparator)
+      val jvmClasspath = (classes.toString +: compileClasspath(dependencies)).mkString(File.pathSeparator)
       assertNoDiff(run(Seq(javaBinary, "-cp", jvmClasspath, mainClass), work, io = io), expected, "JVM output")
 
     val config = Linker.Config(
@@ -107,7 +125,7 @@ class EndToEndTests extends munit.FunSuite:
         if Files.exists(dir.resolve("missing-apis.txt")) then Analyzer.MissingApis.Throw else Analyzer.MissingApis.Error
     )
     val goDir = work.resolve("go")
-    val classpath = (classes +: Path.of(userLibrary) +: extraIR) ++ libraryIR
+    val classpath = (classes +: dependencies) ++ (Path.of(userLibrary) +: extraIR) ++ libraryIR
     if Files.exists(expectedErrors) then
       // The case must fail to link, with (at least) the errors listed in `link-errors.txt`.
       val e = intercept[Linker.LinkingException](Linker.link(classpath, goDir, config))
@@ -223,17 +241,31 @@ class EndToEndTests extends munit.FunSuite:
   private def deleteRecursively(dir: Path): Unit =
     if !sys.env.contains("SCALAGO_KEEP_WORK") then Using.resource(Files.walk(dir))(_.iterator.asScala.toList.reverse.foreach(Files.delete))
 
-  private def compile(sourceDir: Path, outDir: Path, extraSources: Seq[Path]): Unit =
-    val sources = Using.resource(Files.list(sourceDir))(_.iterator.asScala.map(_.toString).filter(_.endsWith(".scala")).toList) ++
-      extraSources.map(_.toString)
+  private def sourcesIn(dir: Path): Seq[Path] =
+    Using.resource(Files.list(dir))(_.iterator.asScala.filter(_.toString.endsWith(".scala")).toList)
+
+  /** The classpath of programs and of generated facades: the classes of the facade sets they
+   *  depend on, the user library, the extra libraries and the Scala library.
+   */
+  private def compileClasspath(dependencies: Seq[Path]): Seq[String] =
+    dependencies.map(_.toString) ++ (userLibrary +: (extraClasspath ++ scalaLibrary))
+
+  /** Generates the facades of the packages listed in `file` into Scala package `scalaPackage`. */
+  private def generateFacades(file: Path, scalaPackage: String, dependencies: Seq[Path], work: Path,
+      goRequires: Seq[(String, String)], goModules: Seq[(String, String)]): FacadeGen.Result =
+    val packages = Files.readAllLines(file, UTF_8).asScala.map(_.trim).filter(_.nonEmpty).toSeq
+    val classpath = compileClasspath(dependencies).map(Path.of(_))
+    FacadeGen.run(FacadeGen.Config(scalaPackage, packages, goRequires, goModules, classpath), work.resolve(s"facades-$scalaPackage"))
+
+  private def compile(sources: Seq[Path], outDir: Path, dependencies: Seq[Path]): Unit =
     val args = Array(
       "-d", outDir.toString,
-      "-classpath", (userLibrary +: (extraClasspath ++ scalaLibrary)).mkString(File.pathSeparator),
+      "-classpath", compileClasspath(dependencies).mkString(File.pathSeparator),
       s"-Xplugin:$pluginClasspath",
       "-color:never"
-    ) ++ sources
+    ) ++ sources.map(_.toString)
     val reporter = dotty.tools.dotc.Main.process(args)
-    assert(!reporter.hasErrors, s"compilation of $sourceDir failed (see output above)")
+    assert(!reporter.hasErrors, s"compilation of ${sources.mkString(", ")} failed (see output above)")
 
   private def javaBinary: String = Path.of(sys.props("java.home"), "bin", "java").toString
 

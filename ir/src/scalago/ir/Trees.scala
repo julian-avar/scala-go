@@ -34,8 +34,11 @@ final case class ClassDef(
  *
  *  @param pkg  the Go import path; `""` for builtin types (`error`)
  *  @param name the Go type name, or `""` for an object standing for a whole Go package
+ *  @param typeAliases for a package: its type aliases that stand for Go types of the package
+ *                    (`type Cmd = () => Msg`), as (Go name, Scala name). Unlike classes, they
+ *                    have no IR of their own; recording them lets generated facades reuse them.
  */
-final case class GoFacade(pkg: String, name: String):
+final case class GoFacade(pkg: String, name: String, typeAliases: List[(String, String)] = Nil):
   def isPackage: Boolean = name.isEmpty
 
 /** A field. `isVolatile` fields (`@volatile`, and lazy val states) are accessed atomically. */

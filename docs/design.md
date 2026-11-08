@@ -368,13 +368,38 @@ from Go packages' APIs, as ScalablyTyped does from `.d.ts` files. Each package b
 - Members whose types cannot be represented are left out with a comment saying why: generics
   with type sets, unnamed structs, arrays, funcs inside Go data, complex numbers, types of
   `internal` packages, and constants beyond `Long`.
+- **Dependencies' facades are reused**, as ScalablyTyped reuses converted libraries, so that
+  values flow between libraries: a Go type has one Scala type, not one per generated set.
+  FacadeGen takes the classpath of the facades' dependencies (`--classpath`; in Mill the
+  module's compile classpath) and reads their facades from the IR (`FacadeIndex`): classes and
+  traits by their `GoFacade`, and type aliases, which have no class, by the package facade
+  that records them (`GoFacade.typeAliases`; the plugin takes them from the object's
+  declarations before erasure). Reading the IR rather than a manifest of FacadeGen's own covers
+  handwritten facades too, and needs nothing beyond what jars already contain. Then:
+  - Go types that a dependency provides are not generated, nor are the types that only they
+    use: generated members take and return the dependency's types (`scalago.gostd.io.Reader`
+    in bubbletea's facades). Their packages are still loaded, for their declarations.
+  - Generated types extend the dependencies' interface facades of the loaded packages, but only
+    those declaring the interface's methods with the types FacadeGen would generate (handwritten
+    traits may differ, and the generated class would not compile). The comparison is on the
+    Scala types the plugin records (`GoMember`), which FacadeGen computes along with the source.
+  - A requested package that dependencies provide completely (all its types, and all the
+    functions, variables and constants that can be generated) is not generated: FacadeGen says
+    so. Otherwise the generated object has its members, with the dependencies' types.
+  - A Go package can thus have facade objects in several modules (`textfacades.base` with
+    `Named`, `gofacades.base` with `Unit`), which the linker allows: facades are matched by
+    the Go type they stand for, not by class. An object whose name a dependency's facade
+    already has is an error (the sets need different Scala packages).
 
 Generated facades are checked against Go at link time like handwritten ones, but only where
 used, so unused members cost nothing. `scalago-gostd` (`gostd/` in this build) has the facades
 of 21 standard library packages and the types of `io/fs`, `reflect` and `syscall` that they use,
 about 1,700 members. The `go-std` test case uses them; `go-facadegen` generates facades of a
-local module written in the style of bubbletea and checks the rules above; and `examples/gotui/` (`mill
-examples.gotui.check`) uses bubbletea, bubbles and lipgloss.
+local module written in the style of bubbletea and checks the rules above; `go-facade-reuse`
+generates two sets (`facades-<package>.txt` sets are compiled as dependencies of `facades.txt`)
+that pass values to each other and to `scalago-gostd`; and `examples/gotui/` (`mill
+examples.gotui.check`) uses bubbletea, bubbles and lipgloss, with `scalago-gostd` for the
+standard library's types.
 
 ### Go data in Scala
 

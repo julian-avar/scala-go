@@ -1,0 +1,3 @@
+example.com/rw/meter
+example.com/rw/text
+strings

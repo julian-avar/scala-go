@@ -266,8 +266,21 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
         report.error("scala-go: unexpected definition in a Go facade", other.srcPos)
         Nil
     }
+    val withAliases = if facade.isPackage then facade.copy(typeAliases = typeAliases(sym)) else facade
     ir.ClassDef(className(sym), classKind(sym), sym.is(Abstract), superClass, interfaces, Nil, methods, position(td),
-      Some(facade))
+      Some(withAliases))
+
+  /** The public type aliases of a package facade (`type Cmd = () => Msg`), which stand for the Go
+   *  types of the package named as them (or by `@GoName`). Erasure drops them, so they are taken
+   *  from the class's declarations as seen before.
+   */
+  private def typeAliases(sym: ClassSymbol): List[(String, String)] =
+    atPhase(erasurePhase) {
+      sym.info.decls.toList.filter(d => d.isAliasType && !d.is(Private) && !d.is(Synthetic)).map { d =>
+        val name = d.name.toString
+        goNameOf(d).getOrElse(name) -> name
+      }.sortBy(_._2)
+    }
 
   private def isModuleField(sym: Symbol): Boolean = sym.name.toString == "MODULE$"
 
