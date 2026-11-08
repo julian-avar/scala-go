@@ -204,6 +204,9 @@ func ClassIsAssignableFrom(c, other *Class) bool {
 	case ClassIsArray(c) || other == classjava_lang_Object:
 		return false
 	}
+	if _, ok := hijackedAncestors[c.name]; ok {
+		return false // they have no subclasses (BigInteger and BigDecimal cannot be extended)
+	}
 	if ancestors, ok := hijackedAncestors[other.name]; ok {
 		for _, a := range ancestors {
 			if a == c.name {

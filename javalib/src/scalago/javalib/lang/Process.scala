@@ -65,7 +65,7 @@ abstract class Process:
 /** A started process (`scalago.runtime.Subprocesses`): its pipes are buffered streams, as the
  *  JDK's (what is written to its input reaches it when flushed or closed).
  */
-private[lang] final class ProcessImpl(process: Object, mergeErrors: scala.Boolean) extends Process:
+private[lang] final class ProcessImpl(process: Object) extends Process:
   private def pipe(handle: Object): FileDescriptor = if handle == null then null else FileDescriptor.fromHandle(handle)
 
   private val stdin: OutputStream =

@@ -106,7 +106,7 @@ final class ProcessBuilder(private var commandList: List[String]):
     val result = Subprocesses.start(command, if dir == null then null else dir.getPath(), environment, kinds, paths,
       mergeErrors)
     if OS.isError(result) then throw failure(Subprocesses.errorMessage(result))
-    new ProcessImpl(result, mergeErrors)
+    new ProcessImpl(result)
 
 object ProcessBuilder:
   /** The environment of a ProcessBuilder: names and values are checked as on the JDK. */
