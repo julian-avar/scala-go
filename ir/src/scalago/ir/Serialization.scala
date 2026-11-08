@@ -10,7 +10,7 @@ import scala.collection.mutable
  */
 object Serialization:
   val Magic: Int = 0x53474f49 // "SGOI"
-  val FormatVersion: Int = 7
+  val FormatVersion: Int = 8
   val FileExtension: String = ".goir"
 
   final class IRFormatException(msg: String) extends IOException(msg)
@@ -175,7 +175,7 @@ object Serialization:
         option(m.goExport) { g => str(g.goName); list(g.params)(scalaType); scalaType(g.result); bool(g.returnsError) }
       }
       pos(c.pos)
-      option(c.goFacade) { f => str(f.pkg); str(f.name) }
+      option(c.goFacade) { f => str(f.pkg); str(f.name); list(f.typeAliases) { (g, s) => str(g); str(s) } }
       option(c.goExport)(str)
 
     def scalaType(t: ScalaType): Unit = t match
@@ -280,7 +280,7 @@ object Serialization:
           option(GoMember(str(), list(scalaType()), scalaType(), bool())),
           option(GoExport(str(), list(scalaType()), scalaType(), bool())))
       }
-      ClassDef(name, kind, isAbstract, superClass, interfaces, fields, methods, pos(), option(GoFacade(str(), str())),
+      ClassDef(name, kind, isAbstract, superClass, interfaces, fields, methods, pos(), option(GoFacade(str(), str(), list((str(), str())))),
         option(str()))
 
     def scalaType(): ScalaType = in.readUnsignedByte() match
