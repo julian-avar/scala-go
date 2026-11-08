@@ -593,18 +593,18 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   private def genExprs(trees: List[Tree], expected: List[Type] = Nil): List[String] =
     val exprs = mutable.ArrayBuffer.empty[String]
     val marks = mutable.ArrayBuffer.empty[Int]
-    for (t, i) <- trees.zipWithIndex do
-      val e = genExpr(t)
-      exprs += (if i < expected.size then adapt(e, t.tpe, expected(i)) else e)
+    for t <- trees do
+      exprs += genExpr(t)
       marks += out.size
     val end = out.size
+    // Spilled values keep their own type; they are adapted where used, like the others.
     for i <- trees.indices.reverse if marks(i) < end && !isPure(trees(i)) do
       val temp = freshTemp()
       val goType = ctx.goType(trees(i).tpe)
       val p = if trees(i).pos.line > 0 then trees(i).pos else pos
       out.insert(marks(i), GoLine(s"var $temp ${if goType.isEmpty then "any" else goType} = ${exprs(i)}", p))
       exprs(i) = temp
-    exprs.toList
+    exprs.toList.zipWithIndex.map((e, i) => if i < expected.size then adapt(e, trees(i).tpe, expected(i)) else e)
 
   /** Converts a Go value of IR type `from` for a location of IR type `to`. Scala upcasts need no
    *  conversion in the IR, but a class that is never instantiated has Go type `any`, which Go does
