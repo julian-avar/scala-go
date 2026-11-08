@@ -328,7 +328,12 @@ object Linker:
           case Some(Natives.Native.Static(gen))   => Some(gen(args))
           case Some(Natives.Native.NullResult)    => Some("nil")
           // An interface's default method (see Program.hijackedDefault).
-          case None => ctx.program.hijackedDefault(h, m).map(i => s"${Mangling.impl(i, m)}(${("v" :: args).mkString(", ")})")
+          case None =>
+            ctx.program.hijackedDefault(h, m).map(i => s"${Mangling.impl(i, m)}(${("v" :: args).mkString(", ")})")
+              .orElse(ctx.program.hijackedCompanionMethod(h, m).map { (module, method) =>
+                // A method written in Scala, in the companion object (see Program.hijackedCompanionMethod).
+                s"${Mangling.module(module)}().${Mangling.virtualMethod(method)}(${("v" :: args).mkString(", ")})"
+              })
         for call <- call do
           line(s"\tcase $goType:")
           line(s"\t\t$ret$call")

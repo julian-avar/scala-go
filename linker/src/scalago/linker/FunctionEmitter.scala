@@ -515,13 +515,16 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     case tree: Apply           => genApply(tree)
     case tree: ApplyStatically => genApplyStatically(tree)
 
-    case ApplyStatic(cls, m, args, _) =>
+    case app @ ApplyStatic(cls, m, args, _) =>
       Natives.lookup(cls, m) match
         case Some(native) => genNative(native, None, args, m)
         case None =>
-          val as = genExprs(args, m.params)
-          initStatics(cls)
-          s"${Mangling.impl(cls, m)}(${as.mkString(", ")})"
+          program.staticMethodViaCompanion(app) match
+            case Some(call) => genExpr(call)
+            case None =>
+              val as = genExprs(args, m.params)
+              initStatics(cls)
+              s"${Mangling.impl(cls, m)}(${as.mkString(", ")})"
 
     case Unary(op, arg) =>
       val a = genExpr(arg)

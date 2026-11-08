@@ -137,6 +137,27 @@ final class Program(irClasses: Seq[ClassDef]):
         .flatMap(i => resolveImplementation(i, m).filter(isInterface))
         .find(i => findMethod(i, m).exists(d => !d.isAbstract && !d.isStatic))
 
+  /** A call of static method `cls.m` that `cls` does not have, as a call of the method of its
+   *  companion object, if that object has one (see `staticFieldViaCompanion`).
+   */
+  def staticMethodViaCompanion(app: Tree.ApplyStatic): Option[Tree] =
+    val Tree.ApplyStatic(cls, m, args, tpe) = app
+    val module = cls + "$"
+    val hasStatic = findMethod(cls, m).exists(d => d.isStatic && !d.isAbstract)
+    Option.when(!hasStatic && get(module).exists(_.kind == ClassKind.ModuleClass) && findMethod(module, m).exists(!_.isStatic)) {
+      Tree.Apply(Tree.LoadModule(module)(app.pos), module, m, args, tpe)(app.pos)
+    }
+
+  /** An instance method of a hijacked class (`String`, boxes) written in Scala in javalib: a method
+   *  of its companion object taking the receiver first (`java.lang.String$.lines(String)` for
+   *  `"...".lines()`). Natives take precedence. Returns the object and the method.
+   */
+  def hijackedCompanionMethod(h: ClassName, m: MethodName): Option[(ClassName, MethodName)] =
+    val module = h + "$"
+    val method = MethodName(m.simple, Type.Class(h) :: m.params, m.result)
+    Option.when(Natives.lookup(h, m).isEmpty && get(module).exists(_.kind == ClassKind.ModuleClass) &&
+      findMethod(module, method).exists(d => !d.isStatic && !d.isAbstract))((module, method))
+
   /** A read of static field `cls.field` (of type `tpe`) that `cls` does not have, as a call of the
    *  getter of the same name on its companion object, if that object has one. javalib's classes
    *  are Scala, where Java's static constants are usually members of the companion object

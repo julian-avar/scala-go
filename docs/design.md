@@ -105,6 +105,13 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
      runtime (`Threads`, `AtomicArrays`, `Regexes`, `Console`, `OS`, `Process`, `Subprocesses`, `Net`, `Crypto`,
      `Zip`): Scala objects whose
      methods throw on the JVM and become Go calls when linked.
+   - **`String` members written in Scala.** `String` is a Go value whose methods are natives;
+     the members that are easier in Scala (`lines()`, `CASE_INSENSITIVE_ORDER`,
+     `join(delimiter, Iterable)`) are in javalib's `java.lang.String$` object
+     (`scalago.javalib.hijacked.lang.String`). A static member without a native is the object's,
+     and an instance method without a native is the object's method taking the receiver first
+     (`Program.staticMethodViaCompanion`, `hijackedCompanionMethod`); this works for any
+     hijacked class.
    - **Static constants of javalib objects.** Java's static fields (`Collections.EMPTY_LIST`,
      `Attributes.Name.MAIN_CLASS`) are usually members of the companion object in javalib's
      Scala. A read of a static field that a class does not have becomes a call of the companion
@@ -922,11 +929,11 @@ Known gaps:
   in [java.time](#javatime).
 - `java.util`: `Stream.gather` (Java 24's gatherers), the concurrent collectors
   (`groupingByConcurrent`, `toConcurrentMap`, waiting for `java.util.concurrent`'s maps),
-  `String.lines()`, parallel execution of parallel streams, the reversed views of
+  parallel execution of parallel streams, the reversed views of
   sequenced maps (`LinkedHashMap.reversed()`, `sequencedKeySet()`, ...), `Formatter`,
   `Calendar`/`Timer`, `EnumSet`/`EnumMap`, `ServiceLoader`,
-  `Arrays.compare`/`mismatch` and the range forms of `Arrays.equals`, `String.CASE_INSENSITIVE_ORDER`,
-  `String.join(delimiter, Iterable)`, and `Properties` keys continued over several lines.
+  `Arrays.compare`/`mismatch` and the range forms of `Arrays.equals`, and `Properties` keys
+  continued over several lines.
   Arrays of references do not know their element type, so `toArray(new Array[String](0))` and
   `Arrays.copyOf` return arrays whose `getClass` is `Object[]`, and an array of references is
   an `Array[Unit]` (to type tests, which the Scala library makes before those for

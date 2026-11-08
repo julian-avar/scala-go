@@ -5,6 +5,9 @@ true
 mixed MIXED
 7-x-1.01
 a, b, null, d|x|
+x/y/z 
+[Apple, apple, banana, cherry]
+[one, two, three, four] 0 [, ]
 java.lang.IllegalStateException: outer
 true
 	at Main$.main(Main.scala) 	at Main.main(Main.scala)

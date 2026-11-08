@@ -20,6 +20,12 @@ object Main:
     println("MiXeD".toLowerCase(Locale.ROOT) + " " + "MiXeD".toUpperCase(Locale.ENGLISH))
     println(String.format(Locale.ROOT, "%d-%s-%.2f", Integer.valueOf(7), "x", java.lang.Double.valueOf(1.005)))
     println(String.join(", ", "a", "b", null, "d") + "|" + String.join("", "x") + "|" + String.join("-"))
+    // String members written in Scala (javalib's String companion).
+    println(String.join("/", java.util.List.of("x", "y", "z")) + " " + String.join("+", new java.util.ArrayList[String]()))
+    val words = new java.util.ArrayList(java.util.List.of("banana", "Apple", "cherry", "apple"))
+    words.sort(String.CASE_INSENSITIVE_ORDER)
+    println(words)
+    println(s"${"one\ntwo\r\nthree\rfour\n".lines().toList} ${"".lines().count()} ${"\n\n".lines().toList}")
 
     val sw = new StringWriter()
     val e = new IllegalStateException("outer", new RuntimeException("inner"))

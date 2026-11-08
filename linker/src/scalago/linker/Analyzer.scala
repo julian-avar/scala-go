@@ -63,6 +63,12 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
     if calledNames.add(m) then
       for c <- instantiated.toList; impl <- program.vtable(c).get(m) do reach(impl, m)
       for h <- Hijacked.instanceGoType.keys; impl <- program.hijackedDefault(h, m) do reach(impl, m)
+      for h <- Hijacked.instanceGoType.keys; (module, method) <- program.hijackedCompanionMethod(h, m) do
+        instantiate(module)
+        reach(module, MethodName(MethodName.ConstructorSimpleName, Nil, Type.Void))
+        initializeStatics(module)
+        typedCalls += ((module, method))
+        reachVirtual(method)
 
   def reach(cls: ClassName, m: MethodName): Unit =
     program.findMethod(cls, m).filterNot(_.isAbstract).foreach { _ =>
@@ -193,6 +199,12 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
               case _ => callVirtual(m)
             if Natives.objectMethod(m).isEmpty then
               receiver.tpe match
+                case Type.Class(c) if Hijacked.isHijacked(c) =>
+                  // A native of the class itself (the call may be declared by a supertype), an
+                  // interface's default method, or one written in Scala in javalib.
+                  if Natives.lookup(c, m).isEmpty && program.hijackedDefault(c, m).isEmpty &&
+                    program.hijackedCompanionMethod(c, m).isEmpty then
+                    missing(tree, Analyzer.MissingKind.Method, s"method $c.$m is not available (no native implementation)")
                 case Type.Class(c) if program.contains(c) && !program.vtable(c).contains(m) && !Hijacked.hijackedAncestors(c) =>
                   missing(tree, Analyzer.MissingKind.Method, s"method $m not found in $c")
                 case Type.Class(c) if !program.contains(c) && !Hijacked.hijackedAncestors(c) && !Hijacked.isHijacked(c) =>
@@ -208,14 +220,18 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
         scan(receiver)
         scanAll(args)
 
-      case ApplyStatic(cls, m, args, _) =>
+      case app @ ApplyStatic(cls, m, args, _) =>
         Natives.calledBy(cls, m).foreach(callVirtual)
-        if Natives.lookup(cls, m).isEmpty then
-          if program.findMethod(cls, m).exists(d => d.isStatic && !d.isAbstract) then
-            reach(cls, m)
-            initializeStatics(cls)
-          else missing(tree, Analyzer.MissingKind.Method, s"static method $cls.$m is not available")
-        scanAll(args)
+        if Natives.lookup(cls, m).isDefined then scanAll(args)
+        else if program.findMethod(cls, m).exists(d => d.isStatic && !d.isAbstract) then
+          reach(cls, m)
+          initializeStatics(cls)
+          scanAll(args)
+        else program.staticMethodViaCompanion(app) match
+          case Some(call) => scan(call) // with the arguments
+          case None =>
+            missing(tree, Analyzer.MissingKind.Method, s"static method $cls.$m is not available")
+            scanAll(args)
 
       case sel @ SelectStatic(cls, field, _) =>
         if Natives.staticField(cls, field).isEmpty then
