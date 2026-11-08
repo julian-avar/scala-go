@@ -138,6 +138,12 @@ object Files:
     if OS.isError(r) then throw translate(r, link.toString, null)
     link
 
+  /** A hard link. */
+  @static def createLink(link: Path, existing: Path): Path =
+    val r = OS.link(existing.toString, link.toString)
+    if OS.isError(r) then throw translate(r, link.toString, existing.toString)
+    link
+
   @static def readSymbolicLink(link: Path): Path =
     val r = OS.readLink(link.toString)
     if OS.isError(r) then

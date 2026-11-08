@@ -84,6 +84,8 @@ object OS:
   def chmod(path: String, permissions: Int): Object = native
   def setModified(path: String, millis: Long): Object = native
   def symlink(target: String, link: String): Object = native
+  /** Makes a hard link to `existing`: null, or an error. */
+  def link(existing: String, link: String): Object = native
   /** The link's target, or an error. */
   def readLink(path: String): Object = native
   /** The absolute path with symbolic links resolved, or an error. */

@@ -351,6 +351,8 @@ func OSSetModified(path *String, millis int64) any {
 
 func OSSymlink(target, link *String) any { return nilOrError(os.Symlink(goPath(target), goPath(link))) }
 
+func OSLink(existing, link *String) any { return nilOrError(os.Link(goPath(existing), goPath(link))) }
+
 func OSReadLink(path *String) any {
 	target, err := os.Readlink(goPath(path))
 	if err != nil {

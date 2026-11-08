@@ -801,6 +801,7 @@ object Natives:
       s"chmod(${JS}I)$JO" -> "rt.OSChmod",
       s"setModified(${JS}J)$JO" -> "rt.OSSetModified",
       s"symlink($JS$JS)$JO" -> "rt.OSSymlink",
+      s"link($JS$JS)$JO" -> "rt.OSLink",
       s"readLink($JS)$JO" -> "rt.OSReadLink",
       s"realPath($JS)$JO" -> "rt.OSRealPath",
       s"workingDir()$JS" -> "rt.OSWorkingDir",
