@@ -1,0 +1,90 @@
+-- FileChannel
+open true size 0 position 0
+wrote 15 position 15 size 15
+gathered 11 size 26
+read 8 'channels' position 15
+positional read 8 'hello, c' position 15
+positional write 5 position 15
+read past the end -1
+at end -1
+scattered 7 'HEL' 'LO, '
+truncate 12 position 7 12
+position beyond the end 20 read -1
+contents 'HELLO, chann'
+-- options
+java.nio.file.NoSuchFileException: missing
+java.nio.file.FileAlreadyExistsException: data.bin
+java.lang.IllegalArgumentException: READ + APPEND not allowed
+java.lang.IllegalArgumentException: APPEND + TRUNCATE_EXISTING not allowed
+java.nio.channels.NonWritableChannelException: null
+java.nio.channels.NonWritableChannelException: null
+java.nio.channels.NonWritableChannelException: null
+java.lang.IllegalArgumentException: Read-only buffer
+append position 12 java.nio.channels.NonReadableChannelException: null
+appended size 13 position 13
+truncated size 0
+delete on close: exists false
+after close: exists false open false java.nio.channels.ClosedChannelException: null java.nio.channels.ClosedChannelException: null
+-- transfers
+transferTo 5 '23456' position 0
+transferFrom 10 size 10 position 0
+transferFrom beyond the end 1
+transferFrom a stream 2
+copy size 51 '0123456789ab' 1
+-- map
+4 true 36 java.nio.ReadOnlyBufferException: null
+java.nio.channels.NonWritableChannelException: null
+private X file 012
+-- locks
+[0:9223372036854775807 exclusive valid] valid true shared false channel true
+java.nio.channels.OverlappingFileLockException: null
+overlaps true false
+released: valid false
+[0:4 shared valid] [4:4 exclusive valid]
+java.nio.channels.OverlappingFileLockException: null
+other region [10:1 exclusive valid]
+after closing the other channel true
+-- stream channels
+same channel true position 0
+read 01 position 2
+stream reads 5 at the channel's position, size 10
+channel open after closing the stream: false
+position 4 java.nio.channels.NonReadableChannelException: null
+java.io.IOException: Stream Closed
+append position 4
+raf position 2 read 2 pointer 4
+-- Channels
+true size 10
+available 10 skip 3 read 3
+rest '456789' read -1
+closing the stream closes the channel: false
+written through a channel: ü | second line | null
+to a stream
+13 'from a stream' -1
+java.nio.channels.ClosedChannelException: null
+-- FileSystem
+true open true readOnly false separator /
+root /
+a/b/c
+java.lang.UnsupportedOperationException: null
+glob:*.txt: a.txt
+glob:**.txt: a.txt dir/b.txt
+glob:**/*.scala: dir/sub/c.scala
+glob:*.{txt,scala}: a.txt Main.scala
+glob:dir/*: dir/b.txt
+glob:dir/**: dir/b.txt dir/sub/c.scala
+glob:data?.csv: data1.csv
+glob:data[0-9]*.csv: data1.csv data22.csv
+glob:[!a-m]*: Main.scala .hidden x.TXT
+glob:.*: .hidden
+glob:*.[tT][xX][tT]: a.txt x.TXT
+regex:.*\.(txt|csv): a.txt dir/b.txt data1.csv data22.csv
+regex:dir/.*: dir/b.txt dir/sub/c.scala
+GLOB:a.txt: a.txt
+glob:[abc: java.util.regex.PatternSyntaxException: Missing '] near index 3
+glob:{a,{b}}: java.util.regex.PatternSyntaxException: Cannot nest groups near index 3
+glob:a\: java.util.regex.PatternSyntaxException: No character to escape near index 1
+glob:[a/b]: java.util.regex.PatternSyntaxException: Explicit 'name separator' in class near index 2
+foo:x: java.lang.UnsupportedOperationException: Syntax 'foo' not recognized
+nocolon: java.lang.IllegalArgumentException: null
+:x: java.lang.IllegalArgumentException: null

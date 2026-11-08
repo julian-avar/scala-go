@@ -1,0 +1,107 @@
+-- ByteBuffer
+java.nio.HeapByteBuffer[pos=0 lim=16 cap=16]
+BIG_ENDIAN hasArray true direct false readOnly false offset 0
+pos=16 lim=16 cap=16 rem=0
+1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16
+pos=0 lim=16 cap=16 rem=16 get 1 short 515 int 84281096 long 651345242494996240
+LITTLE_ENDIAN short 1027 int 134678021 long 1157159078456920585 char 513
+0,0,-64,63,0,0,0,0,0,0,2,-64,-23,0 float 1.5 double -2.25 char é
+big-endian float 6.8965E-41 double 3.48E-321
+-- positions
+pos=3 lim=8 cap=12 rem=5
+lo, pos=6 lim=8 cap=12 rem=2
+after reset pos=3 lim=8 cap=12 rem=5
+position 6 pos=6 lim=8 cap=12 rem=2 ok java.nio.HeapByteBuffer[pos=3 lim=8 cap=12]
+limit 4 pos=3 lim=4 cap=12 rem=1
+rewind pos=0 lim=4 cap=12 rem=4
+slice pos=0 lim=4 cap=4 rem=4 first h offset 0
+duplicate pos=2 lim=4 cap=12 rem=2 original pos=0 lim=4 cap=12 rem=4
+compact pos=4 lim=6 cap=6 rem=2 cdefef
+slice(1, 3) pos=0 lim=3 cap=3 rem=3 d
+-- bulk
+pos=6 lim=6 cap=6 rem=0 pos=6 lim=8 cap=8 rem=2 1,2,3,4,5,6,0,0
+9,9,3,4,5,7,7,0
+9,3,4,5
+-- errors
+java.lang.IllegalArgumentException: newPosition > limit: (9 > 8)
+java.lang.IllegalArgumentException: newPosition < 0: (-1 < 0)
+java.lang.IllegalArgumentException: newLimit > capacity: (9 > 8)
+java.lang.IndexOutOfBoundsException: null
+java.lang.IndexOutOfBoundsException: null
+java.lang.IndexOutOfBoundsException: null
+java.nio.BufferUnderflowException: null
+java.nio.BufferOverflowException: null
+java.nio.BufferUnderflowException: null
+java.lang.IndexOutOfBoundsException: Range [2, 2 + 2) out of bounds for length 3
+java.lang.IllegalArgumentException: The source buffer is this buffer
+java.lang.IndexOutOfBoundsException: Range [3, 3 + 9) out of bounds for length 8
+java.lang.IllegalArgumentException: capacity < 0: (-1 < 0)
+java.lang.IndexOutOfBoundsException: null
+java.nio.HeapByteBufferR[pos=6 lim=8 cap=8] true hasArray false
+java.nio.ReadOnlyBufferException: null
+java.nio.ReadOnlyBufferException: null
+java.nio.ReadOnlyBufferException: null
+java.nio.ReadOnlyBufferException: null
+-- comparisons
+-5
+2
+true
+2
+-1
+32737
+-89281
+false
+-- views
+java.nio.ByteBufferAsIntBufferB[pos=0 lim=4 cap=4]
+0,0,0,1,-1,-1,-1,-2,1,2,3,4
+BIG_ENDIAN 16909060 hasArray false java.lang.UnsupportedOperationException: null
+java.nio.ByteBufferAsIntBufferL[pos=0 lim=4 cap=4] LITTLE_ENDIAN 67305985
+java.nio.ByteBufferAsLongBufferL[pos=0 lim=1 cap=1] 289077008678256639
+java.nio.ByteBufferAsShortBufferRL[pos=0 lim=6 cap=6] java.nio.ReadOnlyBufferException: null
+java.nio.ByteBufferAsCharBufferB 'hi!' 3 i
+java.nio.ByteBufferAsDoubleBufferB[pos=2 lim=2 cap=2] 1.0 0.1 java.nio.BufferUnderflowException: null
+java.nio.ByteBufferAsFloatBufferB[pos=0 lim=1 cap=1] 4.0
+-- typed buffers
+java.nio.HeapIntBuffer[pos=0 lim=4 cap=4] true hasArray true
+pos=0 lim=3 cap=4 rem=3 1 1 java.lang.IndexOutOfBoundsException: null
+-1 1 32737
+java.nio.HeapLongBuffer[pos=0 lim=2 cap=2] 1099511627776 930 java.nio.HeapLongBufferR[pos=0 lim=2 cap=2]
+5 java.nio.HeapShortBuffer[pos=0 lim=1 cap=1] 1
+true
+true
+-1
+-1
+1024
+1
+java.nio.HeapDoubleBufferR[pos=0 lim=1 cap=1] java.nio.ReadOnlyBufferException: null java.nio.ReadOnlyBufferException: null
+java.lang.IllegalArgumentException: capacity < 0: (-1 < 0)
+-- CharBuffer
+pos=8 lim=8 cap=8 rem=0 java.nio.BufferOverflowException: null
+'héllo, w' length 8 charAt(1) é java.lang.IndexOutOfBoundsException: null
+subSequence 'éll' pos=1 lim=4 cap=8 rem=3
+java.nio.HeapCharBuffer -870586068 true
+java.nio.StringCharBuffer 'bcd' pos=1 lim=4 cap=6 rem=3 readOnly true java.nio.ReadOnlyBufferException: null java.lang.UnsupportedOperationException: null
+chars 98,99,100 slice 'bcd' get b 'cd'
+isEmpty true compare -1
+java.nio.BufferOverflowException: null
+java.lang.IndexOutOfBoundsException: null
+read 10 'read throu'
+Readable 4 'read' 'able'
+into a StringBuilder
+a+bc
+-- charsets
+pos=0 lim=20 71,114,-61,-68,-61,-97,101,44,32,-28,-72,-106,-25,-107,-116,32,-16,-97,-104,-128
+'Grüße, 世界 😀' 0
+'a�b'
+latin1 -23,63
+java.nio.charset.MalformedInputException: Input length = 1
+UNDERFLOW pos=1 lim=2 cap=4 rem=1 pos=1 lim=10 cap=10 rem=9
+UNDERFLOW pos=4 lim=4 cap=4 rem=0 'añb' flush UNDERFLOW
+java.lang.IllegalStateException: Current state = FLUSHED, new state = CODING
+OVERFLOW overflow true java.lang.UnsupportedOperationException: null
+MALFORMED[1] malformed true length 1 pos=1 lim=3 cap=3 rem=2 java.nio.charset.MalformedInputException: Input length = 1
+canEncode true false true
+java.nio.charset.UnmappableCharacterException: Input length = 1
+UNMAPPABLE[1] unmappable true pos=3 lim=10 cap=10 rem=7
+caf* java.lang.IllegalArgumentException: Illegal replacement
+MALFORMED[2] UNMAPPABLE[1] UNDERFLOW

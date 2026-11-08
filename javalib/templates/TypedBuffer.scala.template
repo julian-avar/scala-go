@@ -1,0 +1,225 @@
+// Generated from javalib/templates/TypedBuffer.scala.template by javalib.generatedSources.
+package java.nio
+
+/** java.nio.$B$ (see [[Buffer]]): an array (`Heap$B$`) or a view of a byte array
+ *  (`ByteBufferAs$B$`).
+ */
+abstract class $B$ private[nio] (cap: Int) extends Buffer(cap) with Comparable[$B$]:
+  // The implementations' part: elements by index (from element 0, unchecked), the backing
+  // array if there is one, and buffers over the same elements.
+  private[nio] def load(i: Int): $T$
+  private[nio] def store(i: Int, x: $T$): Unit
+  /** The array holding the elements (null for views of byte buffers). */
+  private[nio] def backing: Array[$T$]
+  /** The index of element 0 in [[backing]]. */
+  private[nio] def backingOffset: Int
+  /** A buffer of the same kind over the `cap` elements from `index`. */
+  private[nio] def sliceAt(index: Int, cap: Int): $B$
+  /** A read-only buffer over the same elements. */
+  private[nio] def readOnlyView(): $B$
+
+  def order(): ByteOrder
+
+  final def hasArray(): Boolean = backing != null && !isReadOnly()
+
+  final def array(): Array[$T$] =
+    if backing == null then throw new UnsupportedOperationException()
+    if isReadOnly() then throw new ReadOnlyBufferException()
+    backing
+
+  final def arrayOffset(): Int =
+    if backing == null then throw new UnsupportedOperationException()
+    if isReadOnly() then throw new ReadOnlyBufferException()
+    backingOffset
+
+  def slice(): $B$ = sliceAt(pos, remaining())
+
+  def slice(index: Int, length: Int): $B$ =
+    Buffer.checkRange(index, length, lim)
+    sliceAt(index, length)
+
+  def duplicate(): $B$ =
+    val b = sliceAt(0, capacity())
+    b.init(pos, lim, markPos)
+    b
+
+  def asReadOnlyBuffer(): $B$ =
+    val b = readOnlyView()
+    b.init(pos, lim, markPos)
+    b
+
+  def compact(): $B$ =
+    checkWritable()
+    val n = remaining()
+    val a = backing
+    if a != null then System.arraycopy(a, backingOffset + pos, a, backingOffset, n)
+    else
+      var i = 0
+      while i < n do
+        store(i, load(pos + i))
+        i += 1
+    pos = n
+    lim = capacity()
+    markPos = -1
+    this
+
+  final def get(): $T$ = load(nextGetIndex())
+  final def get(index: Int): $T$ = load(checkIndex(index))
+
+  final def put(x: $T$): $B$ =
+    checkWritable()
+    store(nextPutIndex(), x)
+    this
+
+  final def put(index: Int, x: $T$): $B$ =
+    checkWritable()
+    store(checkIndex(index), x)
+    this
+
+  /** Copies `n` elements from `index` to `dst(off)`. */
+  private def loadAll(index: Int, dst: Array[$T$], off: Int, n: Int): Unit =
+    val a = backing
+    if a != null then System.arraycopy(a, backingOffset + index, dst, off, n)
+    else
+      var i = 0
+      while i < n do
+        dst(off + i) = load(index + i)
+        i += 1
+
+  /** Copies `n` elements from `src(off)` to `index`. */
+  private def storeAll(index: Int, src: Array[$T$], off: Int, n: Int): Unit =
+    val a = backing
+    if a != null then System.arraycopy(src, off, a, backingOffset + index, n)
+    else
+      var i = 0
+      while i < n do
+        store(index + i, src(off + i))
+        i += 1
+
+  /** Copies `n` elements of `src` from `srcIndex` to `index`. */
+  private def storeAll(index: Int, src: $B$, srcIndex: Int, n: Int): Unit =
+    val a = src.backing
+    if a != null then storeAll(index, a, src.backingOffset + srcIndex, n)
+    else
+      var i = 0
+      while i < n do
+        store(index + i, src.load(srcIndex + i))
+        i += 1
+
+  def get(dst: Array[$T$], off: Int, length: Int): $B$ =
+    Buffer.checkRange(off, length, dst.length)
+    if length > remaining() then throw new BufferUnderflowException()
+    loadAll(pos, dst, off, length)
+    pos += length
+    this
+
+  def get(dst: Array[$T$]): $B$ = get(dst, 0, dst.length)
+
+  def get(index: Int, dst: Array[$T$], off: Int, length: Int): $B$ =
+    Buffer.checkRange(index, length, lim)
+    Buffer.checkRange(off, length, dst.length)
+    loadAll(index, dst, off, length)
+    this
+
+  def get(index: Int, dst: Array[$T$]): $B$ = get(index, dst, 0, dst.length)
+
+  def put(src: $B$): $B$ =
+    if src eq this then throw new IllegalArgumentException("The source buffer is this buffer")
+    checkWritable()
+    val n = src.remaining()
+    if n > remaining() then throw new BufferOverflowException()
+    storeAll(pos, src, src.pos, n)
+    src.pos += n
+    pos += n
+    this
+
+  def put(index: Int, src: $B$, off: Int, length: Int): $B$ =
+    Buffer.checkRange(index, length, lim)
+    Buffer.checkRange(off, length, src.lim)
+    checkWritable()
+    storeAll(index, src, off, length)
+    this
+
+  def put(src: Array[$T$], off: Int, length: Int): $B$ =
+    checkWritable()
+    Buffer.checkRange(off, length, src.length)
+    if length > remaining() then throw new BufferOverflowException()
+    storeAll(pos, src, off, length)
+    pos += length
+    this
+
+  final def put(src: Array[$T$]): $B$ = put(src, 0, src.length)
+
+  def put(index: Int, src: Array[$T$], off: Int, length: Int): $B$ =
+    checkWritable()
+    Buffer.checkRange(index, length, lim)
+    Buffer.checkRange(off, length, src.length)
+    storeAll(index, src, off, length)
+    this
+
+  def put(index: Int, src: Array[$T$]): $B$ = put(index, src, 0, src.length)
+
+  override def position(newPosition: Int): $B$ =
+    super.position(newPosition)
+    this
+  override def limit(newLimit: Int): $B$ =
+    super.limit(newLimit)
+    this
+  override def mark(): $B$ =
+    super.mark()
+    this
+  override def reset(): $B$ =
+    super.reset()
+    this
+  override def clear(): $B$ =
+    super.clear()
+    this
+  override def flip(): $B$ =
+    super.flip()
+    this
+  override def rewind(): $B$ =
+    super.rewind()
+    this
+
+  /** The index (relative to the positions) of the first difference in the remaining elements,
+   *  or -1. As on the JDK, NaNs are equal, and so are 0.0 and -0.0.
+   */
+  def mismatch(that: $B$): Int =
+    val n = Math.min(remaining(), that.remaining())
+    var i = 0
+    while i < n && $B$.same(load(pos + i), that.load(that.pos + i)) do i += 1
+    if i < n || remaining() != that.remaining() then i else -1
+
+  def compareTo(that: $B$): Int =
+    val i = mismatch(that)
+    if i >= 0 && i < remaining() && i < that.remaining() then $B$.compare(load(pos + i), that.load(that.pos + i))
+    else remaining() - that.remaining()
+
+  override def equals(that: Any): Boolean = that match
+    case that: $B$ => (this eq that) || mismatch(that) < 0
+    case _         => false
+
+  override def hashCode(): Int =
+    var h = 1
+    var i = lim - 1
+    while i >= pos do
+      h = 31 * h + load(i).toInt
+      i -= 1
+    h
+
+object $B$:
+  def allocate(capacity: Int): $B$ =
+    if capacity < 0 then throw new IllegalArgumentException("capacity < 0: (" + capacity + " < 0)")
+    new Heap$B$(capacity, new Array[$T$](capacity), 0)
+
+  def wrap(array: Array[$T$], offset: Int, length: Int): $B$ =
+    Buffer.checkWrap(array.length, offset, length)
+    val b = new Heap$B$(array.length, array, 0)
+    b.init(offset, offset + length, -1)
+    b
+
+  def wrap(array: Array[$T$]): $B$ = new Heap$B$(array.length, array, 0)
+
+  /** Element comparisons, as the JDK's. */
+  private[nio] def same(x: $T$, y: $T$): Boolean = $same$
+  private[nio] def compare(x: $T$, y: $T$): Int = $compare$

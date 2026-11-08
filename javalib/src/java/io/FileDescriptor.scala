@@ -13,6 +13,9 @@ final class FileDescriptor private[java] (private[java] var handle: Object):
 
   def valid(): Boolean = handle != null
 
+  /** The file's path, when known: for the locks of its channel. */
+  private[java] var path: String = null
+
   def sync(): Unit =
     if handle == null then throw new SyncFailedException("sync failed")
     OS.sync(handle)
@@ -34,6 +37,11 @@ object FileDescriptor:
   @static val out: FileDescriptor = new FileDescriptor(OS.stdout())
   @static val err: FileDescriptor = new FileDescriptor(OS.stderr())
 
+  /** A descriptor of a native handle, for javalib's java.lang classes (programs, compiled against
+   *  the JDK, do not see it).
+   */
+  def fromHandle(handle: Object): FileDescriptor = new FileDescriptor(handle)
+
   /** Opens a file for java.io's streams: failures are FileNotFoundExceptions with the JDK's
    *  message, `<path> (<reason>)`.
    */
@@ -42,4 +50,6 @@ object FileDescriptor:
     val result = if path.isEmpty() then null else OS.open(path, mode | OS.RejectDirectory, 0x1b6 /* 0666 */)
     if result == null then throw new FileNotFoundException(path + " (No such file or directory)")
     if OS.isError(result) then throw new FileNotFoundException(path + " (" + OS.errorReason(result) + ")")
-    new FileDescriptor(result)
+    val fd = new FileDescriptor(result)
+    fd.path = path
+    fd

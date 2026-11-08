@@ -138,6 +138,12 @@ object Files:
     if OS.isError(r) then throw translate(r, link.toString, null)
     link
 
+  /** A hard link. */
+  @static def createLink(link: Path, existing: Path): Path =
+    val r = OS.link(existing.toString, link.toString)
+    if OS.isError(r) then throw translate(r, link.toString, existing.toString)
+    link
+
   @static def readSymbolicLink(link: Path): Path =
     val r = OS.readLink(link.toString)
     if OS.isError(r) then
@@ -253,6 +259,13 @@ object Files:
   @static def newOutputStream(path: Path, options: Array[OpenOption]): OutputStream =
     new FileOutputStream(open(path, writeMode(options)))
 
+  @static def newByteChannel(path: Path, options: java.util.Set[? <: OpenOption], attrs: Array[FileAttribute[?]])
+      : java.nio.channels.SeekableByteChannel =
+    java.nio.channels.FileChannel.open(path, options, attrs)
+
+  @static def newByteChannel(path: Path, options: Array[OpenOption]): java.nio.channels.SeekableByteChannel =
+    java.nio.channels.FileChannel.open(path, options)
+
   private def decoder(cs: Charset) =
     cs.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT)
 
@@ -279,12 +292,7 @@ object Files:
 
   /** Decodes all of `bytes`, reporting malformed input (MalformedInputException). */
   private def decode(bytes: Array[Byte], cs: Charset): String =
-    val d = decoder(cs)
-    val chars = new Array[Char](bytes.length)
-    d.inPos = 0
-    d.outPos = 0
-    d.decode(bytes, bytes.length, chars, chars.length, true)
-    new String(chars, 0, d.outPos)
+    decoder(cs).decodeAll(bytes, 0, bytes.length)
 
   @static def readString(path: Path, cs: Charset): String = decode(readAllBytes(path), cs)
 
@@ -310,13 +318,8 @@ object Files:
 
   /** Encodes all of `s`, reporting unencodable chars. */
   private def encode(s: CharSequence, cs: Charset): Array[Byte] =
-    val e = encoder(cs)
     val chars = s.toString.toCharArray()
-    val out = new Array[Byte]((chars.length * e.maxBytesPerChar()).toInt + 1)
-    e.inPos = 0
-    e.outPos = 0
-    e.encode(chars, chars.length, out, out.length, true)
-    java.io.IOUtils.copyOfRange(out, 0, e.outPos)
+    encoder(cs).encodeAll(chars, 0, chars.length)
 
   @static def writeString(path: Path, csq: CharSequence, cs: Charset, options: Array[OpenOption]): Path =
     write(path, encode(csq, cs), options)

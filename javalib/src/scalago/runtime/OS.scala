@@ -46,6 +46,15 @@ object OS:
   /** The number of bytes read, or -1 at the end of the input. */
   def read(handle: Object, b: Array[Byte], off: Int, len: Int): Int = native
   def write(handle: Object, b: Array[Byte], off: Int, len: Int): Unit = native
+  /** Reads at a position, without moving the handle's: the number of bytes read, or -1 at the end. */
+  def readAt(handle: Object, b: Array[Byte], off: Int, len: Int, position: Long): Int = native
+  /** Writes at a position, without moving the handle's. */
+  def writeAt(handle: Object, b: Array[Byte], off: Int, len: Int, position: Long): Unit = native
+  /** Locks a region (to the end of the file and beyond if `size` is `Long.MaxValue`), as fcntl.
+   *  Without `waiting`, returns false if another process holds a conflicting lock.
+   */
+  def lock(handle: Object, position: Long, size: Long, shared: Boolean, waiting: Boolean): Boolean = native
+  def unlock(handle: Object, position: Long, size: Long): Unit = native
   /** Moves the position (`whence`: 0 from the start, 1 from the current position, 2 from the
    *  end) and returns the new one.
    */
@@ -75,6 +84,8 @@ object OS:
   def chmod(path: String, permissions: Int): Object = native
   def setModified(path: String, millis: Long): Object = native
   def symlink(target: String, link: String): Object = native
+  /** Makes a hard link to `existing`: null, or an error. */
+  def link(existing: String, link: String): Object = native
   /** The link's target, or an error. */
   def readLink(path: String): Object = native
   /** The absolute path with symbolic links resolved, or an error. */

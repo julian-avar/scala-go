@@ -1,0 +1,61 @@
+-- ProcessBuilder
+[sh, -c, echo out; echo err >&2; exit 3] null PIPE PIPE false
+stdout 'out' stderr 'err'
+waitFor 3 exitValue 3 alive false pid true
+merged 'one two three' -1 0
+cat: through cat: grüße | second line -> 0
+environment 'a-b-home'
+cleared environment 'only--'
+java.lang.IllegalArgumentException: Invalid environment variable name: "A=B"
+java.lang.NullPointerException
+directory: in the directory
+-- redirects
+0 stream -1 file 'to a file'
+appended 'to a file appended'
+from a file 'to a file appended' java.io.IOException: Stream closed
+discard '' 'kept'
+PIPE INHERIT WRITE redirect to read from file "x"
+redirect to write to file "y" redirect to append to file "z"
+true List(PIPE, INHERIT, READ, WRITE, APPEND)
+java.lang.IllegalArgumentException: Redirect invalid for reading: redirect to write to file "<root>/out.txt"
+java.lang.IllegalArgumentException: Redirect invalid for writing: redirect to read from file "<root>/out.txt"
+before an inheriting child
+inherited stdout
+inherited: 0 -1
+-- failures
+java.io.IOException: Cannot run program "scalago-no-such-program": Exec failed, error: 2 (No such file or directory) 
+java.io.IOException: Cannot run program "scalago-no-such-program" (in directory "/"): Exec failed, error: 2 (No such file or directory) 
+java.io.IOException: Cannot run program "cat" (in directory "<root>/missing"): Exec failed, error: 2 (No such file or directory) 
+java.io.IOException: Cannot run program "cat": <root>/missing (No such file or directory)
+java.lang.ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0
+java.io.IOException: invalid null character in command
+-- lifecycle
+alive true java.lang.IllegalThreadStateException: process hasn't exited waitFor(50ms) false
+got x waitFor(10s) true 0
+interactive: first
+interactive: second
+interactive: null 0
+destroyed: 143 alive false
+destroyed forcibly: 137 false
+current pid true true alive true
+java.lang.IllegalStateException: destroy of current process not allowed
+Runtime.exec 'from exec' 0
+-- scala.sys.process
+hello world
+exit 4
+split into words
+logger 2 [a][b] <c>
+java.lang.RuntimeException: Nonzero exit value: 1
+extra env
+in the directory
+#> 0 into a file
+#< into a file
+#&& and #|| or
+run: 5
+#| piped through two cats
+#| status 6
+lazyLines 6
+lazyLines 2000 line 1999
+before !
+printed by the child
+! 0

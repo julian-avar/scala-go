@@ -111,6 +111,9 @@ func IntCompare(a, b int32) int32   { return compareInts(a, b) }
 func LongCompare(a, b int64) int32  { return compareInts(a, b) }
 func CharCompare(a, b uint16) int32 { return int32(a) - int32(b) }
 
+// SmallIntCompare is Byte.compare and Short.compare: the difference, as on the JDK.
+func SmallIntCompare(a, b int32) int32 { return a - b }
+
 // DoubleCompare implements Double.compare: -0.0 < 0.0, and NaN is greater than everything.
 func DoubleCompare(a, b float64) int32 {
 	switch {

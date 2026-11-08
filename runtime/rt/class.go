@@ -159,6 +159,66 @@ func ClassToString(c *Class) *String {
 	return Str("class " + c.name)
 }
 
+// hijackedAncestors are the supertypes (but Object) of the classes whose instances are Go values
+// (Hijacked.ancestors in the linker).
+var hijackedAncestors = func() map[string][]string {
+	comparable := []string{"java.lang.Comparable", "java.io.Serializable", "java.lang.constant.Constable"}
+	numeric := []string{"java.lang.Number", "java.lang.Comparable", "java.io.Serializable",
+		"java.lang.constant.Constable", "java.lang.constant.ConstantDesc"}
+	m := map[string][]string{
+		"java.lang.Boolean":   comparable,
+		"java.lang.Character": comparable,
+		"java.lang.String": {"java.lang.CharSequence", "java.lang.Comparable", "java.io.Serializable",
+			"java.lang.constant.Constable", "java.lang.constant.ConstantDesc"},
+		"java.lang.Class":         {"java.io.Serializable", "java.lang.reflect.Type", "java.lang.reflect.GenericDeclaration"},
+		"scala.runtime.BoxedUnit": {"java.io.Serializable"},
+		"java.math.BigInteger":    {"java.lang.Number", "java.lang.Comparable", "java.io.Serializable"},
+		"java.math.BigDecimal":    {"java.lang.Number", "java.lang.Comparable", "java.io.Serializable"},
+	}
+	for _, box := range []string{"Byte", "Short", "Integer", "Long", "Float", "Double"} {
+		m["java.lang."+box] = numeric
+	}
+	return m
+}()
+
+// ClassIsAssignableFrom implements c.isAssignableFrom(other) where the runtime can tell: the same
+// class, Object, primitives, arrays (whose elements are of class Object unless primitive, see
+// Array), and the classes whose instances are Go values. The runtime does not know the program's
+// class hierarchy (there is no reflection), so other cases throw UnsupportedOperationException.
+func ClassIsAssignableFrom(c, other *Class) bool {
+	if other == nil {
+		ThrowKind(NullPointer, "")
+	}
+	switch {
+	case c == other:
+		return true
+	case ClassIsPrimitive(c) || ClassIsPrimitive(other):
+		return false
+	case c == classjava_lang_Object:
+		return true
+	case ClassIsArray(other):
+		if ClassIsArray(c) {
+			return ClassIsAssignableFrom(ClassGetComponentType(c), ClassGetComponentType(other))
+		}
+		return c.name == "java.lang.Cloneable" || c.name == "java.io.Serializable"
+	case ClassIsArray(c) || other == classjava_lang_Object:
+		return false
+	}
+	if _, ok := hijackedAncestors[c.name]; ok {
+		return false // they have no subclasses (BigInteger and BigDecimal cannot be extended)
+	}
+	if ancestors, ok := hijackedAncestors[other.name]; ok {
+		for _, a := range ancestors {
+			if a == c.name {
+				return true
+			}
+		}
+		return false
+	}
+	ThrowKind(UnsupportedOperation, "Class.isAssignableFrom("+other.name+") on "+c.name+": scala-go has no reflection")
+	return false
+}
+
 // ArrayClassOf is the class of arrays whose elements have class c.
 func ArrayClassOf(c *Class) *Class {
 	if d, ok := primitiveDescriptors[c.name]; ok {

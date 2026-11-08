@@ -24,7 +24,7 @@ object System:
   @static def setIn(stream: InputStream): Unit = in = stream
 
   /** As in the JDK, the line separator is fixed at startup: setting the property does not change it. */
-  @static private val separator: String = Process.getProperty("line.separator")
+  @static private val separator: String = SystemProperties.current.getProperty("line.separator")
 
   @static def lineSeparator(): String = separator
 
@@ -42,9 +42,29 @@ object System:
     if key == null then throw new java.lang.NullPointerException("key can't be null")
     if key.isEmpty() then throw new java.lang.IllegalArgumentException("key can't be empty")
 
+  /** The properties: as on the JDK, a Properties object that programs may change or replace,
+   *  initially the platform's (`Process.properties`).
+   */
+  private object SystemProperties:
+    @volatile var current: java.util.Properties = defaults()
+
+    def defaults(): java.util.Properties =
+      val props = new java.util.Properties()
+      val kv = Process.properties()
+      var i = 0
+      while i + 1 < kv.length do
+        props.setProperty(kv(i), kv(i + 1))
+        i += 2
+      props
+
+  @static def getProperties(): java.util.Properties = SystemProperties.current
+
+  @static def setProperties(props: java.util.Properties): Unit =
+    SystemProperties.current = if props == null then SystemProperties.defaults() else props
+
   @static def getProperty(key: String): String =
     checkKey(key)
-    Process.getProperty(key)
+    SystemProperties.current.getProperty(key)
 
   @static def getProperty(key: String, default: String): String =
     val value = getProperty(key)
@@ -53,8 +73,8 @@ object System:
   @static def setProperty(key: String, value: String): String =
     checkKey(key)
     if value == null then throw new java.lang.NullPointerException()
-    Process.setProperty(key, value)
+    SystemProperties.current.setProperty(key, value).asInstanceOf[String]
 
   @static def clearProperty(key: String): String =
     checkKey(key)
-    Process.setProperty(key, null)
+    SystemProperties.current.remove(key).asInstanceOf[String]

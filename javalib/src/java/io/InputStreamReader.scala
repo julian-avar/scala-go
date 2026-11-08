@@ -1,6 +1,6 @@
 package java.io
 
-import java.nio.charset.{Charset, CharsetDecoder, CodingErrorAction}
+import java.nio.charset.{Charset, CharsetDecoder, Coding, CodingErrorAction}
 
 /** Decodes an InputStream with a charset's decoder, on arrays (see `CharsetDecoder.decode`). As
  *  in the JDK, malformed input is replaced unless the reader is given its own decoder.
@@ -75,9 +75,11 @@ class InputStreamReader(in: InputStream, decoder: CharsetDecoder) extends Reader
     while n == 0 do
       decoder.inPos = start
       decoder.outPos = off
-      decoder.decode(bytes, end, out, outEnd, eof)
+      val status = decoder.decodeArray(bytes, end, out, outEnd, eof)
       start = decoder.inPos
       n = decoder.outPos - off
+      // Malformed input is reported once the chars before it have been read.
+      if status == Coding.Error && n == 0 then Coding.result(status, decoder.errorLength, decoder.errorUnmappable).throwException()
       if n == 0 then
         if eof then return -1
         refill()

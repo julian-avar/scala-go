@@ -97,6 +97,9 @@ trait Appendable:
   def append(csq: CharSequence, start: Int, end: Int): Appendable
   def append(c: Char): Appendable
 
+trait Readable:
+  def read(cb: java.nio.CharBuffer): Int
+
 trait Cloneable
 
 trait Iterable[T]:

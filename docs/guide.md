@@ -49,8 +49,9 @@ What does not work:
 scala-go has its own Java standard library (javalib), written in Scala: `java.lang`,
 `java.util` (collections, streams, `Optional`, `Random`, `UUID`, `regex`, `Properties`, ...),
 `java.util.concurrent`'s atomics and locks, `java.math` (`BigInteger`, `BigDecimal`, exact),
-`java.io`, `java.nio.file`, `java.time` (time zones from Go's tz database), and the parts of
-`java.text` that `java.time` needs. design.md's [Status](design.md#status) lists the gaps.
+`java.io`, `java.nio` (buffers, file channels, `Files`, the default file system), subprocesses
+(`ProcessBuilder`, so `scala.sys.process` and os-lib's `os.proc`), `java.time` (time zones from
+Go's tz database), and the parts of `java.text` that `java.time` needs. design.md's [Status](design.md#status) lists the gaps.
 
 Differences from the JVM worth knowing:
 

@@ -37,7 +37,8 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
    plugin and `-P:scala-go:rename` emits replacements under the library's own names, and its IR
    comes first on the link classpath (`scalago-gears` does this for one gears class).
 4. **javalib** (`javalib/`). JDK classes written in Scala: exceptions, `StringBuilder`,
-   `System`, `java.io`, `java.nio.file` and `java.nio.charset` (see [I/O](#io)), `java.util`
+   `System`, `java.io`, `java.nio` (buffers, channels, files, charsets; see [I/O](#io)),
+   `ProcessBuilder` and `Process` (see [Subprocesses](#subprocesses)), `java.util`
    (collections, `Arrays`, `Collections`, `Optional`, `Random`, `UUID`,
    `java.util.function`, `java.util.stream`, ...), `java.util.concurrent` (see
    [Concurrency](#concurrency-and-the-memory-model)), `java.time` (see [java.time](#javatime)),
@@ -98,7 +99,7 @@ Compiles Scala 3 programs to Go, following the architecture of Scala.js and Scal
    - **Natives** (`Natives.scala`): Go implementations of JDK methods (`String`, boxes, `Math`,
      `System`, `Character`, `BigInteger`, `BigDecimal`, `Arrays`, ...). They take precedence over IR.
      They also implement the `scalago.runtime` objects through which javalib reaches the Go
-     runtime (`Threads`, `AtomicArrays`, `Regexes`, `Console`, `OS`, `Process`): Scala objects whose
+     runtime (`Threads`, `AtomicArrays`, `Regexes`, `Console`, `OS`, `Process`, `Subprocesses`): Scala objects whose
      methods throw on the JVM and become Go calls when linked.
    - **Static constants of javalib objects.** Java's static fields (`Collections.EMPTY_LIST`,
      `Attributes.Name.MAIN_CLASS`) are usually members of the companion object in javalib's
@@ -369,27 +370,56 @@ goroutine (see [Concurrency](#concurrency-and-the-memory-model)).
 
 ## I/O
 
-java.io, java.nio.file and java.nio.charset are Scala code in javalib over a small native layer
-on Go's `os` package (`scalago.runtime.OS`, `rt/files.go`). The Java semantics (which exception,
-which message) are in Scala; the layer is byte-oriented and knows nothing of Java's classes:
+java.io and java.nio (buffers, channels, files, charsets) are Scala code in javalib over a small
+native layer on Go's `os` package (`scalago.runtime.OS`, `rt/files.go`). The Java semantics
+(which exception, which message) are in Scala; the layer is byte-oriented and knows nothing of
+Java's classes:
 
 - **Handles**: `open(path, mode)` (read, write, append, create, create-new, truncate) gives an
-  `*os.File` held as an `Object`; `read`, `write`, `seek`, `size`, `available`, `truncate`, `sync`
-  and `close` work on it. Read and write errors throw `IOException` with the C library's message.
+  `*os.File` held as an `Object`; `read`, `write`, `readAt`, `writeAt` (positional, for file
+  channels), `seek`, `size`, `available`, `truncate`, `sync`, `lock`/`unlock` (POSIX record locks
+  with fcntl, as the JDK's; none on Windows) and `close` work on it. Read and write errors throw
+  `IOException` with the C library's message.
 - **Paths**: `stat`, `access`, `mkdir`, `remove`, `rename`, `readDir`, `createTemp`, `chmod`,
-  `setModified`, `symlink`, `readLink`, `realPath`. They return their result or a Go error;
+  `setModified`, `symlink`, `link`, `readLink`, `realPath`. They return their result or a Go error;
   `errorKind` classifies it (no such file, exists, not empty, access denied, not a directory, is
   a directory, loop) and `errorReason` gives the C library's text ("No such file or directory").
   javalib builds the JDK's exceptions from them: `FileNotFoundException("<path> (<reason>)")` in
   java.io, `NoSuchFileException`, `FileAlreadyExistsException`, `DirectoryNotEmptyException`,
   `AccessDeniedException` or `FileSystemException` in java.nio.file.
 
-The stream, reader and writer classes are adapted from Scala Native's javalib. Charsets are
-UTF-8 (the default), ISO-8859-1 and US-ASCII. Without java.nio buffers, `CharsetDecoder` and
-`CharsetEncoder` have the JDK's configuration (error actions, replacement) but code on arrays,
-through package-private methods that `InputStreamReader`, `OutputStreamWriter` and `Files` use;
-malformed UTF-8 is replaced or reported in the JDK's units (each maximal prefix of a valid
-sequence), also by `new String(bytes, ...)`. Paths are Unix paths (`/`), normalized as by the JDK.
+The stream, reader and writer classes are adapted from Scala Native's javalib. Paths are Unix
+paths (`/`), normalized as by the JDK.
+
+- **Buffers** (`java.nio`) are heap buffers: `ByteBuffer` on a byte array, with multi-byte values
+  in either byte order and views (`asIntBuffer`, ...); `CharBuffer`, `ShortBuffer`, `IntBuffer`,
+  `LongBuffer`, `FloatBuffer` and `DoubleBuffer` on arrays, as views of byte arrays, or (chars)
+  on read-only text (`CharBuffer.wrap(CharSequence)`). States, exceptions, `equals`,
+  `compareTo`, `mismatch` and `hashCode` are the JDK's, and so are the concrete classes' names
+  (`HeapByteBuffer`, `HeapIntBufferR`, `ByteBufferAsLongBufferL`, `StringCharBuffer`), which
+  `toString` shows. Each element type's buffer is a class with abstract element access (`load`,
+  `store`) and the backing array when there is one, which bulk operations copy with
+  `System.arraycopy`; the classes for all element types but bytes and the implementations
+  (heap, read-only, byte-array views in both orders) are generated from
+  `javalib/templates/*.template` by javalib's `generatedSources`. `allocateDirect` makes a heap
+  buffer (`isDirect` is false, `hasArray` true).
+- **Charsets** are UTF-8 (the default), ISO-8859-1 and US-ASCII. Their coders work on arrays
+  (`decodeArray`/`encodeArray`, which `InputStreamReader`, `OutputStreamWriter`, `Files` and
+  `new String(bytes, ...)` use directly), returning underflow, overflow or an error at the
+  input in error; malformed UTF-8 is replaced or reported in the JDK's units (each maximal prefix
+  of a valid sequence). `CharsetDecoder` and `CharsetEncoder` have the JDK's configuration and
+  buffer API on top (`CoderResult`, the reset/coding/end/flushed state machine, `Charset.encode`
+  and `decode`), copying buffers that have no accessible array. Programs cannot define charsets.
+- **Channels**: `FileChannel` (`FileChannel.open`, `Files.newByteChannel`, and `getChannel` of
+  file streams and `RandomAccessFile`, which share the stream's file and position, as on the JDK)
+  with scattering and gathering, positional reads and writes, `transferTo`/`transferFrom`,
+  `truncate`, `force` and locks (overlapping locks within the process are refused, as on the
+  JDK). `map` reads the region into a heap `MappedByteBuffer`: `READ_ONLY` and `PRIVATE` mappings
+  behave as the JDK's (but later changes to the file are not seen), `READ_WRITE` is not
+  supported. `Channels` adapts streams and channels both ways, and readers and writers.
+- **File systems**: `FileSystems.getDefault()` (also `Path.getFileSystem`) is the only one:
+  `getPath`, `getSeparator`, `getRootDirectories`, and `getPathMatcher` with `glob:` (translated
+  as the JDK's `Globs`, into a regular expression for Go's engine) and `regex:` syntaxes.
 
 **Standard streams.** `System.out` and `System.err` are `PrintStream`s whose print methods hand
 the value to the runtime (`Console.write`), which transcodes it straight into a 32 KB stdout
@@ -406,8 +436,44 @@ Not like the JDK: the console streams' print methods do not take the stream's mo
 thread holding `System.out`'s lock does not keep other threads from printing; `FileTime`s have
 millisecond precision; file attributes given at creation are ignored; directories list in name
 order (`Files.list`, `walk`, `newDirectoryStream`; the JDK follows the file system's order);
-`Files.walk` with `FOLLOW_LINKS` does not detect cycles; channels, buffers, watch services,
-`System.getProperties`, `Scanner` and other charsets are not implemented.
+`Files.walk` with `FOLLOW_LINKS` does not detect cycles; blocking channel operations are not
+interrupted by `Thread.interrupt` (no `ClosedByInterruptException`); `FileLock`'s class is
+`java.nio.channels.FileLockImpl`; `ByteOrder.nativeOrder()` is little-endian (Go's big-endian
+platforms are not supported); direct and `READ_WRITE`-mapped buffers, socket channels,
+selectors, asynchronous channels, other file systems and providers (`FileSystemProvider`,
+zip file systems), `FileStore`, watch services, `Scanner` and other charsets are not
+implemented.
+
+## Subprocesses
+
+`java.lang.ProcessBuilder`, `Process` and `ProcessHandle` are Scala (javalib) over Go's `os/exec`
+(`scalago.runtime.Subprocesses`, `rt/subprocess.go`):
+
+- **Starting.** `start` passes the command, the directory, the environment (only if the program
+  touched `environment()`, a copy of `System.getenv()` checked as the JDK checks it) and the three
+  redirects to the native layer. Pipes are `os.Pipe`s: the child gets one end, the parent keeps
+  the other as a handle of the file layer, so a process's streams are java.io file streams,
+  buffered as the JDK's (`getOutputStream` must be flushed or closed). `INHERIT` gives the child
+  the program's own standard streams (standard output is flushed first, so what the program
+  printed comes before what the child prints); files (`from`, `to`, `appendTo`, `DISCARD`) are
+  opened by the parent. As on the JDK, the program is looked up on the parent's `PATH`, a
+  relative program path is relative to the directory, and failures are `IOException`s with the
+  JDK's messages (`Cannot run program "x" (in directory "d"): Exec failed, error: 2 (No such file
+  or directory)`).
+- **Waiting.** A goroutine per process waits for it and records the exit status (128 plus the
+  signal's number when a signal ended it, as on the JDK). `waitFor`, with or without timeout,
+  blocks on a channel and is interruptible (`InterruptedException`). `destroy` sends `SIGTERM`
+  and `destroyForcibly` `SIGKILL` (both kill on Windows), and close the pipes, as the JDK.
+- `ProcessHandle.current()` (pid, parent), `Process.toHandle`, `pid`, `inputReader` and
+  `outputWriter`, and `Runtime.exec` work. `onExit`, `ProcessHandle.of` for other processes,
+  `allProcesses`, `children`, `descendants`, `info` (whose values are empty) and
+  `startPipeline` are not implemented.
+
+`scala.sys.process` (`!`, `!!`, `#|`, `#>`, `#&&`, `lazyLines`, `ProcessLogger`) is the Scala
+library's, unchanged: its pumping threads are goroutine-backed `Thread`s, its pipes
+`java.io.PipedInputStream`s (javalib, as the JDK's), and `System.getProperties` is a
+`Properties` object as on the JDK. os-lib (`os.proc(...).call()`, `spawn`, and its file
+operations) runs unchanged too (see the `ecosystem` module).
 
 ## java.time
 
@@ -727,7 +793,14 @@ Supported and covered by end-to-end tests:
   files through `java.io.File`, file streams, `RandomAccessFile` and `java.nio.file`
   (`Files`, `Path`, `walkFileTree`, `lines`, `walk`, the JDK's exceptions and messages), standard input
   (`StdIn`, `System.in`, end of input), `Console.withOut`, `System.setOut`, `scala.io.Source`,
-  `scala.util.Using`, system properties, environment, exit statuses and shutdown hooks
+  `scala.util.Using`, system properties, environment, exit statuses and shutdown hooks;
+  java.nio buffers of every type with views and byte orders, the charset coders on buffers,
+  file channels (positional I/O, transfers, locks, mappings), `Channels`, glob and regex path
+  matchers
+- subprocesses: `ProcessBuilder` (redirects, environment, directory, merged errors), `Process`
+  (pipes, interactive use, timeouts, exit statuses, signals), `Runtime.exec`, and
+  `scala.sys.process` (`!`, `!!`, pipes, `lazyLines`, loggers, `#>`/`#<`, `#&&`/`#||`), also
+  under Go's race detector
 - concurrency: threads, `synchronized`, `wait`/`notify`, volatile fields, atomics, interrupts,
   and concurrent first use of modules and lazy vals; thread locals, thread builders and virtual
   threads; `scala.concurrent` (futures, promises, `Await`, `blocking`, the global
@@ -749,15 +822,19 @@ Known gaps:
   `Arrays.compare`/`mismatch` and the range forms of `Arrays.equals`, `String.CASE_INSENSITIVE_ORDER`,
   `String.join(delimiter, Iterable)`, and `Properties` keys continued over several lines.
   Arrays of references do not know their element type, so `toArray(new Array[String](0))` and
-  `Arrays.copyOf` return arrays whose `getClass` is `Object[]`.
+  `Arrays.copyOf` return arrays whose `getClass` is `Object[]`, and an array of references is
+  an `Array[Unit]` (to type tests, which the Scala library makes before those for
+  `Array[AnyRef]`) when it is not empty and holds only `()`.
 - Scala libraries are compiled from their TASTy, so classes of a library written in Java (which
   have none) are missing; natives cover those of popular libraries that reachable code uses
   (ujson's float formatting). `WeakHashMap` holds its keys strongly (Go's weak pointers need
-  Go 1.24); `java.nio.CharBuffer` only wraps text for use as a `CharSequence`.
+  Go 1.24).
 - Locales: there is no locale data. `java.util.Locale` carries identifiers only, and every
   locale formats and maps case as `Locale.ROOT` does (so `String.format(Locale.GERMANY, "%.1f",
   x)` uses a `.`).
-- Reflection: `getClass` and `Class` names work; nothing else.
+- Reflection: `getClass` and `Class` names work, and `isAssignableFrom` where the runtime can
+  tell without the program's class hierarchy (equal classes, `Object`, primitives, arrays, and
+  strings, boxes and the other classes whose instances are Go values); nothing else.
 - `BigInteger` and `BigDecimal` cannot be subclassed (they are Go values).
 - Concurrency: the atomic field updaters (`AtomicIntegerFieldUpdater`, ... need reflection),
   `SubmissionPublisher`, thread groups beyond names and handlers (`activeCount`, `enumerate`),

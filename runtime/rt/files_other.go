@@ -12,3 +12,8 @@ func access(path string, mode uint32) bool {
 	}
 	return uint32(info.Mode().Perm()>>6)&mode == mode
 }
+
+// lockFile does not lock: file locks are only implemented on Unix systems.
+func lockFile(f *os.File, position, size int64, shared, wait bool) (bool, error) { return true, nil }
+
+func unlockFile(f *os.File, position, size int64) error { return nil }

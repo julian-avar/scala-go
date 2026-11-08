@@ -198,6 +198,7 @@ object Natives:
   instanceFn(C, "isPrimitive()Z", "rt.ClassIsPrimitive")
   instanceFn(C, "getComponentType()Ljava.lang.Class;", "rt.ClassGetComponentType")
   instanceFn(C, "toString()Ljava.lang.String;", "rt.ClassToString")
+  instanceFn(C, "isAssignableFrom(Ljava.lang.Class;)Z", "rt.ClassIsAssignableFrom")
   instance(C, "desiredAssertionStatus()Z")((_, _) => "false")
   instance(C, "getClassLoader()Ljava.lang.ClassLoader;")((_, _) => "nil")
   staticFn(C, "forName(Ljava.lang.String;)Ljava.lang.Class;", "rt.ClassForName")
@@ -218,9 +219,11 @@ object Natives:
         instance(box, s"${name}Value()${target.descriptor}")((r, _) => convert(unboxed(r), prim, target))
     if prim == Type.Boolean then instance(box, "booleanValue()Z")((r, _) => unboxed(r))
     if prim == Type.Char then instance(box, "charValue()C")((r, _) => unboxed(r))
+    // Byte.compare, Short.compare and Character.compare return x - y, the others -1, 0 or 1.
     val compare = prim match
       case Type.Boolean              => "rt.BoolCompare"
       case Type.Char                 => "rt.CharCompare"
+      case Type.Byte | Type.Short    => "rt.SmallIntCompare"
       case Type.Long                 => "rt.LongCompare"
       case Type.Float | Type.Double  => "rt.DoubleCompare"
       case _                         => "rt.IntCompare"
@@ -696,9 +699,7 @@ object Natives:
   // java.lang.System's properties and java.lang.Runtime (javalib/src/scalago/runtime/Process.scala).
   private val Process = "scalago.runtime.Process$"
   for (desc, fn) <- List(
-      "getProperty(Ljava.lang.String;)Ljava.lang.String;" -> "rt.GetProperty",
-      "setProperty(Ljava.lang.String;Ljava.lang.String;)Ljava.lang.String;" -> "rt.SetProperty",
-      "propertyNames()[Ljava.lang.String;" -> "rt.PropertyNames",
+      "properties()[Ljava.lang.String;" -> "rt.Properties",
       "environment()[Ljava.lang.String;" -> "rt.Environ",
       "exit(I)V" -> "rt.Exit",
       "halt(I)V" -> "rt.Halt",
@@ -780,6 +781,10 @@ object Natives:
       s"open(${JS}II)$JO" -> "rt.OSOpen",
       s"read($JO[BII)I" -> "rt.OSRead",
       s"write($JO[BII)V" -> "rt.OSWrite",
+      s"readAt($JO[BIIJ)I" -> "rt.OSReadAt",
+      s"writeAt($JO[BIIJ)V" -> "rt.OSWriteAt",
+      s"lock(${JO}JJZZ)Z" -> "rt.OSLock",
+      s"unlock(${JO}JJ)V" -> "rt.OSUnlock",
       s"seek(${JO}JI)J" -> "rt.OSSeek",
       s"available($JO)I" -> "rt.OSAvailable",
       s"size($JO)J" -> "rt.OSFileSize",
@@ -796,6 +801,7 @@ object Natives:
       s"chmod(${JS}I)$JO" -> "rt.OSChmod",
       s"setModified(${JS}J)$JO" -> "rt.OSSetModified",
       s"symlink($JS$JS)$JO" -> "rt.OSSymlink",
+      s"link($JS$JS)$JO" -> "rt.OSLink",
       s"readLink($JS)$JO" -> "rt.OSReadLink",
       s"realPath($JS)$JO" -> "rt.OSRealPath",
       s"workingDir()$JS" -> "rt.OSWorkingDir",
@@ -804,6 +810,23 @@ object Natives:
       s"errorReason($JO)$JS" -> "rt.OSErrorReason"
     )
   do staticFn(OS, desc, fn)
+
+  // java.lang.ProcessBuilder, Process and ProcessHandle (javalib/src/scalago/runtime/Subprocesses.scala).
+  private val Subprocesses = "scalago.runtime.Subprocesses$"
+  for (desc, fn) <- List(
+      s"start([$JS$JS[$JS[I[${JS}Z)$JO" -> "rt.ProcessStart",
+      s"errorMessage($JO)$JS" -> "rt.ProcessErrorMessage",
+      s"stdin($JO)$JO" -> "rt.ProcessStdin",
+      s"stdout($JO)$JO" -> "rt.ProcessStdout",
+      s"stderr($JO)$JO" -> "rt.ProcessStderr",
+      s"pid($JO)J" -> "rt.ProcessPid",
+      s"waitFor(${JO}J)Z" -> "rt.ProcessWait",
+      s"exitCode($JO)I" -> "rt.ProcessExitCode",
+      s"destroy(${JO}Z)V" -> "rt.ProcessDestroy",
+      "currentPid()J" -> "rt.CurrentPid",
+      "parentPid()J" -> "rt.ParentPid"
+    )
+  do staticFn(Subprocesses, desc, fn)
 
   // java.time's native side (javalib/src/scalago/runtime/Time.scala).
   private val Time = "scalago.runtime.Time$"

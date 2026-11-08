@@ -156,6 +156,8 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
     case Type.Class(c) if program.isFacade(c)   => interop.typeTest(e, c)
     case Type.Class(c) if Hijacked.isHijacked(c) => s"rt.Is[${Hijacked.instanceGoType(c)}]($e)"
     case Type.Class(c)                           => classTypeTest(e, c)
+    // Arrays of references do not know their element type (see rt.IsUnitArray).
+    case Type.Array(Type.Class(Hijacked.BoxedUnit)) => s"rt.IsUnitArray($e)"
     case Type.Array(elem) => s"rt.Is[*rt.Array[${goArrayElemType(elem)}]]($e)"
     case _                => "false"
 
