@@ -288,6 +288,48 @@ object millplugin extends ScalaModule with Published {
   def compileMvnDeps = Seq(mvn"com.lihaoyi::mill-libs:${Versions.mill}")
 }
 
+/** The documentation site: the pages of `docs/_docs` (with `docs/sidebar.yml`) and the API of
+ *  the user-facing modules. `mill docs.site`, then open `out/docs/site.dest/docs/index.html` (the
+ *  pages; `index.html` next to `docs/` is the API). The Mill plugin's settings are documented in
+ *  a page (`docs/_docs/user/build.md`): its API would bring in all of Mill's.
+ */
+object docs extends ScalaGoModule with UnidocModule {
+  def moduleDeps = Seq(library, gears, gostd)
+  def unidocDocumentTitle = "scala-go"
+  def unidocVersion = Some(UserScalaGoModule.Version)
+
+  def siteSources = Task.Source(moduleDir)
+
+  /** Scaladoc's site root: `docs/`, with the contributor design document as one of its pages. */
+  def siteRoot = Task {
+    val root = Task.dest / "root"
+    for (name <- Seq("_docs", "_assets", "sidebar.yml", "api-overview.md") if os.exists(siteSources().path / name))
+      os.copy(siteSources().path / name, root / name, createFolders = true)
+    val design = os.read.lines(siteSources().path / "design.md").drop(1) // its title is the page's
+    os.write(root / "_docs" / "contributing" / "design.md", ("---" +: "title: Design" +: "---" +: design).mkString("", "\n", "\n"))
+    PathRef(root)
+  }
+
+  def unidocOptions = Task {
+    val root = siteRoot().path
+    Seq(
+      "-siteroot", root.toString,
+      "-doc-root-content", (root / "api-overview.md").toString,
+      // Implementation details, which users do not call.
+      "-skip-by-id:scalago.go.internal,scalago.gearsrt",
+      // Code snippets are compiled, except those marked `sc:nocompile` (build files, generated
+      // facades, ...) and those of the design document.
+      s"-snippet-compiler:${root / "_docs" / "contributing"}=nocompile,compile"
+    )
+  }
+
+  /** The site, in this task's directory (`out/docs/site.dest`). */
+  def site = Task {
+    siteRoot() // the options only name its directory: rebuild when its contents change
+    unidocCommon(local = true)()
+  }
+}
+
 /** A ScalaGoModule that uses this build's modules instead of published artifacts. */
 trait InBuildScalaGoModule extends UserScalaGoModule {
   def scalaGoPlugin = plugin.jar()

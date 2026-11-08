@@ -10,8 +10,17 @@ import java.nio.charset.StandardCharsets.UTF_8
  *  byte array, so the same code runs and can be tested there. On both, `==` and `hashCode`
  *  compare contents and `toString` decodes, as for a Go string.
  *
- *  Write them with the `go` interpolator (`go"x = \$x"`), or convert a `String` with
- *  `toGoString`. Conversions between the two representations copy and transcode.
+ *  {{{
+ *  import scalago.go.*
+ *
+ *  val name = "Grüße"
+ *  val g = go"Hi $name"           // or name.toGoString, or GoString(name)
+ *  g.byteLength                   // 10
+ *  g.toJavaString                 // "Hi Grüße"
+ *  g == GoString("Hi Grüße")      // true: contents are compared
+ *  }}}
+ *
+ *  Conversions between the two representations copy and transcode.
  */
 opaque type GoString = AnyRef
 
@@ -19,6 +28,7 @@ object GoString:
   /** Encodes as UTF-8. Unpaired surrogates become U+FFFD. */
   def apply(s: String): GoString = JvmGoString(wellFormed(s).getBytes(UTF_8))
 
+  /** The empty string. */
   def empty: GoString = apply("")
 
   /** `String.valueOf(x)` as a `GoString`: Java's formatting of primitives, `"null"` for null,
@@ -33,8 +43,10 @@ object GoString:
     /** Length in bytes (not characters). */
     def byteLength: Int = bytes(g).length
 
+    /** The byte at `index` (Go's `s[index]`). */
     def byteAt(index: Int): Byte = bytes(g)(index)
 
+    /** The two strings' bytes, one after the other (Go's `s + other`). */
     def concat(other: GoString): GoString =
       val a = bytes(g)
       val b = bytes(other)
@@ -78,5 +90,5 @@ object GoString:
     override def hashCode: Int = java.util.Arrays.hashCode(bytes)
     override def toString: String = new String(bytes, UTF_8)
 
-/** Encodes as UTF-8, like `GoString(s)`. */
+/** Encodes a Scala string as a [[GoString]] (UTF-8), as `GoString(s)` does. */
 extension (s: String) def toGoString: GoString = GoString(s)

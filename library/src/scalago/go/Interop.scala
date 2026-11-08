@@ -70,17 +70,42 @@ final class GoImport(path: String, name: String = "") extends StaticAnnotation
  */
 final class GoExport(name: String = "") extends StaticAnnotation
 
-/** The Go name of a facade member or type, when it differs from the Scala name. */
+/** The Go name of a facade member or type, when it differs from the Scala name: for example to
+ *  declare one Go function with several Scala signatures, or a Go name that is not a valid or
+ *  convenient Scala name.
+ *  {{{
+ *  @GoImport("slices")
+ *  object slices:
+ *    def Max(xs: GoSlice[GoInt]): GoInt = native
+ *    @GoName("Max") def MaxFloat(xs: GoSlice[Double]): Double = native
+ *  }}}
+ */
 final class GoName(name: String) extends StaticAnnotation
 
-/** The body of Go facade members. */
+/** The body of Go facade members: `def Itoa(i: Int): String = native`. Under scala-go the
+ *  linker replaces the member with a call to Go; on the JVM, calling it throws
+ *  `UnsupportedOperationException`.
+ */
 def native: Nothing =
   throw UnsupportedOperationException("Go facade member called on the JVM: it only exists in programs compiled to Go")
 
-/** Go's predeclared `error` interface. */
+/** Go's predeclared `error` interface. `null` is Go's `nil` error.
+ *  {{{
+ *  val (ok, err) = strconv.ParseBool("maybe")   // a facade returning (bool, error)
+ *  if err != null then println(err.Error())
+ *  }}}
+ */
 @GoImport("", "error")
 trait GoError:
   def Error(): String
 
-/** A Go `error` returned by a facade call that does not return it to Scala. */
+/** A Go `error`, as a Scala exception.
+ *
+ *  A facade call throws it when the Go function returns a non-nil `error` that the facade's
+ *  result type leaves out. In the other direction, a Scala method implementing a Go method that
+ *  returns an `error` returns the wrapped error when it throws a `GoException`
+ *  (`throw GoException(io.EOF)`).
+ *
+ *  @param error the Go error
+ */
 class GoException(val error: GoError) extends RuntimeException(error.Error())

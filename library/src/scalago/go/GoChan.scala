@@ -2,11 +2,27 @@ package scalago.go
 
 import scalago.go.internal.GoNatives
 
-/** A Go channel, `chan T`, shared with Go code. Unbuffered unless made with a capacity. */
+/** A Go channel, `chan T`, shared with Go code. Unbuffered unless made with a capacity.
+ *
+ *  {{{
+ *  import scalago.go.*
+ *
+ *  val ch = GoChan.make[Int](capacity = 10)   // chan int32
+ *  ch.send(1)
+ *  ch.close()
+ *  for v <- ch do println(v)                  // Go's for v := range ch
+ *  }}}
+ *
+ *  Blocking operations block the calling thread (a goroutine), and are interrupted by
+ *  `Thread.interrupt`. In gears code, `scalago.gears` has cancellable versions
+ *  (`awaitSend`, `awaitReceive`).
+ */
 opaque type GoChan[T] = AnyRef
 
 object GoChan:
+  /** Go's `make(chan T)`: an unbuffered channel. */
   def make[T](using t: GoType[T]): GoChan[T] = GoNatives.makeChan(t.underlying, 0)
+  /** Go's `make(chan T, capacity)`. */
   def make[T](capacity: Int)(using t: GoType[T]): GoChan[T] = GoNatives.makeChan(t.underlying, capacity)
 
   private object Closed
@@ -25,8 +41,11 @@ object GoChan:
     def tryReceive(): Option[T] =
       val r = GoNatives.chanTryReceive(c, NotReady, Closed)
       if (r.asInstanceOf[AnyRef] eq Closed) || (r.asInstanceOf[AnyRef] eq NotReady) then None else Some(r.asInstanceOf[T])
+    /** Go's `close(c)`. */
     def close(): Unit = GoNatives.chanClose(c)
+    /** Go's `len(c)`: the number of buffered values. */
     def length: Int = GoNatives.chanLength(c)
+    /** Go's `cap(c)`. */
     def capacity: Int = GoNatives.chanCapacity(c)
     def isNil: Boolean = GoNatives.isNil(c)
     /** The values received until the channel is closed (Go's `for v := range c`). */

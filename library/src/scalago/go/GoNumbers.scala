@@ -4,7 +4,16 @@ package scalago.go
 // they are opaque over), so they only matter as type arguments: `GoSlice.make[GoInt](n)` makes
 // a Go `[]int`, while `GoSlice.make[Long](n)` makes an `[]int64`. Reading either gives Longs.
 
-/** Go `int` (64 bits on the platforms Go supports for scala-go). */
+/** Go `int` (64 bits on the platforms scala-go supports).
+ *
+ *  Go's numeric types without a Scala counterpart are opaque over Scala numbers, so they only
+ *  matter as type arguments and in facades: `GoSlice.make[GoInt](n)` makes an `[]int`, while
+ *  `GoSlice.make[Long](n)` makes an `[]int64`. Reading either gives `Long`s.
+ *  {{{
+ *  val n: GoInt = GoInt(42)
+ *  n.toLong + 1   // 43
+ *  }}}
+ */
 opaque type GoInt = Long
 object GoInt:
   def apply(x: Long): GoInt = x
