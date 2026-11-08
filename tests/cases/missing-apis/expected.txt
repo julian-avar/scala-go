@@ -1,5 +1,6 @@
 linked and running
 static method: java.lang.NoSuchMethodError, true
 class: java.lang.NoClassDefFoundError, true
+result used: java.lang.NoSuchMethodError, true
 false
 done
