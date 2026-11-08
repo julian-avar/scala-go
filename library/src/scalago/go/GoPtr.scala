@@ -2,7 +2,15 @@ package scalago.go
 
 import scalago.go.internal.GoNatives
 
-/** A Go pointer, `*T`, for types that facades do not already represent by pointers. */
+/** A Go pointer, `*T`, for types that facades do not already represent by pointers.
+ *
+ *  {{{
+ *  import scalago.go.*
+ *
+ *  val p = GoPtr.to(42L)   // *int64
+ *  p.set(p.get + 1)
+ *  }}}
+ */
 opaque type GoPtr[T] = AnyRef
 
 object GoPtr:

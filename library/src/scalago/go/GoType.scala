@@ -3,10 +3,13 @@ package scalago.go
 import scalago.go.internal.GoNatives
 
 /** The Go type that values of Scala type `T` are stored as in Go data structures, for creating
- *  them: `GoSlice.make[Int](n)` makes an `[]int32`. Instances exist for Scala's primitive types
- *  (`Int` is `int32`, `Long` is `int64`, ...), the Go numeric types (`GoInt`, `GoByte`, ...),
- *  `GoString` (`string`), `String` (Scala strings, as they are), `Any` (`any`), `GoError`, and
- *  slices, maps, channels and pointers of those.
+ *  them: `GoSlice.make[Int](n)` makes an `[]int32`, `GoSlice.make[GoInt](n)` an `[]int`.
+ *
+ *  Instances exist for Scala's primitive types (`Int` is `int32`, `Long` is `int64`, `Char` is
+ *  `uint16`, ...), the Go numeric types ([[GoInt]], [[GoByte]], ...), [[GoString]] (`string`),
+ *  `String` (Scala strings, as they are), `Any` (`any`), [[GoError]], and slices, maps,
+ *  channels and pointers of those. They are found implicitly; `GoType.of[T].name` is the Go
+ *  type's name.
  */
 opaque type GoType[T] = AnyRef
 
@@ -37,9 +40,11 @@ object GoType:
   given chan[T](using elem: GoType[T]): GoType[GoChan[T]] = GoNatives.chanType(elem.underlying)
   given ptr[T](using elem: GoType[T]): GoType[GoPtr[T]] = GoNatives.ptrType(elem.underlying)
 
+  /** The instance for `T`. */
   def of[T](using t: GoType[T]): GoType[T] = t
 
   extension [T](t: GoType[T])
     /** The runtime representation, for the natives. */
     private[go] def underlying: AnyRef = t
+    /** The Go type, as Go writes it (`[]int32`, `map[string]int`). */
     def name: String = t.toString

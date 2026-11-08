@@ -2,15 +2,27 @@ package scalago.go
 
 import scalago.go.internal.GoNatives
 
-/** A Go map, `map[K]V`, shared with Go code without copying. Keys and values are in their
- *  canonical Scala representations (see `GoType` and `GoSlice`). Iteration order is Go's
- *  (randomized); on the JVM it is insertion order.
+/** A Go map, `map[K]V`, shared with Go code without copying.
+ *
+ *  {{{
+ *  import scalago.go.*
+ *
+ *  val counts = GoMap.make[GoString, GoInt]   // map[string]int
+ *  counts(GoString("go")) = GoInt(1)
+ *  counts.get(GoString("go"))                 // Some(1)
+ *  counts.remove(GoString("go"))              // Go's delete
+ *  }}}
+ *
+ *  Keys and values are in their canonical Scala representations (see [[GoType]] and
+ *  [[GoSlice]]). Iteration order is Go's (randomized); on the JVM it is insertion order.
  */
 opaque type GoMap[K, V] = AnyRef
 
 object GoMap:
+  /** Go's `make(map[K]V)`. */
   def make[K, V](using k: GoType[K], v: GoType[V]): GoMap[K, V] = GoNatives.makeMap(k.underlying, v.underlying)
 
+  /** A new map holding `entries`. */
   def of[K, V](entries: (K, V)*)(using k: GoType[K], v: GoType[V]): GoMap[K, V] =
     val m = make[K, V]
     for (key, value) <- entries do m(key) = value
@@ -19,9 +31,11 @@ object GoMap:
   private object Missing
 
   extension [K, V](m: GoMap[K, V])
+    /** Go's `len(m)`. */
     def size: Int = GoNatives.mapSize(m)
     def isEmpty: Boolean = size == 0
     def isNil: Boolean = GoNatives.isNil(m)
+    /** Go's `v, ok := m[key]`. */
     def get(key: K): Option[V] =
       val r = GoNatives.mapLookup(m, key, Missing)
       if r.asInstanceOf[AnyRef] eq Missing then None else Some(r.asInstanceOf[V])
@@ -29,9 +43,11 @@ object GoMap:
     def contains(key: K): Boolean = get(key).isDefined
     /** The value for `key`; throws `NoSuchElementException` if there is none. */
     def apply(key: K): V = get(key).getOrElse(throw new NoSuchElementException(s"key not found: $key"))
+    /** `m[key] = value`. */
     def update(key: K, value: V): Unit = GoNatives.mapStore(m, key, value)
     /** Go's `delete(m, key)`. */
     def remove(key: K): Unit = GoNatives.mapDelete(m, key)
+    /** The entries, in Go's iteration order. */
     def iterator: Iterator[(K, V)] =
       val entries = GoNatives.mapEntries(m)
       Iterator.range(0, entries.length / 2).map(i => (entries(2 * i).asInstanceOf[K], entries(2 * i + 1).asInstanceOf[V]))
