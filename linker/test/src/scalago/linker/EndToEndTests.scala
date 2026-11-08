@@ -164,18 +164,25 @@ class EndToEndTests extends munit.FunSuite:
 
   /** The tests' own Go build cache. Every change to the linker, javalib or the runtime gives each
    *  case a new generated package, tens of MB in the cache (more with the race detector), and Go
-   *  only trims entries unused for five days: a day of development added tens of GB to the user's
-   *  cache. This one is pruned of entries unused for a day when the tests start (Go refreshes an
-   *  entry's modification time when it uses it).
+   *  only trims entries unused for five days: a day of development can add a hundred GB. So when
+   *  the tests start, this cache is pruned of entries unused for a day, and then, if it is still
+   *  larger than `SCALAGO_TEST_GOCACHE_GB` (10 by default), of the least recently used ones until
+   *  it is half that (Go refreshes an entry's modification time when it uses it).
    */
   private val goCache: Path =
     val dir = Path.of(sys.props("user.home"), ".cache", "scalago-tests", "go-build")
     Files.createDirectories(dir)
+    val maxBytes = sys.env.get("SCALAGO_TEST_GOCACHE_GB").map(_.toLong).getOrElse(10L) << 30
     val cutoff = java.time.Instant.now().minus(java.time.Duration.ofDays(1))
-    Using.resource(Files.walk(dir)) { paths =>
-      for p <- paths.iterator.asScala if Files.isRegularFile(p) && Files.getLastModifiedTime(p).toInstant.isBefore(cutoff) do
-        Files.deleteIfExists(p)
-    }
+    val files = Using.resource(Files.walk(dir))(_.iterator.asScala.filter(Files.isRegularFile(_)).toList)
+      .map(p => (p, Files.getLastModifiedTime(p).toInstant, Files.size(p)))
+    val (stale, kept) = files.partition(_._2.isBefore(cutoff))
+    stale.foreach(f => Files.deleteIfExists(f._1))
+    var total = kept.map(_._3).sum
+    if total > maxBytes then
+      for (path, _, size) <- kept.sortBy(_._2) if total > maxBytes / 2 do
+        Files.deleteIfExists(path)
+        total -= size
     dir
 
   /** Each case builds in a new temporary directory. Without `-trimpath` the directory is part of
