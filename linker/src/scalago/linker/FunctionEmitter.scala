@@ -564,7 +564,8 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   /** A placeholder value after code that never completes (keeps the Go code well-typed). */
   private def zeroValue(t: Type): String =
     val goType = ctx.goType(t)
-    if goType.isEmpty then "" else s"*new($goType)"
+    // Parenthesized: a selector binds tighter than `*` (`(*new(*rt.Array[any])).Data`).
+    if goType.isEmpty then "" else s"(*new($goType))"
 
   private def viaTemp(tree: Tree): String =
     val temp = freshTemp()
