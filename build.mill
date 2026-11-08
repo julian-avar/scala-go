@@ -342,16 +342,17 @@ object examples extends Module {
 
   /** Popular Go libraries used from Scala through generated facades: a bubbletea TUI styled with
    *  lipgloss, using bubbles components. `mill examples.gotui.goRun` runs it in the terminal; `mill examples.gotui.check`
-   *  runs it on scripted keys and checks the final state.
+   *  runs it on scripted keys and checks the final state. The generated facades use those of
+   *  scalago-gostd for the standard library's types (`io.Reader`, `time.Duration`).
    */
   object gotui extends InBuildScalaGoModule {
+    override def moduleDeps = Seq(library, gostd)
     def goRequires = Seq(
       "github.com/charmbracelet/bubbletea@v1.3.10",
       "github.com/charmbracelet/lipgloss@v1.1.0",
       "github.com/charmbracelet/bubbles@v1.0.0"
     )
     def goFacadePackages = Seq(
-      "io",
       "github.com/charmbracelet/bubbletea",
       "github.com/charmbracelet/lipgloss",
       "github.com/charmbracelet/bubbles/textinput",
