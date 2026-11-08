@@ -51,8 +51,12 @@ scala-go has its own Java standard library (javalib), written in Scala: `java.la
 `java.util.concurrent` (executors, `ForkJoinPool`, `CompletableFuture`, locks, atomics,
 concurrent collections; so `scala.concurrent.Future` too), `java.math` (`BigInteger`, `BigDecimal`, exact),
 `java.io`, `java.nio` (buffers, file channels, `Files`, the default file system), subprocesses
-(`ProcessBuilder`, so `scala.sys.process` and os-lib's `os.proc`), `java.time` (time zones from
-Go's tz database), and the parts of `java.text` that `java.time` needs. design.md's [Status](design.md#status) lists the gaps.
+(`ProcessBuilder`, so `scala.sys.process` and os-lib's `os.proc`), `java.net` (URIs, URLs,
+addresses, TCP sockets) and HTTP (`HttpURLConnection` and `java.net.http.HttpClient`, on Go's
+`net/http`), message digests, HMACs and `SecureRandom` (Go's crypto), `java.util.zip` (deflate,
+GZIP, zip files; compressed bytes differ from the JDK's zlib but are interchangeable),
+`java.time` (time zones from Go's tz database), and the parts of `java.text` that `java.time`
+needs. design.md's [Status](design.md#status) lists the gaps.
 
 Differences from the JVM worth knowing:
 
@@ -66,6 +70,9 @@ Differences from the JVM worth knowing:
 - **Stack traces** are like the JVM's, but line numbers are per statement, and JDK methods
   implemented natively have no frames.
 - **`WeakHashMap`** keeps its keys (Go 1.22 has no weak pointers).
+- **HTTP** is HTTP/1.1 on Go's `net/http`, also when HTTP/2 is asked for. TLS trusts the
+  system's certificates (not the JDK's `cacerts`); proxies, cookies and authenticators are not
+  supported, and response header names arrive in Go's canonical case (`Content-Type`).
 - **Unicode version:** character properties and case mappings come from Go's tables (Unicode
   15, like JDK 21); characters added in Unicode 16 (JDK 25) have no case mapping.
 

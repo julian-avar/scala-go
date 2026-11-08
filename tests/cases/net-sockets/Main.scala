@@ -99,7 +99,7 @@ object Main:
     println("-- closing from another thread")
     val server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress)
     val accepting = startThread(attempt("blocked accept")(server.accept()))
-    Thread.sleep(100)
+    Thread.sleep(500) // for the accept to block (were the socket closed first, the message would differ)
     server.close()
     accepting.join()
     attempt("accept after close")(server.accept())
@@ -111,7 +111,8 @@ object Main:
       s.close()
     }
     val c = new Socket(InetAddress.getLoopbackAddress, server2.getLocalPort)
-    val reading = startThread(attempt("blocked read")(c.getInputStream.read()))
+    val in = c.getInputStream
+    val reading = startThread(attempt("blocked read")(in.read()))
     Thread.sleep(100)
     c.close()
     reading.join()

@@ -165,3 +165,12 @@ func TestHttpExchange(t *testing.T) {
 		t.Errorf("timeout: %v", e)
 	}
 }
+
+func TestHttpUntrustedCertificate(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer server.Close()
+	e := HttpSend(Str("GET"), Str(server.URL), ArrayOf[any](), nil, 1000, 1000, redirectNever, 3)
+	if NetErrorKind(e) != netTLS {
+		t.Errorf("self-signed certificate: %v", e)
+	}
+}
