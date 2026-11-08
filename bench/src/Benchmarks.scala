@@ -52,7 +52,7 @@ object Main:
       val xs = (1 to 100000).toList
       val m = xs.groupBy(_ % 1000).view.mapValues(_.sum).toMap
       val v = xs.toVector.map(_ * 2).filter(_ % 3 == 0)
-      sum += m.values.sum + v.length + xs.sorted(Ordering[Int].reverse).head
+      sum += m.values.sum + v.length + xs.sorted(using Ordering[Int].reverse).head
     sum
 
   def mutableColls(): Long =
