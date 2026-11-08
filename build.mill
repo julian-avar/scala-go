@@ -30,9 +30,9 @@ trait Published extends PublishModule {
   def pomSettings = PomSettings(
     description = "scala-go: compile Scala 3 to Go",
     organization = UserScalaGoModule.Organization,
-    url = "https://github.com/scalago/scala-go",
+    url = "https://github.com/julian-avar/scala-go",
     licenses = Seq(License.`Apache-2.0`),
-    versionControl = VersionControl(),
+    versionControl = VersionControl.github("julian-avar", "scala-go"),
     developers = Seq()
   )
 }
