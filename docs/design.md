@@ -298,7 +298,8 @@ object url:
   | Scala class                | a Go interface it implements                                       |
   | `Array[T]`                 | `[]T`. Memory is shared when the representations match (`Array[Byte]`/`[]byte`, `Array[Long]`/`[]int64`, ...); otherwise elements are copied |
   | `T*`, `Array[T]`           | variadic `...T`. Literal varargs skip the `Seq`                    |
-  | `(A, B) => C`              | `func(A, B) C`, or a named func type (`type Cmd func() Msg`): calls `apply` through a dispatcher. A Go func *returned* to Scala becomes a `GoFunctionN` wrapping a Go closure that converts with the facade's types |
+  | `(K, V)*`, `Seq[(K, V)]`, `Array[(K, V)]` | `map[K]V`, a new map (Go's composite literal; a later key wins) |
+  | `(A, B) => C`              | `func(A, B) C`, or a named func type (`type Cmd func() Msg`): calls `apply` through a dispatcher. Results are as for methods implemented in Scala (below): a trailing `error` that `C` leaves out is the exception the function throws, several results come from a tuple. A Go func *returned* to Scala becomes a `GoFunctionN` wrapping a Go closure that converts with the facade's types (and throws its error) |
   | `GoSlice[T]`, `GoMap[K, V]`, `GoChan[T]`, `GoPtr[T]` | the Go value as is (no copy), if `T` is the canonical view of the Go element type (see below); directional channels and named types are converted |
   | `(A, B)` result            | two results                                                        |
   | `Any`                      | `any`, or a named interface without methods (`type Msg interface{}`); Scala strings become Go strings |
@@ -331,7 +332,9 @@ object url:
 
 - **Conversions to named types** are package members named as the type, with one parameter:
   `def Color(value: String): Color` in a facade of `lipgloss` is Go's `lipgloss.Color(value)`,
-  with the argument converted to the underlying type.
+  with the argument converted to the underlying type. A named slice or map type's composite
+  literal is such a conversion from varargs: `def H(entries: (String, Any)*): H` is gin's
+  `gin.H{"message": "pong"}` as `gin.H("message" -> "pong")`.
 - **Generic Go functions** are called through monomorphic facades: `def Max(xs: GoSlice[GoInt]):
   GoInt` for `slices.Max`. The Go types that mention type parameters are taken from the facade's
   Scala types, and the call passes values of those types, so Go infers the type arguments. A
@@ -351,7 +354,13 @@ from Go packages' APIs, as ScalablyTyped does from `.d.ts` files. Each package b
   Any`), and interfaces without methods of `Any` (`type Msg = Any`), so that Scala lambdas and
   values are passed as they are; aliases of function types are erased in the IR, so the plugin
   records facade types as seen before erasure, aliases followed. Other named non-struct types
-  are classes, with a conversion (`def Color(value: String): Color`).
+  are classes, with a conversion (`def Color(value: String): Color`); named slice and map types
+  also with their composite literal (`def H(entries: (String, Any)*): H`, `def
+  HandlersChain(elems: HandlerFunc*): HandlersChain`), which also covers element types that
+  cannot be inside Go data, such as funcs.
+- Func types' results are as functions' and methods': a trailing `error` is an exception (the
+  Scala function throws it; a Go func returned to Scala throws it), several results are a tuple
+  (`errgroup`'s `func() error` is `() => Unit`).
 - Generic functions whose type parameters are constrained by interfaces (`key.Matches[K
   fmt.Stringer](k K, ...)`) take the constraint (`k: fmt.Stringer`); the linker passes values of
   that type, so Go infers it as the type argument. Constraints with type sets (`~int | string`,
@@ -395,11 +404,14 @@ Generated facades are checked against Go at link time like handwritten ones, but
 used, so unused members cost nothing. `scalago-gostd` (`gostd/` in this build) has the facades
 of 21 standard library packages and the types of `io/fs`, `reflect` and `syscall` that they use,
 about 1,700 members. The `go-std` test case uses them; `go-facadegen` generates facades of a
-local module written in the style of bubbletea and checks the rules above; `go-facade-reuse`
+local module written in the style of bubbletea and checks the rules above; `go-web` one in the
+style of gin (embedded structs and promoted methods, variadic named func types, composite
+literals, handlers on goroutines, JSON with `GoData`, callbacks with error results); `go-facade-reuse`
 generates two sets (`facades-<package>.txt` sets are compiled as dependencies of `facades.txt`)
 that pass values to each other and to `scalago-gostd`; and `examples/gotui/` (`mill
 examples.gotui.check`) uses bubbletea, bubbles and lipgloss, with `scalago-gostd` for the
-standard library's types.
+standard library's types; `examples/gin/` a JSON API on gin, and `examples/argus/` configuration
+reloaded by argus (`mill examples.gin.check`, `mill examples.argus.check`).
 
 ### Go data in Scala
 
@@ -427,6 +439,21 @@ the Go element type, which a `GoType[T]` given supplies: `GoSlice.make[GoInt](n)
 opaque over Scala numbers, so they only matter there and in facades. Every operation has a JVM
 implementation with Go's semantics (`GoNatives`), so code that uses Go data without facades also
 runs on the JVM. The `go-data` test case checks that both agree.
+
+**Plain data.** Go code that inspects values by reflection (`encoding/json`, templates,
+configuration libraries) cannot see inside Scala objects: a case class in an `any` is a pointer
+to a generated struct. `GoData` (`library/src/scalago/go/GoData.scala`) copies between Scala data
+and plain Go data. `GoData(x)` makes strings Go strings, Scala integers Go `int`s (the type of Go's
+integer literals, which libraries' type switches expect), collections `[]any`, maps and case
+classes (by `productElementNames`) `map[string]any`, `Option` its value or `nil`, and leaves Go
+values as they are; `GoData.map(k -> v, ...)` is a typed `GoMap[GoString, Any]`. `GoData.toScala`
+goes back: strings, `Long`, `Double`, `Boolean`, `Vector`, and maps as `Map[String, Any]` sorted by
+key (Go maps have no order). It needs two natives (`rt.GoDataKind`, `rt.GoBasicData`) that tell
+predeclared basic values, maps and slices from other values. This is a copy by design: an
+automatic conversion of Scala values passed to `any` would break identity (a Scala message passed
+through bubbletea must come back as itself). Struct tags have no Scala counterpart, so JSON
+request bodies are bound into `*any` (`GoPtr.alloc[Any]`) and read with `GoData.toScala`, or parsed
+by a Scala JSON library.
 
 Not supported yet: generic Go *types*, `GoType` instances for facade types, facades using
 `GoSlice`/`GoMap` for *named* slice and map types, `select` over channels, unnamed struct and
