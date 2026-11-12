@@ -18,25 +18,38 @@ by an end-to-end test (`tests/cases/limits-*`) that expects it to fail.
   Java serialization, class loading) does not exist. `getClass`, class names and
   `isAssignableFrom` work. Use macros, givens and `Mirror`s, as most Scala 3 libraries do.
   [Runtime: reflection](../spec/runtime.md#reflection-and-class-loading).
-- **Type tests with a `ClassTag`** (`case x: T` given a `ClassTag[T]`) throw `NoSuchMethodError`:
-  `Class.isInstance` and `Class.cast` are missing. Match on concrete types.
-- **Structural types** (`reflectiveSelectable`) throw. Use a trait.
-- **Classpath resources** are not embedded: `getResourceAsStream` returns `null`. Read files, or
-  embed data in code.
+- **Type tests with a `ClassTag`** (`case x: T` given a `ClassTag[T]`) do not link:
+  `Class.isInstance` and `Class.cast` are missing (with `--missing-apis throw`, they throw
+  `NoSuchMethodError`). Match on concrete types. Also missing: `getSuperclass`, `getInterfaces`,
+  `isInterface`, `isEnum`, `getEnumConstants`, `getCanonicalName`.
+- **Structural types** (`reflectiveSelectable`) do not link. Use a trait.
+- **Classpath resources** are not embedded: `getResourceAsStream` returns `null`, and
+  `Source.fromResource` does not link. Read files, or embed data in code.
+- **No Go counterpart:** Java serialization, JMX (`java.lang.management`), `SecurityManager`,
+  `System.loadLibrary` and method handles do not link.
 
 ## JDK and Scala libraries
 
 - **Missing JDK classes** include `Scanner`, `java.util.Formatter`, `EnumSet`/`EnumMap`,
-  `Calendar`, `java.util.logging`, `java.text`'s number and date formats, TLS configuration and
-  ciphers, UDP and NIO socket channels. Use another API, or call Go through a
+  `Calendar`, `Timer`, `Currency`, `ServiceLoader`, `ResourceBundle`, `java.util.logging`,
+  `java.text`, `java.util.jar`, TLS configuration and ciphers, UDP and NIO socket channels,
+  `PhantomReference` and `Cleaner`. Use another API, or call Go through a
   [facade](../interop/facades.md). [The JDK](../libraries/jdk.md).
-- **`String.format` and `f"..."`** throw on argument indices (`%1$s`), the `,` flag (`%,d`) and
-  `%t`. `String.formatted` is missing. Other output differences:
-  [Differences](differences.md#text).
-- **Regular expressions** are Go's RE2: no lookaround, backreferences or possessive quantifiers.
-- **Charsets:** UTF-8, ISO-8859-1 and US-ASCII only.
-  [Runtime: locales](../spec/runtime.md#locales-text-and-charsets).
-- **HTTP client:** no proxies, cookies or authenticators.
+- **Missing methods** of present classes include `String.formatted`, `strip{Leading,Trailing}`,
+  `indent`, `Character.getType`, `Math.fma`, `copySign`, `Integer.parseUnsignedInt`,
+  `System.gc` (`Runtime.gc()` works), `System.runFinalization`, `Thread.getStackTrace` and
+  `ReferenceQueue.poll`. The [roadmap](../contributing/roadmap.md#m3-common-programs) lists them.
+- **`String.format` and `f"..."`** throw on argument indices (`%1$s`, `%<s`), the `,` flag,
+  `%h`, `%t`, `%a`, and `BigDecimal` with `%f`. The exception is an
+  `IllegalArgumentException` naming the JDK's (`UnknownFormatConversionException: ...`), not
+  the JDK's subclass. Other output differences: [Differences](differences.md#text).
+- **Regular expressions** are Go's RE2: no lookaround, backreferences, possessive quantifiers or
+  atomic groups. Such a pattern throws `UnsupportedOperationException` when compiled.
+- **Charsets:** UTF-8, ISO-8859-1 and US-ASCII only. Others throw
+  `UnsupportedOperationException` (not `UnsupportedEncodingException`), and
+  `Charset.isSupported` is `false`. [Runtime: locales](../spec/runtime.md#locales-text-and-charsets).
+- **HTTP client:** no proxies, cookies or authenticators (`HttpClient.Builder.proxy`,
+  `cookieHandler`, `authenticator`, `CookieManager` do not link).
 - **Libraries with Java code**, Scala 2 libraries and libraries built on runtime reflection do not
   link. Blocked today: cats-effect, ZIO, fs2-io, circe, zio-json, scribe, scopt, requests-scala,
   munit, utest. Use Go libraries in place of Java ones. [Scala libraries](../libraries/scala.md).
@@ -51,7 +64,8 @@ by an end-to-end test (`tests/cases/limits-*`) that expects it to fail.
   the [gin example](../examples/gin.md) does).
 - **cats-effect and ZIO** do not link. Use gears or `scala.concurrent`
   ([Concurrency](concurrency.md)).
-- **Parallel streams** run sequentially.
+- **Parallel streams** run sequentially; `parallel()` of primitive streams (`IntStream`) does
+  not link.
 - **Missing:** `SubmissionPublisher`, `Thread.getAllStackTraces`, `ThreadGroup.activeCount` and
   `ThreadGroup.enumerate`.
 
@@ -73,7 +87,8 @@ by an end-to-end test (`tests/cases/limits-*`) that expects it to fail.
   - unnamed struct and interface types (gin's `Context.Done()` returns `<-chan struct{}`);
   - arrays and complex numbers;
   - unexported types in exported APIs (gin's `Context.Errors`), types of `internal` packages;
-  - funcs stored in Go data (struct fields of func type, slices of funcs), variadic func types;
+  - funcs inside Go slices and maps (struct fields of func type are generated), variadic func
+    types;
   - Go funcs with more than 3 parameters returned to Scala;
   - constants beyond `Long`.
 
@@ -103,7 +118,10 @@ by an end-to-end test (`tests/cases/limits-*`) that expects it to fail.
   [Go standard library](../libraries/gostd.md).
 - **Exports** (Go calling Scala): no exported traits, `val`s or fields, secondary constructors,
   tuple results, overloads with the same Go name or generic methods; one Scala library per Go
-  binary. [Calling Scala from Go](../interop/exports.md#limitations).
+  binary. Most are compile or link errors; `@GoExport` on a `val` or field is ignored, and
+  overloads exported under one Go name give Go code that does not compile
+  ([known bugs](../contributing/roadmap.md#known-bugs)).
+  [Calling Scala from Go](../interop/exports.md#limitations).
 
 ## Tooling
 

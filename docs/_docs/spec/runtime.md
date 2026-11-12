@@ -122,7 +122,7 @@ A `GoMap` written concurrently with other uses is a fatal error (see
 | Collector | Go's concurrent, non-generational, non-moving mark-and-sweep collector, tuned with `GOGC` and `GOMEMLIMIT` |
 | Object addresses | Stable (objects never move); identity hash codes derive from them |
 | `finalize()` | **Deviation:** never called |
-| `WeakReference`, `SoftReference` | **Deviation:** hold their referent strongly; `get` returns it until `clear()`. `ReferenceQueue` exists but is never filled. `PhantomReference` is not implemented. `WeakHashMap` holds its keys strongly |
+| `WeakReference`, `SoftReference` | **Deviation:** hold their referent strongly; `get` returns it until `clear()`. `ReferenceQueue` exists but has no methods (`poll`, `remove`). `PhantomReference` is not implemented. `WeakHashMap` holds its keys strongly |
 | Heap exhaustion | **Deviation:** a Go fatal error (`fatal error: runtime: out of memory`), not a catchable `OutOfMemoryError` |
 | `Runtime.totalMemory`, `freeMemory` | The heap Go obtained from the system, and its unused part |
 | `Runtime.maxMemory` | `Long.MaxValue` (no limit unless `GOMEMLIMIT` is set) |
@@ -246,7 +246,9 @@ use, with the chain of calls that reaches it.
   - **Deviation (bug):** `%g` is Go's, which drops trailing zeros: `"%g".format(1.0)` is `1`
     (JDK: `1.00000`).
 - Charsets: UTF-8 (default), ISO-8859-1 and US-ASCII, with the JDK's malformed-input handling.
-  No other charsets.
+  No other charsets: `Charset.isSupported` is `false` for them. **Deviation (bug):** using one
+  throws `UnsupportedOperationException` (JVM: `UnsupportedEncodingException` or
+  `UnsupportedCharsetException`).
 - **Deviation:** `Character` classification and case mapping use Go's Unicode tables (Unicode
   15.0 with Go 1.26); JDK 25 uses Unicode 16.0. Code points added in Unicode 16 classify
   differently.

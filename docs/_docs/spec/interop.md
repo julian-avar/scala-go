@@ -338,7 +338,10 @@ module's root package:
 - A Go package that the library imports through a facade cannot import the library: Go forbids
   import cycles (Go: [Import declarations][go-import]).
 - Not supported: exported traits, fields and `val`s, secondary constructors, tuple results,
-  generic methods, overloads with the same Go name.
+  generic methods, overloads with the same Go name. Traits, secondary constructors and generic
+  methods are compile errors; tuple results are link errors. **Deviation (bug):** `@GoExport` on
+  a field or `val` is ignored, and overloads exported under one Go name give Go code that does
+  not compile.
 
 ## Goroutines and threads
 

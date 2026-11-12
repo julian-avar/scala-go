@@ -392,7 +392,7 @@ Annotations with a run-time effect:
 | `@switch` | compile-time check; the match is a Go `switch` |
 | `@static` | a Go package variable or function, initialized by the static initializer |
 | `@throws` | none, except on `@GoExport` methods: the Go function gets a trailing `error` result |
-| `@native` | the method has no body. **Deviation:** calling it throws `RuntimeException("AbstractMethodError: ...")` (JVM: `UnsatisfiedLinkError`) |
+| `@native` | the method has no body. **Deviation:** calling it throws `RuntimeException("native method stub")` (JVM: `UnsatisfiedLinkError`) |
 | `@inline`, `@noinline` | none in the back end; Go inlines by its own heuristics |
 | `@SerialVersionUID`, `@BeanProperty`, `@varargs` | as Scala compiles them; serialization has no effect |
 | `@GoImport(path, name)` | the object is a Go package, or the class or trait a Go type (see [Data representation](data.md#go-interop-types)) |

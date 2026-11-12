@@ -94,7 +94,9 @@ replace example.com/mylib => ../out/mylib/goLink.dest/go
 
 - Not supported: exported traits (Go code implementing Scala traits), exported `val`s and
   fields, secondary constructors, tuple results, overloads with the same Go name, generic
-  methods. Wrap them in exported methods.
+  methods. Wrap them in exported methods. Most are compile or link errors, but `@GoExport` on a
+  `val` or field is ignored, and overloads exported under one Go name give Go code that does not
+  compile ([known bugs](../contributing/roadmap.md#known-bugs)).
 - Exported classes are Go interfaces. Go code sees their methods, never fields, so reflection
   over struct fields (`encoding/json`) cannot see inside them.
 - One Scala library per Go binary, and no import cycles (see [Rules](#rules)).

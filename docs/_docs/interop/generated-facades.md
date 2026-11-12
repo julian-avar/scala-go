@@ -85,7 +85,7 @@ Members that cannot be represented are left out, with a comment in the generated
   type's parameters or instances (argus's `Bind[T]`, which returns a `*Bound[T]`)
 - unnamed struct and interface types (a `<-chan struct{}` result), arrays, complex numbers
 - unexported types in exported APIs, and types of `internal` packages
-- funcs stored inside Go data (struct fields of func type, slices of funcs), variadic func
+- funcs inside Go slices and maps (struct fields of func type are generated), variadic func
   types, and returned funcs with more than 3 parameters
 - constants that do not fit in a `Long`
 

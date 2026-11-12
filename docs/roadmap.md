@@ -57,7 +57,7 @@ All **S**.
 |-----|--------|
 | `a * b + c` on `Double` fuses into one FMA on arm64 (and amd64 `GOAMD64=v3`): one rounding instead of two | `FunctionEmitter`: wrap products in explicit `float64(…)`/`float32(…)` |
 | `Math.round(0.49999999999999994)` is 1 (JVM: 0); large odd doubles round off by one | `rt.MathRound`: not `floor(d + 0.5)` |
-| `(16777217L: Any) == (16777216f: Any)` is `false` (JVM: `true`, compared as `Float`) | `rt.Equals` |
+| A boxed `Int` or `Long` `==` a boxed `Float` (`val l: Any = 16777217L; val f: Any = 16777216f; l == f`) is `false` (JVM: `true`, compared as `Float`). Literal operands are folded correctly | `rt.Equals` |
 | `(1: Any) == BigInt(1)` is `false` (JVM: `true` via `ScalaNumber`) | `rt.Equals`: `ScalaNumber` on the right |
 | `==` with a null `String` throws `NullPointerException` (JVM: `false`); string matches on a null selector throw | `genArithmetic`: `UnivEq` operands reach `rt.Equals` as a nil `*rt.String` in an `any`. Check `BigInteger`/`BigDecimal` too |
 | `eq` on Go slices, maps or funcs panics | `refEq` emits `any(a) == any(b)` on uncomparable types |
@@ -73,12 +73,17 @@ All **S**.
 | `getSimpleName` of a local class is `""` | `rt.ClassGetSimpleName` |
 | `try throw e finally return x` emits code `go vet` rejects (unreachable code) | `FunctionEmitter` |
 | A facade of a pointer-receiver method on a non-struct Go type links, then fails `go build` | `GoInterop`: reject at link time, or copy to an addressable variable |
+| A Scala subclass of `BigInteger` or `BigDecimal` links, then fails `go build` (`cannot use this (variable of type *S_…) as *rt.BigInteger`) | Linker: a link error naming the class |
+| Two methods exported under one Go name (`@GoExport("Twice")` on overloads) link, then fail `go build` (`Export_Twice redeclared`) | `Exports`: a link error |
+| `@GoExport` on a `val` or a constructor field is ignored, without an error | Plugin: reject, as for traits |
+| A tuple result of an export is rejected with a misleading message (`cannot instantiate a generic Go function with Scala type scala.Tuple2[…]`) | `Exports`: say that tuple results are not supported |
+| String charsets other than the supported three throw `UnsupportedOperationException`, not `UnsupportedEncodingException`/`UnsupportedCharsetException` | javalib charsets |
 
 ### Silent wrong output
 
 | Item | Problem | Size |
 |------|---------|------|
-| `String.format`, `f"…"` | `rt.StringFormat` maps onto Go's `fmt`. Wrong: `%x`/`%o` of negatives (`-1`, not `ffffffff`), `%g`, `BigInt`/`BigInteger` arguments (a Go struct dump), `%(d`. Throws: `%1$s`, `%<s`, the `,` flag, `%h`, `%t`, `%a`, `BigDecimal` with `%f`. `java.util.Formatter` and `String.formatted` are missing. Port Scala.js's or Scala Native's `Formatter` to javalib | M |
+| `String.format`, `f"…"` | `rt.StringFormat` maps onto Go's `fmt`. Wrong: `%x`/`%o` of negatives (`-1`, not `ffffffff`), `%g`, `BigInt`/`BigInteger` arguments (a Go struct dump), `%(d`. Throws: `%1$s`, `%<s`, the `,` flag, `%h`, `%t`, `%a`, `BigDecimal` with `%f`, as an `IllegalArgumentException` whose message names the JDK's exception. `java.util.Formatter` and `String.formatted` are missing. Port Scala.js's or Scala Native's `Formatter` to javalib | M |
 | Signals and fatal errors | SIGINT, SIGTERM and SIGHUP exit without shutdown hooks and without flushing standard output (up to 32 KB lost). Go's fatal errors (stack overflow, out of memory, concurrent map writes, deadlock) lose it too. Fix: an `os/signal` handler that runs hooks and exits 128+signal; flush at line ends on a terminal and on a timer otherwise | S |
 | `Class` type tests | `Class.isInstance`/`cast` are missing, so `ClassTag` patterns (`case x: T`) throw `NoSuchMethodError`. `Class.forName` returns a `Class` for any name, so `Try(Class.forName(…))` probes conclude wrongly. Also missing: `getSuperclass`, `getInterfaces`, `isInterface`, `isEnum`, `getEnumConstants`, `getCanonicalName`. Build on the class hierarchy the linker already emits for `isAssignableFrom` | S |
 
@@ -108,14 +113,14 @@ Start with a report that diffs javalib and natives against the JDK's API (`javap
 | Item | Missing | Size | Needs |
 |------|---------|------|-------|
 | API diff report | Tool comparing javalib's public API with JDK 21's, per class | S | — |
-| `java.lang` | `String`: `formatted`, `strip{Leading,Trailing,Indent}`, `indent`, `translateEscapes`, `codePointCount`, `contentEquals`. `Character`: `getType`, `toTitleCase`, `toChars`, `getNumericValue`, `isValidCodePoint`, `UnicodeBlock`, `UnicodeScript`. `Math`: `copySign`, `fma`, `multiplyHigh`, `nextAfter`, `IEEEremainder`, `scalb`, `getExponent`, `ceilDiv`. `parseUnsigned*`, `System.console`, `Thread.getStackTrace`, `getContextClassLoader` (breaks `Source.fromResource`) | S each | — |
+| `java.lang` | `String`: `formatted`, `strip{Leading,Trailing,Indent}`, `indent`, `translateEscapes`, `codePointCount`, `contentEquals`. `Character`: `getType`, `toTitleCase`, `toChars`, `getNumericValue`, `isValidCodePoint`, `UnicodeBlock`, `UnicodeScript`. `Math`: `copySign`, `fma`, `multiplyHigh`, `nextAfter`, `IEEEremainder`, `scalb`, `getExponent`, `ceilDiv`. `parseUnsigned*`, `System.console`, `System.gc`, `System.runFinalization`, `Thread.getStackTrace`, `getContextClassLoader` (breaks `Source.fromResource`), `IntStream.parallel` | S each | — |
 | `java.util` | `Scanner`, `EnumSet`/`EnumMap`, `Calendar`, `Timer`, `Currency`, `ServiceLoader` (resolve `META-INF/services` at link time), `ResourceBundle`, `Stream.gather`, concurrent collectors, reversed sequenced-map views, `Arrays.compare`/`mismatch`, multi-line `Properties` values | M | `getEnumConstants`, reflective instantiation |
 | Classpath resources | `getResourceAsStream` returns null. The linker embeds resources selected by build patterns | S–M | — |
 | `java.util.logging` | `Logger`, `Handler`, `Level`, `LogRecord`, `LogManager` (scribe, cask, ZIO use it) | S–M | — |
 | `TrieMap`, field updaters | `TrieMap`'s node classes are Java sources without TASTy: override them in javalib. Atomic field updaters become intrinsics when the field name is a literal, as `VarHandle`s are | S–M | — |
 | `java.text` | `NumberFormat`, `DecimalFormat`, `SimpleDateFormat`, `MessageFormat`, `Normalizer`, `Collator`, `BreakIterator` | M | locale data |
 | Charsets | UTF-16 (BE, LE), Windows and ISO single-byte charsets | S | — |
-| Weak references | `WeakReference`, `SoftReference`, `WeakHashMap` hold strongly; `ReferenceQueue` never enqueues; no `Cleaner`; the monitor table never shrinks. Long-running caches leak | M | Go ≥ 1.24 |
+| Weak references | `WeakReference`, `SoftReference`, `WeakHashMap` hold strongly; `ReferenceQueue` has no methods (`poll`, `remove`); no `PhantomReference`, `Cleaner`; the monitor table never shrinks. Long-running caches leak | M | Go ≥ 1.24 |
 | Structural types | `reflectiveSelectable` needs `getMethod`. Compile calls by name and signature through generated dispatchers, as Scala.js | M | — |
 | Archives | ZIP64 writing, encrypted entries, `JarFile`, `JarInputStream` | S–M | — |
 
@@ -146,7 +151,7 @@ Not planned: ScalaTest (reflection throughout, `java.awt`), and cask, http4s-emb
 | Go structs from Scala | Go sees Scala classes only as interfaces. No Scala declaration yields a Go struct with fields and tags, which `encoding/json`, gin binding and database scanners read | M–L |
 | Generics | Generic Go *types*; functions constrained by type sets (most of `slices`, `maps`, `cmp`) are left out of generated facades; `GoType` instances for facade types | M |
 | `select` | Over several Go channels, from Scala and from gears | S–M |
-| Data shapes | `GoSlice`/`GoMap` facades of named slice and map types, unnamed struct and interface types, funcs in Go data, arrays, complex numbers, variadic callbacks, returned Go funcs with more than 3 parameters | M |
+| Data shapes | `GoSlice`/`GoMap` facades of named slice and map types, unnamed struct and interface types, funcs in Go slices and maps, arrays, complex numbers, variadic callbacks, returned Go funcs with more than 3 parameters | M |
 | Exports | Go implementing Scala traits, vals and fields, secondary constructors, tuple results, overloads sharing a Go name, generic methods | M |
 | `scalago-gostd` | 21 packages. Add `net/http`, `os/exec`, `regexp`, `crypto/*`, `log/slog`, `database/sql`, `encoding/csv`, `slices`, `maps` | S, after generics |
 | cgo | Test facades of cgo packages (SQLite) and stack traces after C calls | S |
