@@ -4,8 +4,8 @@ title: Generated facades
 
 # Generated facades
 
-Instead of writing facades by hand, list Go packages in `goFacadePackages`, and the build
-generates their facades from the packages' APIs as part of the module's sources:
+The build generates facades for the Go packages listed in `goFacadePackages`, as part of the
+module's sources:
 
 ```scala sc:nocompile
 object app extends ScalaGoModule {
@@ -21,19 +21,19 @@ import gofacades.{strconv, url}
   println(strconv.Quote(u.Query().Get("q")))
 ```
 
-Each Go package becomes one object in the Scala package `gofacades` (`goFacadesPackage`), named
-as the Go package (`tea` for `github.com/charmbracelet/bubbletea`). When two packages have the
-same name, the objects are named after their import paths instead. The generated sources are in
-`out/<module>/goFacadeSources.dest`.
+- Each Go package is one object, named as the Go package (`tea` for
+  `github.com/charmbracelet/bubbletea`), in the Scala package `gofacades` (`goFacadesPackage`).
+  Packages with the same name are named after their import paths instead.
+- The sources are in `out/<module>/goFacadeSources.dest`.
+- Generated facades are checked at link time like hand-written ones, only where used: unused
+  members cost nothing.
 
 ## Reusing dependencies' facades
 
-Generated facades reuse the facades that the module's dependencies already provide, as
-ScalablyTyped reuses converted libraries. When a module depends on `scalago-gostd` (see
-[Go standard library](../libraries/gostd.md)) or on another module with facades, the Go types
-those provide are not generated again: generated members take and return the dependency's
-types, and generated types extend its interface traits. So one library's values flow into
-another's, e.g. a `scalago.gostd.strings.Reader` where bubbletea expects an `io.Reader`.
+Generated facades reuse the Go types that the module's dependencies provide: `scalago-gostd`
+([Go standard library](../libraries/gostd.md)) or another module's facades. Generated members
+take and return the dependency's types, and generated types extend its interface traits, so a
+`scalago.gostd.strings.Reader` goes where bubbletea expects an `io.Reader`.
 
 ```scala sc:nocompile
 object app extends ScalaGoModule {
@@ -44,55 +44,51 @@ object app extends ScalaGoModule {
 }
 ```
 
-A listed package that dependencies provide completely is skipped, with a note. If two modules of
-a build both generate facades and one depends on the other, give them different
-`goFacadesPackage`s.
+A listed package that dependencies provide completely is skipped, with a note. If two modules
+both generate facades and one depends on the other, give them different `goFacadesPackage`s.
 
 ## How Go types map
 
-- Go numbers are Scala numbers (`int` is `Long`, `int32` is `Int`), `string` is `String`,
-  `error` is `GoError`, `any` is `Any`.
-- Several results are a tuple. A trailing `error` result is thrown as a `GoException`, except
-  where the error is the function's value (`errors.New`, `fmt.Errorf`, `ctx.Err()`).
-- Go types are classes; Go interfaces are traits that Scala classes can implement. A type
-  extends every generated interface whose methods it has (`bytes.Buffer` extends `io.Writer`,
-  `io.Reader`, `fmt.Stringer`, ...), since Go typing is structural and Scala's is nominal.
-- Go func types are aliases of Scala function types (`type Cmd = () => Any`), and interfaces
-  without methods are aliases of `Any` (`type Msg = Any`): Scala lambdas and values are passed
-  as they are.
-- Other named types get a conversion named as the type, as in Go: `lipgloss.Color("205")`,
-  `time.Duration(n)`. Named map and slice types are built like Go composite literals:
-  `gin.H("message" -> "pong")`.
-- A Go func type returning `error` is a Scala function that throws: `() => Unit` for
-  `func() error`; an exception becomes the error. Several results come from a tuple.
-- Inside Go data (slices, maps, channels, pointers), elements have their
-  [canonical views](go-data.md#element-types): a `[]string` is a `GoSlice[GoString]`.
-- Generic functions whose type parameters are constrained by interfaces take the interface:
-  `key.Matches[K fmt.Stringer](k K, ...)` takes `k: fmt.Stringer`.
+| Go                                   | Scala                                                       |
+|--------------------------------------|-------------------------------------------------------------|
+| numbers, `bool`, `string`            | Scala numbers (`int` is `Long`, `int32` and `rune` are `Int`), `Boolean`, `String` |
+| `error`, `any`                       | `GoError`, `Any`                                            |
+| several results                      | a tuple                                                     |
+| a trailing `error` result            | thrown as a `GoException`, except where the error is the value (`errors.New`, `fmt.Errorf`, `ctx.Err()`) |
+| a named type                         | a class                                                     |
+| an interface                         | a trait that Scala classes can implement                    |
+| a func type                          | an alias of a Scala function type: `type Cmd = () => Any`   |
+| a func type returning `error`        | a function that throws: `() => Unit` for `func() error`     |
+| an interface without methods         | an alias of `Any`: `type Msg = Any`                         |
+| a named type, not a struct           | also a conversion named as the type: `lipgloss.Color("205")`, `time.Duration(n)` |
+| named map and slice types            | built like composite literals: `gin.H("message" -> "pong")` |
+| elements of Go data                  | their [canonical views](go-data.md#element-types): `[]string` is `GoSlice[GoString]` |
+| a type parameter with an interface constraint | the interface: `key.Matches[K fmt.Stringer](k K, ...)` takes `k: fmt.Stringer` |
+
+- A type extends every generated interface whose methods it has (`bytes.Buffer` extends
+  `io.Writer`, `io.Reader`, `fmt.Stringer`, ...): Go typing is structural, Scala's nominal.
+- Function aliases take Scala lambdas as they are. In a Go func type, an exception becomes the
+  `error` result, and several results come from a tuple.
 
 ## Dependencies between packages
 
-The types of other packages that the generated members use are generated too, but only their
-types: `time.Duration` for `tea.Tick`, `io.Reader` for `tea.WithInput`. List a package itself to
-get its functions, variables and constants (`"time"` for `time.Second`).
+Types of other packages that generated members use are generated too, but only the types:
+`time.Duration` for `tea.Tick`, `io.Reader` for `tea.WithInput`. List the package itself to get
+its functions, variables and constants (`"time"` for `time.Second`).
 
 ## What is left out
 
-Members that cannot be represented are left out, with a comment in the generated source saying
-why (`// not generated: Errors (type github.com/gin-gonic/gin.errorMsgs is not generated)`):
+Members that cannot be represented are left out, with a comment in the generated source:
+`// not generated: Errors (type github.com/gin-gonic/gin.errorMsgs is not generated)`.
 
 - generic functions with type sets (`~int | string`, `comparable`), and members using a generic
-  type's parameters or instances (argus's `Bind[T]`, which returns a `*Bound[T]`);
-- unnamed struct and interface types (a `<-chan struct{}` result), arrays and complex numbers;
-- unexported types in exported APIs, and types of `internal` packages;
-- funcs stored inside Go data (struct fields of func type, slices of funcs), variadic func types,
-  and returned funcs with more than 3 parameters;
-- constants that do not fit in a `Long`.
+  type's parameters or instances (argus's `Bind[T]`, which returns a `*Bound[T]`)
+- unnamed struct and interface types (a `<-chan struct{}` result), arrays, complex numbers
+- unexported types in exported APIs, and types of `internal` packages
+- funcs stored inside Go data (struct fields of func type, slices of funcs), variadic func
+  types, and returned funcs with more than 3 parameters
+- constants that do not fit in a `Long`
 
-To use such a member, add a [hand-written facade](facades.md) for it next to the generated ones,
-where the [conversions](facades.md#conversions) can express it. The
-[examples](../examples/index.md) list what their generated facades leave out, and
-[Limitations](../user/limitations.md#go-interop) all limitations of Go interop.
-
-Generated facades are checked against Go at link time, like hand-written ones, but only where
-they are used: unused members cost nothing.
+To use such a member, declare it in a [hand-written facade](facades.md) next to the generated
+ones, where the [conversions](facades.md#conversions) can express it. The
+[examples](../examples/index.md) list what their generated facades leave out.

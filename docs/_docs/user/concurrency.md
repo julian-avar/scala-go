@@ -4,25 +4,26 @@ title: Concurrency
 
 # Concurrency
 
-Every Java thread is a goroutine, so the JVM's concurrency APIs work unchanged and Go's
-scheduler runs them.
+Every Java thread is a goroutine. The JVM's concurrency APIs work unchanged, scheduled by Go's
+scheduler.
 
 ## Threads, executors and futures
 
-- `java.lang.Thread` runs on a goroutine: `start`, `join`, `sleep`, `interrupt`, thread locals,
-  daemon threads and uncaught-exception handlers work as on the JVM. Virtual threads
-  (`Thread.ofVirtual()`) are goroutines too.
-- `java.util.concurrent` is complete for common use: executors, `ForkJoinPool`,
-  `CompletableFuture`, locks, atomics, latches, semaphores and concurrent collections.
-- `scala.concurrent.Future` runs on the global `ExecutionContext`, a `ForkJoinPool`, and
-  `blocking { ... }` works as on the JVM.
-- `Runtime.availableProcessors` is `GOMAXPROCS`.
-- As on the JVM, the program exits when `main` returns and all non-daemon threads have ended.
+| API                                | On scala-go                                                          |
+|------------------------------------|----------------------------------------------------------------------|
+| `java.lang.Thread`                 | a goroutine; `start`, `join`, `sleep`, `interrupt`, thread locals, daemon threads and uncaught-exception handlers work as on the JVM |
+| `Thread.ofVirtual()`               | a goroutine too                                                      |
+| `java.util.concurrent`             | executors, `ForkJoinPool`, `CompletableFuture`, locks, atomics, latches, semaphores, concurrent collections |
+| `scala.concurrent.Future`          | runs on the global `ExecutionContext`, a `ForkJoinPool`; `blocking { ... }` works |
+| `Runtime.availableProcessors`      | `GOMAXPROCS`                                                         |
+
+The program exits when `main` returns and all non-daemon threads have ended, as on the JVM.
 
 ## gears
 
-[gears](https://github.com/lampepfl/gears), the direct-style concurrency library, runs on
-goroutines: each `Future` is a goroutine. Add `scalago-gears`, which brings gears with it:
+[gears](https://github.com/lampepfl/gears) runs on goroutines: each gears `Future` is a
+goroutine. gears itself is compiled from its published jar; `scalago-gears` replaces the one class
+that needs JVM internals. Add both:
 
 ```scala sc:nocompile
 object app extends ScalaGoModule {
@@ -43,13 +44,12 @@ import gears.async.default.given
     println(lengths.awaitAll)
 ```
 
-gears itself is compiled from its published jar; `scalago-gears` replaces the one class that
-needs JVM internals. The same code runs on the JVM, on virtual threads.
+The same code runs on the JVM, on virtual threads.
 
 ## Go channels
 
-`GoChan` is a Go channel (see [Go data](../interop/go-data.md#channels)). `send` and `receive`
-block the calling thread. In gears code, `scalago.gears` adds cancellable operations:
+`GoChan` is a Go channel ([Go data](../interop/go-data.md#channels)). `send` and `receive` block
+the calling thread. In gears code, `scalago.gears` adds cancellable operations:
 
 ```scala
 import gears.async.*
@@ -64,9 +64,9 @@ def drain(ch: GoChan[Int])(using Async): Unit =
 
 ## Go contexts
 
-`withGoContext(ctx)(body)` runs `body` until it completes or the Go `context.Context` is done,
-which cancels it and throws `CancellationException`. This is how exported Scala code honours
-the deadlines and cancellation of its Go callers:
+`withGoContext(ctx)(body)` runs `body` until it completes or the Go `context.Context` is done.
+When `ctx` is done, `body` is cancelled and `CancellationException` is thrown. Exported Scala code
+uses it to honour its Go callers' deadlines and cancellation:
 
 ```scala
 import gears.async.*
@@ -86,29 +86,23 @@ object Api:
 
 ## The memory model
 
-Synchronize shared state as on the JVM: `synchronized`, `@volatile`, atomics, locks, concurrent
-collections, `Thread.start`/`join` and Go channels all order memory as the Java memory model
-says.
+Synchronize shared state as on the JVM. `synchronized`, `@volatile`, atomics, locks, concurrent
+collections, `Thread.start`/`join` and Go channels order memory as the Java memory model says.
 
-One difference matters for buggy programs: a **data race** on a field holding a reference can
-crash a Go program, where the JVM only shows a stale value. `final` fields also get no special
-guarantee: publish objects to other threads through one of the mechanisms above. Go's race
-detector finds races: `def goBuildFlags = Seq("-race")`.
+Two differences affect only incorrectly synchronized programs:
 
-Generated code is safe to call from any goroutine: objects and `lazy val`s initialize once,
-and the runtime's own state is thread-safe.
+- A **data race** on a reference field can crash the program; the JVM shows a stale value.
+- `final` fields get no publication guarantee. Publish objects through one of the mechanisms
+  above.
+
+Find races with Go's race detector: `def goBuildFlags = Seq("-race")`.
+
+Generated code is safe to call from any goroutine: objects and `lazy val`s initialize once, and
+the runtime's own state is thread-safe. The precise rules are in
+[Runtime: memory model](../spec/runtime.md#memory-model).
 
 ## Limitations
 
-- The atomic field updaters (`AtomicReferenceFieldUpdater`, ...) are missing, so
-  `scala.collection.concurrent.TrieMap` does not link: use `ConcurrentHashMap`, or an immutable
-  map behind `synchronized` (as the [gin example](../examples/gin.md) does).
-- cats-effect and ZIO do not link yet (see [Scala libraries](../libraries/scala.md)); gears and
-  `scala.concurrent` are the concurrency libraries that work.
-- Parallel streams run sequentially. `SubmissionPublisher`, `Thread.getAllStackTraces` and thread
-  groups' `activeCount` and `enumerate` are missing.
-- No `select` over several Go channels from Scala.
-- A data race can crash the program, and unsynchronized concurrent writes to a `GoMap` end it
-  (see [Go data](../interop/go-data.md#limitations)).
-
-[Limitations](limitations.md) lists all limitations.
+Missing concurrency APIs (atomic field updaters, `TrieMap`, ...) and their workarounds are in
+[Limitations: concurrency](limitations.md#concurrency); `select` over Go channels and `GoMap`
+races in [Limitations: Go interop](limitations.md#go-interop).

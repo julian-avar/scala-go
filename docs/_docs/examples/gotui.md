@@ -7,7 +7,10 @@ title: gotui
 A todo list in the terminal on [bubbletea](https://github.com/charmbracelet/bubbletea), with
 [bubbles](https://github.com/charmbracelet/bubbles) components (text input, spinner, key
 bindings) and [lipgloss](https://github.com/charmbracelet/lipgloss) styles
-([source](https://github.com/julian-avar/scala-go/tree/main/examples/gotui)). The model is a
+([source](https://github.com/julian-avar/scala-go/tree/main/examples/gotui)). All three are used
+through [generated facades](../interop/generated-facades.md).
+
+bubbletea is the Elm architecture: a model, an update function and a view. The model, `App`, is a
 Scala case class implementing the Go interface `tea.Model` (simplified here):
 
 ```scala sc:nocompile
@@ -23,27 +26,17 @@ final case class App(todos: Vector[Todo], input: textinput.Model, spin: spinner.
   def View(): String = ...
 ```
 
-## Running it
+- **Go results as tuples.** `Update` returns Go's `(tea.Model, tea.Cmd)` as a Scala tuple.
+- **Value receivers.** `textinput.Model` and `spinner.Model` are Go structs with value receivers:
+  `Update` returns an updated copy, stored back into the case class.
+- **Scala messages.** Any Scala value is a `tea.Msg`. Saving is simulated with
+  `tea.Tick(time.Duration(200_000_000L), _ => Saved(count))`: a Go timer calls a Scala function,
+  which returns the Scala message `Saved`.
+- **Go interfaces implemented in Scala.** `--demo` passes `tea.WithInput(ScriptedKeys(keys))`:
+  `ScriptedKeys` implements `io.Reader` from `scalago-gostd`, whose `io` and `time` types the
+  generated facades reuse. It returns `io.EOF` by throwing `GoException(io.EOF)`.
 
-```sh
-./mill examples.gotui.goBuild && out/examples/gotui/goBuild.dest/app   # in a terminal
-./mill examples.gotui.check     # headless: scripted keys (--demo), checks the final state
-```
-
-Go modules: bubbletea v1.3.10, lipgloss v1.1.0, bubbles v1.0.0 (Go 1.24.2 or later).
-
-## Limitations
-
-- It needs a terminal, and `./mill examples.gotui.goRun` fails with `could not open a new TTY`:
-  Mill runs tasks in a daemon without one. Run the executable directly.
-- Facades throw on the JVM, so it runs only as Go.
-- `--demo` reads keys from a Go `io.Reader` implemented in Scala and renders nothing
-  (`tea.WithoutRenderer()`), so the check needs no terminal.
-- A Go `time.Duration` is a facade value, not a number: `time.Duration(200_000_000L)` instead of
-  `200 * time.Millisecond`.
-- The generated facades leave out `tea.BatchMsg`'s conversion, `spinner.NewModel` and
-  `lipgloss.WhitespaceOption`'s conversion (funcs in Go data, a variadic func type, an unexported
-  type); the example does not need them.
-
-More in the example's
-[README](https://github.com/julian-avar/scala-go/blob/main/examples/gotui/README.md).
+Build it with `./mill examples.gotui.goBuild` and run `out/examples/gotui/goBuild.dest/app` in a
+terminal; `./mill examples.gotui.check` runs it headless. The
+[README](https://github.com/julian-avar/scala-go/blob/main/examples/gotui/README.md) has the keys,
+the expected output and the limitations.

@@ -46,3 +46,4 @@ subsection:
     directory: contributing
     subsection:
       - page: contributing/design.md
+      - page: contributing/roadmap.md

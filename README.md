@@ -5,30 +5,28 @@ intermediate representation (`.goir`) next to the `.class` files. A whole-progra
 the program's IR into a Go module that `go build` compiles, together with IR for the Scala
 standard library (recompiled from its TASTy) and a Java standard library written in Scala.
 
-**Status:** real programs and popular libraries work; not yet published. The language, the
-standard collections, `scala.concurrent` and gears on goroutines, and most of the JDK that
-programs use (`java.util` with `concurrent` and streams, `java.io`, `java.nio`, `java.math`,
-`java.time`, `java.net` with HTTP, subprocesses, digests, `java.util.zip`) run with the JVM's
-semantics. Scala 3 libraries are compiled from the TASTy in their jars: cats, upickle,
-fastparse, pprint, mainargs and os-lib are checked against the JVM. Scala code calls Go packages
-(bubbletea, for example), and Go code calls Scala libraries. Runtime reflection, Java-only
-libraries and Scala 2 libraries do not work.
+**Status:** not yet published. The language, the standard collections, `scala.concurrent` and
+gears (on goroutines) run with the JVM's semantics, as does most of the JDK that programs use
+([coverage](docs/_docs/libraries/jdk.md)). Scala 3 libraries compile from the TASTy in their jars;
+cats, upickle, fastparse, pprint, mainargs and os-lib are checked against the JVM. Scala calls Go
+packages (bubbletea, gin), and Go calls Scala libraries. Runtime reflection, Java-only libraries
+and Scala 2 libraries do not work ([limitations](docs/_docs/user/limitations.md),
+[roadmap](docs/roadmap.md)).
 
 ## Documentation
 
-The documentation is at **https://julian-avar.github.io/scala-go/docs/**, with the
+**https://julian-avar.github.io/scala-go/docs/**, with the
 [API](https://julian-avar.github.io/scala-go/). It is a Scaladoc site, published from `main` by
-`.github/workflows/docs.yml`; build it locally with `./mill docs.site`, then open
-`out/docs/site.dest/docs/index.html`. Its pages are in [docs/_docs](docs/_docs):
+`.github/workflows/docs.yml`. Build it locally with `./mill docs.site` and open
+`out/docs/site.dest/docs/index.html`. Sources are in [docs/_docs](docs/_docs):
 [getting started](docs/_docs/getting-started.md), the [user's guide](docs/_docs/user/index.md),
 [Go interop](docs/_docs/interop/index.md), [libraries](docs/_docs/libraries/index.md),
-[examples](docs/_docs/examples/index.md). [Limitations](docs/_docs/user/limitations.md) lists what
-does not work yet, with workarounds. The [design document](docs/design.md) explains the
-architecture, and lists the status and roadmap.
+[examples](docs/_docs/examples/index.md). The [design document](docs/design.md) explains the
+architecture.
 
 ## Quick start
 
-Requires a JDK (17+), Go (1.22+) and Mill. Nothing is published yet: `./mill __.publishLocal`
+Requires JDK 25, Go 1.27 and Mill. Nothing is published yet: `./mill __.publishLocal`
 publishes everything to the local Ivy repository. Then, in `build.mill`:
 
 ```scala
@@ -80,15 +78,19 @@ final case class Counter(n: Int) extends tea.Model:   // a Go interface, impleme
 | `bench/`             | CPU benchmarks, run on the JVM (`mill bench.run`) and as Go (`mill bench.goRun`) |
 | `tests/published/`   | A project using only the published artifacts (`tests/published/check.sh` after `publishLocal`) |
 | `tests/cases/`       | End-to-end programs with their expected output                          |
-| `docs/`              | Documentation site (`_docs/`, `sidebar.yml`; `mill docs.site`) and the design document |
+| `docs/`              | Documentation site (`_docs/`, `sidebar.yml`; `mill docs.site`), the design document and the roadmap |
 
 The `stdlib` module produces the Scala standard library's IR (`mill stdlib.ir`).
 
 ## Development
 
-`./mill` is Mill's launcher (it downloads the Mill version the build names), so only a JDK (17+)
-and Go (1.22+) need to be installed. CI (`.github/workflows/ci.yml`) runs the runtime's unit
-tests on amd64 and arm64 (Linux, macOS; oldest and newest Go) and everything below.
+`./mill` is Mill's launcher: it downloads the Mill version the build names, so only JDK 25
+and Go 1.27 need to be installed. CI (`.github/workflows/ci.yml`) runs the runtime's unit tests
+on amd64 and arm64 (Linux, macOS) and everything below.
+
+With Nix, `nix develop` (or direnv's `.envrc`) provides JDK 25, Go and the Mill that `./mill`
+then uses, and `nix flake check` runs CI's runtime checks. Mill runs on the system JDK
+(`mill-jvm-version: system`).
 
 ```sh
 mill linker.test                 # end-to-end tests (compile, run on JVM and as Go, compare)
@@ -99,26 +101,31 @@ mill bench.run 3; mill bench.goRun 3   # CPU benchmarks on the JVM and as Go
 mill docs.site                   # documentation site with the API: out/docs/site.dest
 ```
 
-Each directory in `tests/cases/` holds a program and an `expected.txt`. Cases with a
-`go-only.txt` (they call Go) skip the JVM, subdirectories with a `go.mod` are local Go modules, and
-a `link-errors.txt` lists errors that linking must report instead of running. Cases with a
-`race.txt` also run under Go's race detector (`allow-race: <Go function>` lines in it tolerate
-known races in third-party libraries). A `library.txt` case is linked as a library and
-used by the Go program in its `consumer/` directory. The entry point is
-`Main` unless `main.txt` names another one. Both runs read `stdin.txt` on standard input if there
-is one (otherwise standard input is closed), get the environment variables of `env.txt`
-(`NAME=value` lines, such as a fixed `TZ`), and must exit with the status in `exit-status.txt`
-(0 by default; an uncaught exception exits with 1). The test compiles the program with the plugin and
-runs it on the JVM. It then links it to Go, runs `go vet` and `go build`, and runs the binary.
-Both outputs must equal `expected.txt`. The work directory of a failing case is kept under
-`/tmp/scalago-<case>-*` for inspection. Set `SCALAGO_KEEP_WORK=1` to keep passing ones too.
-Cases run concurrently; `SCALAGO_TEST_PARALLELISM` sets how many at once, and
-`SCALAGO_TEST_ONLY=regex,traits` runs only the named cases. A `missing-apis.txt` case is linked
-with `--missing-apis throw`. The tests use their own Go build cache
-(`~/.cache/scalago-tests/go-build`), pruned when they start of entries unused for a day and,
-beyond `SCALAGO_TEST_GOCACHE_GB` (10 GB by default), of the least recently used ones.
+### End-to-end tests
 
-The generated Go code carries line directives, so Go reports Scala positions, also in
-compiler errors. `SCALAGO_LINE_DIRECTIVES=false` (the linker's `--line-directives false`)
-leaves them out, to see positions in the generated code. `SCALAGO_TRACE=1` at run time keeps
-all Go frames in stack traces.
+Each directory in `tests/cases/` is a program, entry point `Main`, with an `expected.txt`. The test
+compiles it with the plugin and runs it on the JVM; links it to Go, runs `go vet` and `go build`,
+and runs the binary. Both outputs must equal `expected.txt`. Optional files change this:
+
+| File                | Effect                                                                  |
+|---------------------|-------------------------------------------------------------------------|
+| `main.txt`          | names another entry point                                               |
+| `stdin.txt`         | standard input of both runs (otherwise closed)                          |
+| `env.txt`           | environment variables, `NAME=value` lines (such as a fixed `TZ`)        |
+| `exit-status.txt`   | expected exit status (default 0; an uncaught exception exits with 1)    |
+| `go-only.txt`       | skips the JVM run (the program calls Go); says why                      |
+| `facades.txt`       | Go packages to generate facades of (package `gofacades`); `facades-<name>.txt` adds a set compiled first, in package `<name>`; `facade-notes.txt` lists notes the generator must give |
+| `link-errors.txt`   | errors linking must report, instead of running                          |
+| `missing-apis.txt`  | links with `--missing-apis throw`                                       |
+| `race.txt`          | also runs under Go's race detector; `allow-race: <Go function>` lines tolerate known races in third-party libraries |
+| `library.txt`       | links the case as a library, used by the Go program in `consumer/`      |
+| `<dir>/go.mod`      | a subdirectory with a `go.mod` is a local Go module                     |
+
+| Variable                    | Effect                                                          |
+|-----------------------------|-----------------------------------------------------------------|
+| `SCALAGO_TEST_ONLY`         | runs only the named cases: `SCALAGO_TEST_ONLY=regex,traits`     |
+| `SCALAGO_TEST_PARALLELISM`  | how many cases run at once (they run concurrently)              |
+| `SCALAGO_KEEP_WORK=1`       | keeps the work directory of passing cases too; failing ones are always kept, under `/tmp/scalago-<case>-*` |
+| `SCALAGO_TEST_GOCACHE_GB`   | size cap of the tests' Go build cache, `~/.cache/scalago-tests/go-build` (default 10). At start, entries unused for a day are pruned, then the least recently used beyond the cap |
+| `SCALAGO_LINE_DIRECTIVES=false` | leaves out line directives (the linker's `--line-directives false`), so Go reports positions in the generated code instead of Scala positions |
+| `SCALAGO_TRACE=1`           | at run time: keeps all Go frames in stack traces                |

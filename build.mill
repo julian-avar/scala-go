@@ -308,13 +308,17 @@ object docs extends ScalaGoModule with UnidocModule {
 
   def siteSources = Task.Source(moduleDir)
 
-  /** Scaladoc's site root: `docs/`, with the contributor design document as one of its pages. */
+  /** Scaladoc's site root: `docs/`, with the contributor documents (design, roadmap) as pages. */
   def siteRoot = Task {
     val root = Task.dest / "root"
     for (name <- Seq("_docs", "_assets", "sidebar.yml", "api-overview.md") if os.exists(siteSources().path / name))
       os.copy(siteSources().path / name, root / name, createFolders = true)
-    val design = os.read.lines(siteSources().path / "design.md")
-    os.write(root / "_docs" / "contributing" / "design.md", ("---" +: "title: Design" +: "---" +: design).mkString("", "\n", "\n"))
+    // Their links to site pages are repository paths (`_docs/user/...`), which work on GitHub;
+    // on the site they sit in `contributing/`.
+    for ((file, title) <- Seq("design.md" -> "Design", "roadmap.md" -> "Roadmap")) {
+      val lines = os.read.lines(siteSources().path / file).map(_.replace("](_docs/", "](../"))
+      os.write(root / "_docs" / "contributing" / file, ("---" +: s"title: $title" +: "---" +: lines).mkString("", "\n", "\n"))
+    }
     PathRef(root)
   }
 

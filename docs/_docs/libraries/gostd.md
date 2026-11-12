@@ -4,8 +4,8 @@ title: Go standard library
 
 # Go standard library
 
-`scalago-gostd` has the [generated facades](../interop/generated-facades.md) of the most-used
-Go standard library packages, so programs can call them without generating facades themselves:
+`scalago-gostd` holds [generated facades](../interop/generated-facades.md) of 21 Go standard
+library packages, ready to call:
 
 ```scala sc:nocompile
 object app extends ScalaGoModule {
@@ -21,7 +21,7 @@ import scalago.gostd.{strings, strconv}
   println(strconv.Quote("tab\there"))
 ```
 
-Each package is an object of `scalago.gostd`, named as the Go package:
+Each package is an object of `scalago.gostd`, named after the Go package:
 
 | Go packages                                              | Objects                            |
 |----------------------------------------------------------|------------------------------------|
@@ -31,24 +31,22 @@ Each package is an object of `scalago.gostd`, named as the Go package:
 | `encoding/json`, `encoding/base64`, `encoding/hex`       | `json`, `base64`, `hex`            |
 | `context`, `sync`, `time`, `sort`, `math`                | `context`, `sync`, `time`, `sort`, `math` |
 
-The types of `io/fs`, `reflect` and `syscall` that these packages use are included too (objects
-`fs`, `reflect`, `syscall`), without their functions.
+The types (not the functions) of `io/fs`, `reflect` and `syscall` that these packages use are
+included too, as objects `fs`, `reflect`, `syscall`. When a module depends on `scalago-gostd`,
+generated facades of other Go packages reuse these types instead of generating their own.
 
-[Generated facades](../interop/generated-facades.md) of other Go packages use these types when
-the module depends on `scalago-gostd`, instead of generating their own.
-
-Most programs need few of these: the JDK's own APIs (`java.nio.file`, `java.time`, ...) work
-and also run on the JVM. Go's packages are useful when you pass their values to other Go code,
-or want Go's exact behaviour. The [API documentation](scalago.gostd) lists every member.
+Most programs need few of these: the JDK's APIs (`java.nio.file`, `java.time`, ...) work and also
+run on the JVM. Use Go's packages to pass their values to other Go code, or for Go's exact
+behaviour. The [API documentation](scalago.gostd) lists every member.
 
 ## Limitations
 
-- Only the 21 packages above. Others (`net/http`, `os/exec`, `regexp`, `crypto/...`,
-  `log/slog`, `database/sql`, `encoding/csv`, ...) need `goFacadePackages`, as the
+- **Only these 21 packages.** Generate others (`net/http`, `os/exec`, `regexp`, `crypto/...`,
+  `log/slog`, `database/sql`, `encoding/csv`, ...) with `goFacadePackages`, as the
   [gin example](../examples/gin.md) does for `net` and `net/http`.
-- `slices`, `maps` and `cmp` are not included: most of their functions are generic with type-set
-  constraints, which generated facades leave out. Declare the instantiations you need in a
+- **No `slices`, `maps`, `cmp`:** most of their functions are generic with type-set constraints,
+  which generated facades leave out. Declare the instantiations you need in a
   [hand-written facade](../interop/facades.md#generic-functions).
-- The generated facades leave out what Scala cannot express, as for any
+- Members Scala cannot express are left out, as in any
   [generated facade](../interop/generated-facades.md#what-is-left-out).
 - Like all facades, they throw on the JVM.

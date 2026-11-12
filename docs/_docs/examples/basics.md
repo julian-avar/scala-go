@@ -4,9 +4,15 @@ title: basics
 
 # basics
 
-A small program ([source](https://github.com/julian-avar/scala-go/tree/main/examples/basics)):
-case classes and pattern matching, a `GoString`, Go called through generated facades (the
-standard library's `strconv` and a local Go module), and gears futures on goroutines.
+A small program built with `ScalaGoModule`
+([source](https://github.com/julian-avar/scala-go/tree/main/examples/basics)). It shows:
+
+- case classes and pattern matching, collections, string interpolation;
+- a `GoString`, UTF-8 as Go stores strings (`"Grüße"` is 7 bytes);
+- Go called through [generated facades](../interop/generated-facades.md): the standard library's
+  `strconv` and a local Go module, `go/textstats`;
+- [gears](../user/concurrency.md#gears) futures on goroutines, gears being an ordinary Maven
+  dependency compiled from its TASTy.
 
 ```scala sc:nocompile
 // build.mill
@@ -15,6 +21,11 @@ object basics extends ScalaGoModule {
   def goFacadePackages = Seq("strconv", "example.com/textstats")
 }
 ```
+
+`goLocalModules` adds the module to the generated `go.mod` (a `replace` directive), and
+`goFacadePackages` generates the `gofacades.textstats` and `gofacades.strconv` objects. A Go
+`[]string` arrives as a `GoSlice[GoString]`. `Longest` returns `(string, error)`: the facade
+returns the `String` and throws a non-nil `error` as a `GoException`.
 
 ```scala sc:nocompile
 import gofacades.*
@@ -25,21 +36,6 @@ try textstats.Longest(GoSlice.empty[GoString])
 catch case e: GoException => println(s"Go error: ${e.getMessage}")      // Go's error result
 ```
 
-## Running it
-
-```sh
-./mill examples.basics.goRun Ada Grace
-```
-
-There is no `check` command: the example's
-[README](https://github.com/julian-avar/scala-go/blob/main/examples/basics/README.md) shows the
-expected output.
-
-## Limitations
-
-- It calls Go, so it runs only as Go: on the JVM (`./mill examples.basics.run`) the first facade
-  call throws `UnsupportedOperationException`.
-- The generated `go.mod` refers to the local Go module by absolute path; copy it along to build
-  the generated module elsewhere (see [Shipping binaries](../user/shipping.md#building-elsewhere)).
-- The generated facade throws `Longest`'s `error` result; a
-  [hand-written facade](../interop/facades.md#errors) can return it as a `GoError` instead.
+Run it with `./mill examples.basics.goRun Ada Grace`. The
+[README](https://github.com/julian-avar/scala-go/blob/main/examples/basics/README.md) has the
+expected output and the limitations this example hits, with workarounds.

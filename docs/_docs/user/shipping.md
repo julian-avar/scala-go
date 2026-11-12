@@ -15,6 +15,9 @@ object app extends ScalaGoModule {
 }
 ```
 
+Binaries are large: the repository's small examples are 16 to 50 MB with debug information.
+`-ldflags=-s -w` drops it.
+
 ## Cross-compiling
 
 ```scala sc:nocompile
@@ -23,22 +26,22 @@ object app extends ScalaGoModule {
 }
 ```
 
-Linux and macOS on amd64 and arm64 are tested. Big-endian targets (s390x, ppc64, mips) are not
-supported. Windows builds, but file paths are Unix paths there and the tests do not run on it.
+Linux and macOS on amd64 and arm64 are tested. Other targets:
+[Limitations: platforms](limitations.md#platforms).
 
 ## Static binaries
 
-Add `"CGO_ENABLED" -> "0"` to `goBuildEnv` for a statically linked binary, unless Go libraries
-the program uses need cgo.
+Add `"CGO_ENABLED" -> "0"` to `goBuildEnv` for a statically linked binary. Go libraries that need
+cgo rule this out ([Limitations: Go interop](limitations.md#go-interop)).
 
 ## Time zones
 
-The binary embeds Go's time zone database (about 450 KB) only when the program can use named
-time zones, so it also works where the system has no zoneinfo (Windows, minimal containers).
+When the program can use named time zones, the binary embeds Go's time zone database (about
+450 KB). It then also works where the system has no zoneinfo (Windows, minimal containers).
 
 ## Building elsewhere
 
-`mill app.goLink` writes a self-contained Go module (`out/app/goLink.dest/go`): the generated
+`mill app.goLink` writes a self-contained Go module to `out/app/goLink.dest/go`: the generated
 code, the runtime and a `go.mod`. Copy it to build with Go alone, for example in a Docker build
 stage:
 
@@ -46,23 +49,10 @@ stage:
 cd out/app/goLink.dest/go && go build -o app .
 ```
 
-`goLocalModules` are referred to by absolute paths (`replace` directives in `go.mod`): copy them
+`go.mod` refers to `goLocalModules` by absolute paths (`replace` directives). Copy those modules
 too, and adjust the paths.
 
 ## Go libraries
 
 To ship Scala code as a Go module for Go programs, see
 [Calling Scala from Go](../interop/exports.md).
-
-## Limitations
-
-- Binaries are large: the repository's small examples are 16 to 50 MB with debug information
-  (`-ldflags=-s -w` drops it).
-- Go libraries that need cgo need a C compiler for the target, and rule out `CGO_ENABLED=0`
-  unless they have a fallback without cgo.
-- 64-bit little-endian targets only. Windows builds, but file paths are Unix paths and the tests
-  do not run there; WebAssembly is untested.
-- Not published yet: scala-go itself comes from `./mill __.publishLocal` (see
-  [Getting started](../getting-started.md)).
-
-[Limitations](limitations.md) lists all limitations.
