@@ -1,0 +1,15 @@
+static method java.lang.Math.clamp(DDD)D is not available
+static method java.lang.Math.clamp(FFF)F is not available
+static method java.lang.Math.floorMod(JI)I is not available
+static method java.lang.Math.ulp(D)D is not available
+static method java.lang.Math.nextUp(F)F is not available
+static method java.lang.Short.reverseBytes(S)S is not available
+static method java.lang.Byte.parseByte(Ljava.lang.String;)B is not available
+static method java.lang.Short.parseShort(Ljava.lang.String;)S is not available
+static method java.lang.Character.toString(I)Ljava.lang.String; is not available
+static method java.lang.Character.isSupplementaryCodePoint(I)Z is not available
+static method java.lang.Character.isBmpCodePoint(I)Z is not available
+static method java.lang.Character.highSurrogate(I)C is not available
+static method java.lang.Character.lowSurrogate(I)C is not available
+method java.lang.String.codePointBefore(I)I is not available
+method java.lang.String.offsetByCodePoints(II)I is not available

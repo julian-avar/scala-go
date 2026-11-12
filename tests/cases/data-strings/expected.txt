@@ -1,0 +1,58 @@
+lengths: 0 3 2 6 3
+code units of mixed: 0061 d83d de00 0062 00e9 0063
+charAt: a d83d de00 é
+isSurrogate: .HL...
+codePointAt: 1f600 de00 d800
+codePoints: 61,1f600,62,e9,63
+codePoints of lone surrogates: 78,d800,79,dc00,7a
+chars: 104,233
+Character.charCount: 2 1
+toCodePoint: 1f600
+indexOf: 3 1 1 2 5 -1
+lastIndexOf: 4 1 1
+substring splitting a pair: 0061 d83d | de00 0062 00e9 0063
+substring whole pair: true
+substring edges: [] [] [b]
+subSequence: ell
+contains, startsWith, endsWith: true true true true
+regionMatches: true true
+compareTo: -1 1 1 -1 -32
+compareTo across planes: 10178 -10178 1987
+sorted by code units: List(, 005a, 007a, 00e9, d83d de00, ffff)
+compareToIgnoreCase: -1 0
+equalsIgnoreCase: true true false
+hashCode: 0 1772899 -241011592 1829617 0
+hashCode of a built string: true
+toUpperCase: HELLO ÉÈ ΑΒ 0053 0054 0052 0041 0053 0053 0045
+toLowerCase: hello é αβ
+Character case: A É ß true 10428
+Unicode 16 case mapping: 264 true
+character classes: true true true false true false
+getBytes UTF-8 lengths: List(1, 2, 3, 4, 3, 2)
+lone surrogate becomes ?: 120,63,121
+bytes of mixed: 97,240,159,152,128,98,195,169,99
+decode valid UTF-8: d83d de00 0041
+decode invalid UTF-8: 0041 fffd fffd 0042 fffd
+ISO-8859-1 round trip: 00e9 00ff
+US-ASCII of non-ASCII: 63,97
+Character.toString, valueOf: z é
+new String(chars): true
+new String(chars, offset, count): bc
+toCharArray: 6
+String.valueOf(char array): xy
+StringBuilder reverse keeps pairs: 0063 00e9 0062 d83d de00 0061
+Scala reverse: 0063 00e9 0062 d83d de00 0061
+StringBuilder appendCodePoint: d83d de01 0021
+StringBuilder setCharAt, insert, delete: 0062 d83d de00 0063 0064 0065
+replace chars: a/b/c
+replace strings: a<smile>béc
+repeat, concat, join: ababab xy a-b-c true
+trim vs strip: [a  ] [a] [x]
+isEmpty, isBlank: true false true true
+split: List(a, b, , c) List(a, b, c) 1
+lines: List(a, b, c, d)
+chars of empty: 0
+equal literals are one object: true
+strings are immutable: abc
+string switch over non-ASCII: List(summer, smile, other)
+unicode escapes: 0000 0001 007f 0080 ffff

@@ -1,0 +1,154 @@
+Int.MaxValue + 1: -2147483648
+Int.MinValue - 1: 2147483647
+-Int.MinValue: -2147483648
+Int.MaxValue * 2: -2
+Int.MaxValue * Int.MaxValue: 1
+65536 * 65536: 0
+46341 * 46341: -2147479015
+Long.MaxValue + 1: -9223372036854775808
+-Long.MinValue: -9223372036854775808
+Long.MinValue * -1: -9223372036854775808
+Long.MaxValue * 3: 9223372036854775805
+Int.MaxValue + 1L: 2147483648
+Int.MaxValue.toLong * 2: 4294967294
+Long.MaxValue.toInt: -1
+0x123456789L.toInt: 591751049
+-1L.toInt: -1
+Int.MinValue.toLong: -2147483648
+abs(Int.MinValue): -2147483648
+abs(Long.MinValue): -9223372036854775808
+~0, ~Int.MaxValue: -1 -2147483648
+~5L: -6
+7 / 2, 7 % 2: 3 1
+-7 / 2, -7 % 2: -3 -1
+7 / -2, 7 % -2: -3 1
+-7 / -2, -7 % -2: 3 -1
+1 / 3, 1 % 3: 0 1
+-1 / 3, -1 % 3: 0 -1
+0 / -5, 0 % -5: 0 0
+7L / 2L, 7L % 2L: 3 1
+-7L / 2L, -7L % 2L: -3 -1
+7L / -2L, 7L % -2L: -3 1
+-7L / -2L, -7L % -2L: 3 -1
+Int.MinValue / -1: -2147483648
+Int.MinValue % -1: 0
+Long.MinValue / -1: -9223372036854775808
+Long.MinValue % -1: 0
+Int.MinValue / 2: -1073741824
+1 / 0: ArithmeticException(/ by zero)
+1 % 0: ArithmeticException(/ by zero)
+1L / 0L: ArithmeticException(/ by zero)
+1L % 0L: ArithmeticException(/ by zero)
+0 / 0: ArithmeticException(/ by zero)
+byte / 0: ArithmeticException(/ by zero)
+char % 0: ArithmeticException(/ by zero)
+Math.floorDiv(-7, 2): -4
+Math.floorMod(-7, 2): 1
+Math.floorMod(7, -2): -1
+Math.floorDiv(-7L, 2L): -4
+Math.floorMod(-7L, 3L): 2
+Math.floorDiv(1, 0): ArithmeticException(/ by zero)
+addExact(Int.MaxValue, 1): ArithmeticException(integer overflow)
+subtractExact(Int.MinValue, 1): ArithmeticException(integer overflow)
+multiplyExact(65536, 65536): ArithmeticException(integer overflow)
+multiplyExact(1L << 32, 1L << 31): ArithmeticException(long overflow)
+negateExact(Int.MinValue): ArithmeticException(integer overflow)
+toIntExact(1L << 31): ArithmeticException(integer overflow)
+incrementExact(Long.MaxValue): ArithmeticException(long overflow)
+addExact(1, 2): 3
+multiplyExact(-3L, 4L): -12
+shifts by 0: 1 -256 -256 1 -256 -256
+shifts by 1: 2 -128 2147483520 2 -128 9223372036854775680
+shifts by 31: -2147483648 -1 1 2147483648 -1 8589934591
+shifts by 32: 1 -256 -256 4294967296 -1 4294967295
+shifts by 33: 2 -128 2147483520 8589934592 -1 2147483647
+shifts by 63: -2147483648 -1 1 -9223372036854775808 -1 1
+shifts by 64: 1 -256 -256 1 -256 -256
+shifts by -1: -2147483648 -1 1 -9223372036854775808 -1 1
+shifts by -31: 2 -128 2147483520 8589934592 -1 2147483647
+shifts by -32: 1 -256 -256 4294967296 -1 4294967295
+1 << 33L (Long count): 2
+Int.MinValue >> 31: -1
+Int.MinValue >>> 31: 1
+-1 >>> 1: 2147483647
+-1L >>> 1: 9223372036854775807
+byte -128 >>> 4: 268435448
+byte -128 >> 4: -8
+char 0xFFFF >> 4: 4095
+short -1 >>> 16: 65535
+1 << 31: -2147483648
+1L << 63: -9223372036854775808
+bit ops: 15 4095 4080 255
+byte 127 + 1: 128
+(byte 127 + 1).toByte: -128
+byte * byte: 16384
+short 32767 + 1: -32768
+-(byte -128): 128
+(-(byte -128)).toByte: -128
+byte var += 10: -126
+short var += 10: -32766
+127 to Byte/Short/Char: 127 127 127
+128 to Byte/Short/Char: -128 128 128
+255 to Byte/Short/Char: -1 255 255
+256 to Byte/Short/Char: 0 256 256
+-129 to Byte/Short/Char: 127 -129 65407
+300 to Byte/Short/Char: 44 300 300
+65535 to Byte/Short/Char: -1 -1 65535
+65536 to Byte/Short/Char: 0 0 0
+70000 to Byte/Short/Char: 112 4464 4464
+-1 to Byte/Short/Char: -1 -1 65535
+-2147483648 to Byte/Short/Char: 0 0 0
+549755813887L to Int/Short/Byte/Char: -1 -1 -1 65535
+-1L to Int/Short/Byte/Char: -1 -1 -1 65535
+-9223372036854775808L to Int/Short/Byte/Char: 0 0 0 0
+2147483648L to Int/Short/Byte/Char: -2147483648 0 0 0
+1311768467294899695L to Int/Short/Byte/Char: -1867788817 -12817 -17 52719
+byte -1 to Char/Int/Long: 65535 -1 -1
+short -1 to Char: 65535
+char 0xFFFF to Short/Byte/Int: -1 -1 65535
+char 0x8000 to Short: -32768
+'a' + 1: 98
+('a' + 1).toChar: b
+'z' - 'a': 25
+'a' * 2: 194
+'0' + 9 to Char: 9
+0xFFFF + 1 to Char: 0
+0.toChar - 1: -1
+char var incremented twice: z
+'a' < 'b': true
+'\uffff' > 'a': true
+Char range: abcde
+'A' + 'B' (Int): 131
+"" + 'A' + 'B': AB
+Int.MaxValue < Long.MaxValue: true
+-1 < 0xFFFFFFFFL: true
+byte -1 == char 0xFFFF: false
+byte -1 == short -1: true
+Int.MinValue compare 0: -1
+Integer.compare / signum: -1 -1 -1
+Integer.MIN_VALUE, MAX_VALUE: -2147483648 2147483647
+toHexString(-1): ffffffff
+toBinaryString(10): 1010
+toOctalString(-8): 37777777770
+Long.toHexString(Long.MinValue): 8000000000000000
+Integer.toString(-255, 16): -ff
+Long.toString(Long.MinValue, 36): -1y2p0ij32e8e8
+toUnsignedString(-1): 4294967295
+Long.toUnsignedString(-1L): 18446744073709551615
+divideUnsigned(-1, 2): 2147483647
+remainderUnsigned(-1, 7): 3
+compareUnsigned(-1, 1): 1
+toUnsignedLong(-1): 4294967295
+bitCount: 32 4 64
+leading/trailing zeros: 31 32 32 40
+highest/lowestOneBit: 64 4 -2147483648
+rotate: 3 -2147483648 2
+reverse, reverseBytes: -2147483648 67305985
+Integer.parseInt edges: -2147483648 7 255 -10
+Long.parseLong(Long.MinValue): -9223372036854775808
+Integer.MAX_VALUE.toString.toInt + 0: 2147483647
+Character.MAX_VALUE: 65535
+Byte/Short MIN, MAX: -128 127 -32768 32767
+Integer.hashCode / Long.hashCode: -1 0 1
+Integer.sum, max, min: -2147483648 -1 -2
+Math.abs, max, min, signum: 3 5 -3

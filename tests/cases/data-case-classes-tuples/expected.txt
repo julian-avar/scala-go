@@ -1,0 +1,59 @@
+toString: Point(1,2) Named(n,List(),1.0) Nested(Point(1,2),Some(Named(x,List(a),1.0))) Empty $123.45 Var(ArraySeq(1, 2)) Gen(c,2.5)
+Many toString: Many(1,2,c,4,5,6.5,7.25,true,(),null)
+copy: Point(1,9) Named(a,List(),2.0) Point(1,2) true false
+defaults: Named(d,List(),1.0)
+operator method: Point(11,22)
+unapply: 12
+nested patterns: 2 z t1
+varargs pattern: 1 List(2, 3)
+productArity, productPrefix: 2 Point 10 0 Empty
+productElement: 1 1.0
+productIterator: List(1:Byte, 2:Short, c:Character, 4:Integer, 5:Long, 6.5:Float, 7.25:Double, true:Boolean, ():BoxedUnit, s:String)
+productElementNames: List(name, tags, weight)
+productElement out of range: java.lang.IndexOutOfBoundsException
+second parameter list: Curried(1) true 3
+companion apply and tupled: Point(3,4) Point(5,6)
+case class in Set and Map: 2 origin
+ordering by fields: List(Point(1,2), Point(1,5), Point(2,1))
+eval sealed tree: 7.5
+isInstanceOf Product, Serializable: true true true
+tuple toString: (1,two) (1,2,3.0) (a,1,2,3.5,false) (1,2,3,4,5,6,7,8,9,10)
+Tuple22: (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22) 22 22 22
+Tuple23 (TupleXXL): (1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23) 23 23 23
+Tuple25: 25 x 25 List(23, 25)
+Tuple23 equality and hash: true false
+tuple accessors: 1 two 3 a 7.0 false
+swap: (two,1)
+tuple equality: true true true
+tuple patterns: List(a1, b2)
+nested tuples: 11
+generic tuple ops: 3 1 (2,3.0) List(1, 2, 3.0) (1,two,1,2,3.0) (2,3.0) (1,2) ((1),(2,3.0))
+*: and EmptyTuple: (1,a) 0 true
+Tuple.fromArray, fromProduct: (a,b) (1,2)
+tuple map: (11,2.52.5,ss)
+zip of tuples: ((1,a),(2,b))
+named tuples: Bob 42 (Bob,42)
+specialized tuples: (-1,7) (-3,-1) (Q,q) (2.5,1) (true,false)
+destructured: 14
+tuple element classes: List(java.lang.Double, java.lang.Integer)
+Option: Some(2) 0 None Some(1) None
+Option of primitives: Some(99) 5.0 true
+Either: Right(4) Left(e) Left(bad 1) Left(no)
+Try: true 1
+boxed classes: List(java.lang.Byte, java.lang.Short, java.lang.Character, java.lang.Integer, java.lang.Long, java.lang.Float, java.lang.Double, java.lang.Boolean, scala.runtime.BoxedUnit)
+round trips: -128 32767 65535 -2147483648 9223372036854775807 1.4E-45 -0.0 NaN ()
+generic container of primitives: Gen(1,2.5) 2 5.0
+unboxing null through generics: 0 0 0.0
+Integer.valueOf, intValue: 8 8 1.5 k
+Predef conversions: 6 3.5
+boxes in java collections: [1, 2, c, 1.5]
+BoxedUnit: true () ()
+Class values: true Point [I java.math.BigInteger
+Number.doubleValue: List(1.0, 2.0, 3.5, 4.5, 5.0, 6.0, 7.0, 8.25)
+Number.intValue: List(1, 2, 3, 4, 5, 6, 7, 8)
+Number.toString: List(1, 2, 3.5, 4.5, 5, 6, 7, 8.25)
+Comparable.compareTo: List(1, -1, 0, -1, 1, 1)
+CharSequence: List(3:a:ab:abc, 4:d:de:defg, 2:h:hi:hi)
+hashCode via Any: List(115, 1, 1, 1073217536, 1231, 99, 10)
+equals via Any: List(true, true, false, true, true)
+BigInt and BigDecimal wrappers: 1267650600228229401496703205376 -246913578024691357802469135780 3.305 java.math.BigInteger

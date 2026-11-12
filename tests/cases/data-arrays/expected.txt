@@ -1,0 +1,65 @@
+defaults: List(List(0, 0), List(0), List(0.0), List(0.0), List(false, false), List(0), List(0), List(0), List(null, null), List(null), List(null), List(null))
+Array[Unit]: List(null, null)
+empty arrays: 0 0 true
+lengths: 3 1 1000
+stores: List(-128, 127) List(32767, -32768) List(65535, 0) List(-9223372036854775808, -9223372036854775808) List(Infinity, NaN, -0.0) List(0.0, NaN) List(true, true)
+read past the end: throws java.lang.ArrayIndexOutOfBoundsException
+write past the end: throws java.lang.ArrayIndexOutOfBoundsException
+message: Index 5 out of bounds for length 3
+empty array index 0: throws java.lang.ArrayIndexOutOfBoundsException
+long array past the end: throws java.lang.ArrayIndexOutOfBoundsException
+reference array past the end: throws java.lang.ArrayIndexOutOfBoundsException
+2D inner past the end: throws java.lang.ArrayIndexOutOfBoundsException
+negative size: throws java.lang.NegativeArraySizeException
+null array: throws java.lang.NullPointerException
+ofDim 3x4: 0,1,2,3 / 10,11,12,13 / 20,21,22,23
+ofDim shapes: 3 4 4 null
+jagged: List(1, 2, 3)
+rows are shared references: -1
+tabulate: List(List(0, 1), List(1, 2), List(2, 3))
+deepToString: [[1, 2], [a], [[true]]]
+deepEquals: true
+clone: List(1, 2, 3) List(99, 2, 3) false
+clone is shallow: 42 2
+clone of each type: List(1) List(c) List(true) List(s) List(1.5)
+copyOf grows and truncates: List(1, 2, 3, 0, 0) List(1) List(true, false)
+copyOfRange: bc
+Array.copyOf (Scala): List(1.5, 0.0, 0.0)
+arraycopy: List(2, 3, 4, 0, 0)
+arraycopy overlapping: List(1, 1, 2, 3, 4) List(2, 3, 4, 5, 5)
+arraycopy String[] to Object[]: List(null, a, b, c)
+arraycopy int[] to long[]: throws java.lang.ArrayStoreException
+arraycopy int[] to Object[]: throws java.lang.ArrayStoreException
+arraycopy out of bounds: throws java.lang.ArrayIndexOutOfBoundsException
+arraycopy negative length: throws java.lang.ArrayIndexOutOfBoundsException
+arraycopy null: throws java.lang.NullPointerException
+arraycopy zero length at end: ok
+covariant view shares storage: z
+Array[String] is Array[AnyRef], Array[Int] is not: true false false
+arrays are Objects: true
+sort ints: List(-2147483648, -1, 0, 3, 5)
+binarySearch: 3 -5 -6
+sort chars: ehllo
+sort longs: List(-9223372036854775808, -1, 3)
+sort range: List(9, 6, 7, 8, 5)
+fill: List(2.5, -1.0, -1.0, 2.5)
+equals, hashCode: true false true 994 40359 0
+toString: [1, 2] [a, b] [1.5] [s, null] null []
+asList on references: [a, b]
+stream: 12
+sorted, reverse, map: List(1, 2, 3) List(2, 1, 3) List(6, 2, 4) List(3, 1, 2)
+primitive result types: 6.0 312 2
+sameElements, ==: true false true
+++, :+, +:: List(0, 3, 1, 2, 4, 3, 1, 2, 9)
+slice, take, drop: List(1, 2) List(3, 1, 2) List()
+indexOf, contains: 2 false false true
+zip, unzip: List(1, 2) List(a, b) List((1,a), (2,b))
+flatten: List(1, 2, 3)
+update via varargs: 6
+Array pattern: 3 1 List(2)
+Array of case classes: List(Pt(1,2), Pt(2,1))
+Array.range, iterate, fill: List(0, 3, 6, 9) List(1, 3, 9, 27) List(x, x)
+String toCharArray round trip: !éh
+Byte array from String: List(65, 90)
+Array.equals is identity: true
+array hashCode stable: true

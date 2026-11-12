@@ -1,0 +1,45 @@
+find: 2 -1 -1
+return from for: (1,0) (-1,-1)
+return in Unit method: ran 2;
+while with block condition: 6 4
+do-while idiom: -2
+nested whiles: 6
+while is Unit: ()
+Int compound: 123
+Int >>= and >>>= on negative: -16 15
+Long compound: -42816357175132161
+Double compound: 0.625
+Float compound: -0.52857137
+Byte reassignment wraps: 88
+Short reassignment wraps: -5536
+Char reassignment: y
+Boolean compound: false true false
+String +=: ab1c2.5
+List ::= :+= ++=: List(0, 1, 2, 3)
+field compound: 30 6.0 s! 4 16
+array element compound: List(11, 10, 47)
+primitive array element updates: List(1.0, 0.5) cb -128
+2D element compound: -1,0,0/0,0,7
+assignment value is Unit: () 5
+tuple var pattern: 4 2
+if branch widening: 1 2.5 a 1 Long Character
+match branch widening: 1.0 Double
+if without else is Unit: () 0
+nested if expression: List(neg, zero, small, big)
+if in arithmetic: 13
+match in arithmetic: 90
+block as expression: 25
+Int switch: Vector(?, Mon, Tue, midweek, midweek, midweek, weekend, weekend, ?)
+Char switch: ArraySeq(vowel, vowel, space, zero, digit, other, space)
+String match: List(1, 2, 2, 0, 3, -1)
+Long match: List(zero, max, negative, positive)
+Double match: List(zero, zero, NaN, one and a half)
+Boolean match: List(yes, no)
+tuple match: List(exact, other b, first)
+MatchError: scala.MatchError: 5 (of class java.lang.Integer)
+tailrec sum: 500000500000
+tail call without annotation: 0
+tailrec gcd: 21
+million iterations: 499999500000
+synchronized value: 42
+synchronized with exception: in lock relocked

@@ -1,0 +1,118 @@
+double 0.0 | 0.0 | 0.0
+double -0.0 | -0.0 | -0.0
+double 1.0 | 1.0 | 1.0
+double -1.0 | -1.0 | -1.0
+double 100.0 | 100.0 | 100.0
+double 0.1 | 0.1 | 0.1
+double 0.5 | 0.5 | 0.5
+double 0.3333333333333333 | 0.3333333333333333 | 0.3333333333333333
+double 0.6666666666666666 | 0.6666666666666666 | 0.6666666666666666
+double 0.001 | 0.001 | 0.001
+double 1.0E-4 | 1.0E-4 | 1.0E-4
+double 0.001 | 0.001 | 0.001
+double 9.999E-4 | 9.999E-4 | 9.999E-4
+double 1234567.0 | 1234567.0 | 1234567.0
+double 9999999.0 | 9999999.0 | 9999999.0
+double 1.0E7 | 1.0E7 | 1.0E7
+double 1.0000001E7 | 1.0000001E7 | 1.0000001E7
+double 1.23456789E7 | 1.23456789E7 | 1.23456789E7
+double 1.0E21 | 1.0E21 | 1.0E21
+double 1.0E22 | 1.0E22 | 1.0E22
+double 1.0E23 | 1.0E23 | 1.0E23
+double 1.2345678901234568E17 | 1.2345678901234568E17 | 1.2345678901234568E17
+double 1.0E-5 | 1.0E-5 | 1.0E-5
+double 1.234E-7 | 1.234E-7 | 1.234E-7
+double 4.9E-324 | 4.9E-324 | 4.9E-324
+double 2.2250738585072014E-308 | 2.2250738585072014E-308 | 2.2250738585072014E-308
+double 2.225073858507201E-308 | 2.225073858507201E-308 | 2.225073858507201E-308
+double 1.7976931348623157E308 | 1.7976931348623157E308 | 1.7976931348623157E308
+double 9.007199254740992E15 | 9.007199254740992E15 | 9.007199254740992E15
+double 9.007199254740992E15 | 9.007199254740992E15 | 9.007199254740992E15
+double 0.30000000000000004 | 0.30000000000000004 | 0.30000000000000004
+double 1.5E-323 | 1.5E-323 | 1.5E-323
+double 1.0E100 | 1.0E100 | 1.0E100
+double 3.141592653589793 | 3.141592653589793 | 3.141592653589793
+double 2.718281828459045 | 2.718281828459045 | 2.718281828459045
+double 1.0E15 | 1.0E15 | 1.0E15
+double 1.0E16 | 1.0E16 | 1.0E16
+double 123.456 | 123.456 | 123.456
+double -9.87654E-8 | -9.87654E-8 | -9.87654E-8
+double 0.002 | 0.002 | 0.002
+double Infinity | Infinity | Infinity
+double NaN | NaN | NaN
+double Infinity | Infinity | Infinity
+double -Infinity | -Infinity | -Infinity
+float 0.0 | 0.0 | 0.0
+float -0.0 | -0.0 | -0.0
+float 1.0 | 1.0 | 1.0
+float 0.1 | 0.1 | 0.1
+float 0.2 | 0.2 | 0.2
+float 0.3 | 0.3 | 0.3
+float 1.1 | 1.1 | 1.1
+float 0.33333334 | 0.33333334 | 0.33333334
+float 100.0 | 100.0 | 100.0
+float 1.0E7 | 1.0E7 | 1.0E7
+float 9999999.0 | 9999999.0 | 9999999.0
+float 0.001 | 0.001 | 0.001
+float 1.0E-4 | 1.0E-4 | 1.0E-4
+float 1.6777216E7 | 1.6777216E7 | 1.6777216E7
+float 1.6777216E7 | 1.6777216E7 | 1.6777216E7
+float 3.4028235E38 | 3.4028235E38 | 3.4028235E38
+float 1.4E-45 | 1.4E-45 | 1.4E-45
+float 1.1754944E-38 | 1.1754944E-38 | 1.1754944E-38
+float 3.1415927 | 3.1415927 | 3.1415927
+float 1.0E10 | 1.0E10 | 1.0E10
+float 123456.79 | 123456.79 | 123456.79
+float 3.3554432E7 | 3.3554432E7 | 3.3554432E7
+float 8.5E-44 | 8.5E-44 | 8.5E-44
+float NaN | NaN | NaN
+float Infinity | Infinity | Infinity
+float -Infinity | -Infinity | -Infinity
+ints -2147483648 2147483647 0 -1
+longs -9223372036854775808 9223372036854775807 -1
+bytes -128 127 shorts -32768 32767
+booleans true false true false
+chars a é € Z 7
+char concat xy122
+char + int (Int) 98 b
+supplementary 😀 😁
+null null null null null
+interpolated null null null
+unit () () () ()
+(side effect)
+unit result ()
+default toString Hashed@beef true
+primitive array toString prefix [I [D [C
+objects Plain#1 Point(1,2.5) Singleton Green Wrapper(Point(0,-0.0),w,Some(3))
+boxes 1 1 1.0 c 1
+Option Some(1.0) None Some(null) Some(())
+collections List(1, 2) Vector(a) Map(1 -> one) Set(1.5) List() List(List(1), List())
+tuples (1,a) (1,(2.0,c),null) (1) ()
+Either/Try Left(1) Right(r) Success(1) Failure(java.lang.Exception: m)
+ranges Range 1 to 3 Range 1 until 10 by 3  NumericRange a to c
+array contents [1,2] a,null
+StringBuilder sb1c2.5truenull-0.0
+java StringBuilder 121.50.1xfalsenullhi
+valueOf char array abc bc
+toString methods 42 42 4.2 q true
+boxed toString -5 5 1.0E-5
+Integer.toString -123 1099511627776 -7 8
++= on String var a1b2.0null()
+s: Ann is 42, 43 next, $ sign, 3Ann
+s: nested <84> and pos and List(2, 4)
+s: escapes 	| "quoted" \ A
+raw: \t| \n \\ Ann 43 A
+f: 42|   42|42   |00042|-42|42
+f: Ann|     Ann|Ann     |ANN|null
+f: 3.14|   3.142|3.1     |-3|3|10000000000.0|0.13
+f: ff|FF|000000ff|10|c|true|false|100%
+f: 1.500000e-05|1.235e+05|12345678901|-0.0|NaN|Infinity
+f: 1.500|3|  4|9
+f: x1y
+format: k=7 (12.3%) List(1)
+format:    ab|cd   |e
+multi
+line	string with é and \ backslash
+triple "quoted" \n stays
+stripped
+margin

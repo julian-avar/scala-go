@@ -1,0 +1,65 @@
+finally on normal completion: 4 [try;finally;]
+finally on return: -1 [try;finally;]
+finally on exception: throws java.lang.IllegalArgumentException(negative) [try;finally;]
+finally does not change returned value: 1 [finally sees 1;]
+return in finally (no exception): 20 [try;]
+no return in finally: 10 [try;]
+exception in finally replaces: throws java.lang.UnsupportedOperationException(from finally) []
+finally completes normally: throws java.lang.IllegalStateException(from try) []
+exception in catch, then finally: throws java.lang.RuntimeException(second: first) [finally after catch threw;]
+nested finally order: () [inner finally;middle finally;caught deep;outer finally;]
+rethrow keeps identity: 1 original [handling 1;]
+wrapped cause: wrapped <- java.lang.NumberFormatException: For input string: "x" []
+break out of try: 3 [finally 1;finally 2;finally 3;]
+boundary break out of try: 40 [f1;f2;f3;f4;]
+non-local return out of try in a lambda: 3 [seen 1;seen 2;seen 3;]
+classify ValidationException: validation 400
+classify AppException: server 503
+classify AppException: app 404
+classify NumberFormatException: illegal
+classify IllegalStateException: illegal
+classify Problem: x-problem xyz
+classify Problem: runtime Problem
+classify IOException: exception io
+classify AssertionError: throwable java.lang.AssertionError
+classify StackOverflowError: throwable java.lang.StackOverflowError
+classify InterruptedException: exception i
+try expression: 42 -1
+throw expression: Success(1) Failure(java.lang.IllegalArgumentException: n=-1)
+throw in getOrElse: throws java.util.NoSuchElementException(none) []
+throw null: java.lang.NullPointerException []
+throw a null variable: java.lang.NullPointerException []
+NonFatal: RuntimeException=true Exception=true AssertionError=true NotImplementedError=true InterruptedException=false LinkageError=false =false Problem=true Error=true
+recovered q
+no message: null | null | java.lang.RuntimeException
+custom no message: null | NoMessage
+cause-only constructor: java.lang.IllegalStateException: root | true | java.lang.RuntimeException: java.lang.IllegalStateException: root
+message and cause: top | root | null
+initCause: true
+self cause: Self-causation not permitted
+suppressed: s1,s2 (2)
+no suppressed: 0
+self-suppression: Self-suppression not permitted
+custom fields: 400 invalid email true
+exception toString: AppException: m | Problem: p | java.io.IOException: io | java.lang.ArithmeticException
+is-a: true true false
+Using ok: Success(3) [open a;open bb;close bb;close a;]
+Using failing: use r suppressed List(close r) [open r;close r;]
+Using close fails: Failure(java.lang.IllegalArgumentException: close c) [open c;close c;]
+Try: Failure(java.lang.ArithmeticException: / by zero) Success(8) Success(0)
+Try toEither: Left(Problem: e) Some(5)
+array index past the end: throws java.lang.ArrayIndexOutOfBoundsException(Index 3 out of bounds for length 3) []
+array index Int.MaxValue: throws java.lang.ArrayIndexOutOfBoundsException(Index 2147483647 out of bounds for length 3) []
+string charAt past the end: java.lang.StringIndexOutOfBoundsException []
+division by zero: throws java.lang.ArithmeticException(/ by zero) []
+long remainder by zero: throws java.lang.ArithmeticException(/ by zero) []
+null array length: java.lang.NullPointerException []
+null string method: java.lang.NullPointerException []
+null array store: java.lang.NullPointerException []
+negative array size: java.lang.NegativeArraySizeException []
+failed cast: java.lang.ClassCastException []
+caught as RuntimeException: ArrayIndexOutOfBoundsException []
+caught as Throwable in finally: / by zero [cleanup;]
+exception in lambda: / by zero []
+exception in a constructor argument: For input string: "?" []
+stack unwinds through frames: bottom []

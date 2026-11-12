@@ -1,0 +1,90 @@
+Int 1
+Long 2
+Double 3.0
+Float 4.0
+Char c
+Byte 5
+Short 6
+Boolean true
+Unit ()
+String str
+Array[Int] 2
+Array[Double] 1
+Array of references 2
+Array of references 1
+Puppy rex
+Dog fido
+Animal tom
+Box of Int 7
+Box of x
+Function1
+Function2
+List of 2
+Option Some(1)
+Option None
+Lone
+Number scala.math.BigInt
+Number java.math.BigInteger
+CharSequence 2
+other Rock
+null
+1 isInstanceOf Int, Long, Integer: true false true
+1L isInstanceOf Int, Long: false true
+'a' isInstanceOf Char, Int: true false
+1.0f isInstanceOf Float, Double: true false
+boxes are Numbers: List(true, true, true, true, true, true, false, false)
+boxes are Comparable: List(true, true, true, true, true, true, false)
+boxes are Serializable: List(true, true, true, true, true)
+() isInstanceOf Unit, BoxedUnit: true true
+String is CharSequence, Comparable, AnyRef: true true true
+1 isInstanceOf AnyRef, Any, AnyVal-boxed: true true
+Comparable compareTo through the interface: -1 1 0
+Number methods through the interface: List(300/300/300.0/44, -1/-1/-1.0/-1, 2/2/2.75/2, 1/1/1.5/1, -3/-3/-3.0/-3, 1000/1000/1000.0/-24)
+CharSequence through the interface: 5 e el
+List(1) isInstanceOf List[String]: true
+Box(1) isInstanceOf Box[String]: true
+unchecked cast then use: 1
+unchecked cast element access: java.lang.ClassCastException
+null isInstanceOf String, Any, AnyRef: false false false
+null asInstanceOf Int, Long, Double, Boolean, Char: 0 0 0.0 false 0
+null asInstanceOf String, Dog: null null
+generic unbox of null to Int: 1
+Puppy as Dog, Animal, Pet: p p true
+boxed Int as Int: 42
+boxed Char as Char: x
+Array[Int] as Array[Int]: 3
+String array as Array[AnyRef]: 2
+Function1 as Function1[Int, Int]: 42
+Cat as Dog: throws java.lang.ClassCastException
+Dog as Puppy: throws java.lang.ClassCastException
+String as Dog: throws java.lang.ClassCastException
+Rock as Animal: throws java.lang.ClassCastException
+Int as String: throws java.lang.ClassCastException
+Int as Long (unboxing): throws java.lang.ClassCastException
+Long as Int (unboxing): throws java.lang.ClassCastException
+Double as Float: throws java.lang.ClassCastException
+Char as Int: throws java.lang.ClassCastException
+String as Int: throws java.lang.ClassCastException
+Int as Boolean: throws java.lang.ClassCastException
+Array[Int] as Array[Long]: throws java.lang.ClassCastException
+Array[Int] as Array[AnyRef]: throws java.lang.ClassCastException
+String array as Array[Int]: throws java.lang.ClassCastException
+Int as Comparable then String: throws java.lang.ClassCastException
+Integer as Number as Long: throws java.lang.ClassCastException
+List as Option: throws java.lang.ClassCastException
+Some as None.type: throws java.lang.ClassCastException
+ClassCastException is a RuntimeException: caught as RuntimeException
+areas: List(3.0, 0.0, 4.0)
+alternatives: List(integral, integral, floating, floating, text, text, other)
+getClass.getName of boxes: List(java.lang.Integer, java.lang.Long, java.lang.Double, java.lang.Float, java.lang.Character, java.lang.Byte, java.lang.Short, java.lang.Boolean, scala.runtime.BoxedUnit)
+getClass.getName of primitive arrays: List([I, [J, [D, [F, [C, [B, [S, [Z)
+classOf primitives: List(int, long, double, boolean, char, void)
+classOf boxes and String: List(java.lang.Integer, java.lang.String, java.lang.Character)
+getClass of classes: List(Puppy, Box, Lone$, Circle, java.lang.String, scala.collection.immutable.$colon$colon, scala.collection.immutable.Nil$, scala.None$)
+getSimpleName: List(Puppy, Lone$, String, Integer, int[])
+same class: true false true
+classOf[Int] vs Integer: false true
+isAssignableFrom: true false true
+never-instantiated classes and traits: false false null
+isArray, isPrimitive: true false true false
+getComponentType: int

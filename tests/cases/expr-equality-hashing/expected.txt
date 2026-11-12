@@ -1,0 +1,109 @@
+1 == 1L boxed: true
+1 == 1.0 boxed: true
+1L == 1.0 boxed: true
+'a' == 97 boxed: true
+97L == 'a' boxed: true
+(1: Byte) == (1: Short) boxed: true
+(-1: Byte) == 255 boxed: false
+1.5f == 1.5 boxed: true
+0.1f == 0.1 boxed: false
+1.0f == 1.0 boxed: true
+2^53+1 L == 2^53 D boxed: true
+Long.MaxValue == Int.MaxValue boxed: false
+-0.0 == 0.0 boxed: true
+NaN == NaN boxed, distinct: false
+true == true boxed: true
+true == 1 boxed: false
+() == () boxed: true
+1 == "1": false
+1 != 2L boxed: true
+Integer == Long via ==: true
+BigInt(1) == 1, BigInt(1) == 1L, BigDecimal("1.5") == BigDecimal("1.50"): true true true
+BigInt(2).pow(70) == 2^70 as Double: true
+1 equals 1L: false
+1 equals 1: true
+'a' equals 97: false
+1.0 equals 1.0f: false
+NaN equals NaN: true
+-0.0 equals 0.0: false
+Integer.valueOf(3).equals(3): true
+Long.valueOf(3).equals(3): false
+Short equals Byte: false
+"a" equals "a": true
+1.## 1L.## 1.0.## 1.0f.## 'a'.##: 1 1 1 1 97 97
+boxed ##: 1 1 1 1 1 1
+1.5.##, 1.5.hashCode: 1069547520 1073217536
+Long beyond Int ##: 256 256 -2147483648 -1
+NaN.##, -0.0.##, 0.0.##: 2146959360 0 0
+Float NaN.##, 0.1f.##: 2143289344 1036831949
+Double ## of large whole: 1410065410 1410065410 2139730611
+null.##: 0
+true.##, false.##: 1231 1237
+"abc".## == hashCode: true
+Integer hashCode: -7 -2147483648
+Long hashCode: 0 1 -2147483648
+Double hashCode: 1072693248 -2147483648 2146959360
+Float hashCode: 1065353216 2143289344
+Boolean hashCode: 1231 1237
+Char, Byte, Short hashCode: 97 -1 -1
+String hashCode: 0 97 1794106052 15587 1772899
+long String hashCode (overflow): -1399078606
+BigInteger, BigDecimal hashCode: -5 1915528825 4652
+BigDecimal equals by scale: false true
+case class ==: true false false
+case class hashCode equal: true
+case class hashCode: -254313550 -1230153278 -1004901042 1347001398 79063
+case class with NaN: false true
+case class with null field: true true
+custom equals/hashCode: true 1 1
+tuples ==: true true true false
+tuple hashCode: 1971805870 2016703621 -641462172 true
+Option ==: true false true true true
+Option hashCode: 913362633 2433880
+Either, Try: true true false
+case object: true true true
+List == Vector: true
+List == ArrayBuffer: true
+List(1, 2) == List(1L, 2L): true
+Seq vs Set: false
+Set order: true
+Set mixed numbers: true
+Map ==: true
+mutable Map == immutable Map: true
+Range == List: true
+empty collections: true true false true
+Seq hashCodes: 1836368899 1836368899 1836368899 473519988
+Set and Map hashCodes: 1510543636 1510543636 2098967416 835491922
+String-element hashCodes: -2026639483 43532131
+HashSet(1, 1L, 1.0, 1.0f): 1
+HashMap key 1 found by 1L and 1.0: Some(one) Some(one) None
+mutable.HashMap Long key by Int: Some(1)
+java.util.HashMap Integer vs Long: 2 1 2
+java.util.List equals: true
+java.util.List hashCode: 4066
+array == other array: false
+array == itself: true
+array sameElements: true
+Arrays.equals: true
+Arrays.hashCode: 30817
+Arrays.deepEquals: true
+arrays wrapped: true
+null == null: true
+P == null, null == P: false false false false
+null eq null: true
+null equals via Objects: true
+plain objects: true false true true true
+plain hashCode stable: true
+case class eq: false true
+string literals eq: true
+constant-folded concat eq: true
+new String eq: false
+built string eq, ==: false true
+ref == on strings: true
+same list eq: true
+Nil eq Nil, None eq None: true true
+Objects.hash: 123039
+Objects.hashCode(null): 0
+MurmurHash3 stringHash: -112296174
+MurmurHash3 seqHash: 1836368899
+Statics.anyHash: 1 1075838976 115

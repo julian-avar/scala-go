@@ -1,0 +1,21 @@
+Array(Array(1)) class: [Ljava.lang.Object;
+Array(Point(1)) class: [Ljava.lang.Object;
+Array.ofDim[String](1, 1) class: [Ljava.lang.Object;
+Array[Unit] class: [Ljava.lang.Object;
+Array("a").getClass == classOf[Array[String]]: false
+toString prefix: [Ljava.lang.Object;
+Array("a") isInstanceOf Array[Point]: true
+Array(Dog()) isInstanceOf Array[Cat]: true
+Array(Array(1)) isInstanceOf Array[String]: true
+Array[AnyRef](()) isInstanceOf Array[Unit]: true
+Array("a") asInstanceOf Array[Point]: 1
+Array[Animal] of Dogs asInstanceOf Array[Dog]: 1
+store Integer into String[] seen as Object[]: 1
+store Cat into Dog[] seen as Animal[]: Cat
+reflect.Array.newInstance class: [Ljava.lang.Object;
+Arrays.copyOf(Array("a"), 1, classOf[Array[String]]) class: [Ljava.lang.Object;
+identityHashCode of a box != 0: false
+equal boxes share a monitor: true
+cast message names both classes: false
+substring(2, 1) message: begin 2, end 1, length 3
+parseInt("zz", 16) message: For input string: "zz"

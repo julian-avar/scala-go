@@ -1,0 +1,62 @@
+captured vars after closure: 3 9 0.0625 2.0 3 49 c false s!! List(3, 2)
+closure sees outer writes: 100 x
+closure sees later writes: 200 x
+loop closures: Vector(10, 20, 30)
+while-loop closures over a val: ArrayBuffer(0, 1, 2)
+while-loop closures over the var: ArrayBuffer(3, 3, 3)
+closure over private field: 13 19
+closure returning closure: 7
+closure capturing closures: 12
+two closures sharing a var: 12
+(evaluated once)
+lazy val in closure: 43 43
+curried method: 123
+partial application of curried: 123 156
+eta-expansion: 3 6 11
+curried function: 7
+tupled: 13
+Function.untupled: 2
+overloaded method values: List(int 1, int 2) List(string a)
+polymorphic method value: List(1, 2)
+generic HOF: 42
+placeholders: 6 List(3, 2, 1) List(1, 2)
+placeholder in expression: List(3, 5, 7)
+method value of an object method: List(X, Y)
+varargs through a function: 6
+andThen, compose: 12 11 <4>
+identity, const: 3 7
+Function.chain: 5
+arities: 0 1 3 6 123.0de 55
+arity 22: 231!
+arity 22 is a Function22: true
+f3.curried, f3.tupled: 6 15
+method with 22 params as a function: 42
+specialized functions: 3.0 12 true ()
+specialized through generics: List(1.5, 3.0) List(4) List(3) 6.0
+Any => Any with primitives: 1 c ()
+isDefinedAt: List(true, false, true, false)
+lift: List(Some(positive 1), None)
+orElse: List(positive 1, fallback, fallback)
+applyOrElse: default -5
+collect: List(positive 1, string x, positive 3)
+pf andThen: 10
+MatchError: scala.MatchError
+Scala SAM trait: v,vv,vvv
+generic SAM with a default method: 9 reducer
+SAM abstract class: 3 8
+Unit SAM mutating a var: 11
+Runnable: -1
+Comparator: List(a, bb, ccc)
+Comparator combinators: [c, a, bb, ab]
+java.util.function: j1 supplied 4 true false 42 cba 3
+java Function andThen/compose: j2!
+primitive functional interfaces: 2 3 8 true true 1.5 9223372036854775807 3
+java streams with lambdas: 8
+Scala function as a Java interface: 15
+by-name evaluated each time: List(1, 2, 3)
+by-name not evaluated: 3
+by-name short circuit: false
+recursive function value: 6765
+mutually recursive local defs: true true
+Y-ish fixpoint: 3628800
+function equality is identity: true false
