@@ -17,7 +17,7 @@ object Main:
       catch case e: Exception => e.getClass.getName
     println(s"$label: $r")
 
-  // Negative bit patterns are not constants here: see known-bugs-jdk-go-errors.
+  // Constant bit patterns: `constantOperands`.
   def main(args: Array[String]): Unit =
     doubleToString()
     floatToString()
@@ -25,6 +25,11 @@ object Main:
     bits()
     comparing()
     booleans()
+    constantBits()
+
+  def constantBits(): Unit =
+    println("== constant bit patterns")
+    println(s"${JFloat.intBitsToFloat(0xff800000)} ${JDouble.longBitsToDouble(0x8000000000000000L)}")
 
   def doubleToString(): Unit =
     println("== Double.toString")

@@ -1,7 +1,0 @@
-Main.scala:9:55: int32(2147483647) + int32(1) (constant 2147483648 of type int32) overflows int32
-Main.scala:10:45: int64(9223372036854775807) + int64(1) (constant 9223372036854775808 of type int64) overflows int64
-Main.scala:12:79: invalid operation: division by zero
-Main.scala:13:69: invalid operation: division by zero
-Main.scala:15:62: constant -1 overflows uint32
-Main.scala:17:82: constant -8388608 overflows uint32
-Main.scala:18:72: constant -9223372036854775808 overflows uint64

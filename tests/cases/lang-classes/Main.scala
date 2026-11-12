@@ -87,8 +87,14 @@ object Registry:
   def apply(name: String): Registry = new Registry(name.toUpperCase)
   def created: Int = count
 
+// Named like files the linker generates (entry.go, support.go), up to case.
+class Entry(val n: Int)
+class Support(val n: Int)
+
 object Main:
   def main(args: Array[String]): Unit =
+    println(s"classes named like linker files: ${Entry(1).n} ${Support(2).n}")
+
     // Constructors.
     val t1 = Temperature(212, "F")
     val t2 = Temperature()

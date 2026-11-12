@@ -57,9 +57,6 @@ fail. A fix makes its case fail: move the check to a case run on both the JVM an
 
 | Bug | Fix in |
 |-----|--------|
-| Constant arguments to natives give constant expressions Go rejects: overflow in `Integer.sum(Int.MaxValue, 1)`, `Long.sum`; division by zero in `Integer.divideUnsigned(1, 0)`, `Long.remainderUnsigned(1L, 0L)`; `uint32`/`uint64` overflow in `Character.isISOControl(-1)`, `Float.intBitsToFloat(0xff800000)`, `Double.longBitsToDouble(0x8000000000000000L)` | Natives emitted as Go expressions: convert through variables, not constants |
-| A string literal containing `math.` (`println("math.abs")`) adds an unused `import "math"` to `support.go` | `Linker.goFile`: scan code, not literals |
-| A class `Entry` in the empty package collides with the linker's `entry.go` (Go rejects file names differing only in case); `support.go` likewise | `Linker`: reserve the names |
 | A Scala subclass of `BigInteger` or `BigDecimal` links, then fails `go build` (`cannot use this (variable of type *S_…) as *rt.BigInteger`) | Linker: a link error naming the class |
 | Overloads exported under one Go name (`@GoExport("Twice")`) link, then fail `go build` (`Export_Twice redeclared`) | `Exports`: a link error |
 | A generic facade instantiated outside its Go constraint (`slices.Max` of a `GoSlice[Any]`: `any` is not `cmp.Ordered`) links, then fails `go build` (`does not satisfy`) | `GoInterop.typeParamBindings`: check type sets, `comparable` and interface constraints; a link error |

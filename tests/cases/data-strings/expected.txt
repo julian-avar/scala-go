@@ -1,3 +1,4 @@
+a literal that looks like a Go package member: math.abs
 lengths: 0 3 2 6 3
 code units of mixed: 0061 d83d de00 0062 00e9 0063
 charAt: a d83d de00 é

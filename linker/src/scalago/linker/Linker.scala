@@ -3,6 +3,7 @@ package scalago.linker
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.{Files, Path}
 
+import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
 
@@ -140,9 +141,10 @@ object Linker:
       catch case e: GoApi.GoApiException => throw LinkingException(List(s"loading Go packages failed: ${e.getMessage}"))
 
     val ctx = LinkContext(program, analyzer, errors, goApi, libraryMode = config.library, lineDirectives = config.lineDirectives)
+    val fileNames = classFileNames(program.classes.toList.map(_.name))
     val classFiles = program.classes.toList
       .sortBy(_.name)
-      .map(c => Mangling.fileName(c.name) -> ClassEmitter(ctx, c).emit())
+      .map(c => fileNames(c.name) -> ClassEmitter(ctx, c).emit())
       .filter(_._2.nonEmpty)
     val forwarder = Option.when(isModuleMain)(mainForwarder(ctx, config.mainObject, mainModule))
     val entryFile = entryCode(ctx, entry, forwarder, exceptionClasses)
@@ -174,6 +176,22 @@ object Linker:
       catch case e: GoApi.GoApiException => throw LinkingException(List(e.getMessage))
     errors.warnings
 
+  /** Files of the generated package that are not a class's. */
+  private val ReservedFiles = Set("entry.go", "support.go", "exports.go", "tzdata.go")
+
+  /** The Go file of each class. Go rejects a package with two files whose names differ only in
+   *  case, and a class must not take the name of one of the linker's files: classes `Entry` and
+   *  `entry`, or `Entry` and the linker's `entry.go`, get distinct names.
+   */
+  private def classFileNames(classes: List[ClassName]): Map[ClassName, String] =
+    val taken = mutable.HashSet.from(ReservedFiles)
+    classes.sorted.map { cls =>
+      val base = Mangling.fileName(cls).stripSuffix(".go")
+      // An escaped class name never contains `__`, so a numbered name is not another class's.
+      val name = Iterator.from(0).map(n => if n == 0 then s"$base.go" else s"${base}__$n.go").find(f => taken.add(f.toLowerCase)).get
+      cls -> name
+    }.toMap
+
   private def goMod(config: Config): String =
     val sb = StringBuilder(s"module ${config.goModulePath}\n\ngo 1.27\n")
     if config.goRequires.nonEmpty then
@@ -182,8 +200,10 @@ object Linker:
     sb.toString
 
   private def goFile(ctx: LinkContext, config: Config, body: String): String =
-    def uses(pkg: String) = s"(?<![A-Za-z0-9_.])$pkg\\.".r.findFirstIn(body).isDefined
-    val goPackages = "(?<![A-Za-z0-9_.])(gp_[A-Za-z0-9_]+)\\.".r.findAllMatchIn(body).map(_.group(1)).toSet.toList.sorted
+    // Imports follow from the code: not from what string literals and line directives spell.
+    val code = "\"(?:[^\"\\\\\n]|\\\\.)*\"|/\\*line [^\n]*?\\*/".r.replaceAllIn(body, "")
+    def uses(pkg: String) = s"(?<![A-Za-z0-9_.])$pkg\\.".r.findFirstIn(code).isDefined
+    val goPackages = "(?<![A-Za-z0-9_.])(gp_[A-Za-z0-9_]+)\\.".r.findAllMatchIn(code).map(_.group(1)).toSet.toList.sorted
       .map(alias => s"$alias \"${ctx.interop.imports(alias)}\"")
     val imports = List(
       Option.when(uses("rt"))(s"\"${config.goModulePath}/$RuntimeDir\""),

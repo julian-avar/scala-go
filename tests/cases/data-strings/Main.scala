@@ -15,6 +15,7 @@ object Main:
 
   def main(args: Array[String]): Unit =
     // Code units
+    p("a literal that looks like a Go package member")("math.abs")
     p("lengths")(s"${"".length} ${"abc".length} ${smile.length} ${mixed.length} ${loneHigh.length}")
     p("code units of mixed")(units(mixed))
     p("charAt")(s"${mixed.charAt(0)} ${mixed.charAt(1).toInt.toHexString} ${mixed.charAt(2).toInt.toHexString} ${mixed.charAt(4)}")

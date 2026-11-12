@@ -679,15 +679,30 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
 
   private def genNative(native: Natives.Native, receiver: Option[Tree], args: List[Tree], m: MethodName): String =
     native match
-      case Natives.Native.Static(gen) => gen(genExprs(args, m.params))
+      case Natives.Native.Static(gen) => gen(genNativeArgs(args, m.params))
       case Natives.Native.Instance(gen) =>
-        val r :: as = genExprs(receiver.toList ++ args, receiver.map(_.tpe).toList ++ m.params): @unchecked
+        val r :: as = genNativeArgs(receiver.toList ++ args, receiver.map(_.tpe).toList ++ m.params): @unchecked
         gen(r, as)
       case Natives.Native.NullResult =>
         val values = genExprs(receiver.toList ++ args, receiver.map(_.tpe).toList ++ m.params)
         receiver.foreach(_ => emit(s"rt.CheckNotNull(${values.head})"))
         values.drop(receiver.size).filterNot(isSimple).foreach(v => emit(s"_ = $v"))
         zeroValue(m.result)
+
+  /** The arguments of a native, which emits them inside Go expressions. When all are constants,
+   *  those expressions would be Go constant expressions, which Go evaluates at compile time and
+   *  rejects on overflow, division by zero and negative values converted to unsigned types, where
+   *  the JVM wraps or throws at run time. So they are put in variables (Go folds them anyway).
+   */
+  private def genNativeArgs(trees: List[Tree], expected: List[Type]): List[String] =
+    val values = genExprs(trees, expected)
+    if trees.nonEmpty && trees.forall(isConstant) then
+      values.zip(trees).map { (v, t) =>
+        val temp = freshTemp()
+        emit(s"var $temp ${ctx.goType(t.tpe)} = $v")
+        temp
+      }
+    else values
 
   private def genApply(tree: Apply): String =
     val Apply(receiver, declaringClass, m, args, _) = tree
@@ -924,6 +939,16 @@ object FunctionEmitter:
         _: TryCatch | _: TryFinally =>
       true
     case _ => false
+
+  /** Whether Go evaluates the expression emitted for `tree` at compile time. */
+  private def isConstant(tree: Tree): Boolean = tree match
+    case _: BooleanLiteral | _: CharLiteral | _: ByteLiteral | _: ShortLiteral | _: IntLiteral | _: LongLiteral |
+        _: FloatLiteral | _: DoubleLiteral =>
+      true
+    case Unary(_, arg)       => isConstant(arg)
+    case Binary(_, _, l, r)  => isConstant(l) && isConstant(r)
+    case Convert(arg, _)     => isConstant(arg)
+    case _                   => false
 
   private def isSimple(expr: String): Boolean = expr.forall(c => c.isLetterOrDigit || c == '_')
 
