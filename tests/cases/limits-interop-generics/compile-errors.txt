@@ -1,0 +1,1 @@
+Main.scala:9:13: scala-go: give the type argument of T of this generic Go facade explicitly

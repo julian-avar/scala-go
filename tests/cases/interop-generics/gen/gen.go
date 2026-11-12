@@ -5,7 +5,16 @@ package gen
 import (
 	"cmp"
 	"fmt"
+	"time"
 )
+
+// DurationString takes a defined numeric type of a package that no facade of the program has.
+func DurationString(d time.Duration) string { return d.String() }
+
+// Box is a generic type.
+type Box[T any] struct{ Value T }
+
+func (b *Box[T]) Get() T { return b.Value }
 
 // Map has two type parameters, inferred from the slice and the func.
 func Map[T, U any](xs []T, f func(T) U) []U {

@@ -1,3 +1,2 @@
-Main.scala:15:30: Go facade member defined.Count: cannot pass Scala type scalago.go.GoSlice[scalago.go.GoString] as Go type example.com/defined.Names
-Main.scala:15:72: Go facade member defined.Size: cannot pass Scala type scalago.go.GoMap[scalago.go.GoString, Long] as Go type example.com/defined.Table
-Go facade member defined.Duration: unknown Go type gp_time.Duration
+Main.scala:14:30: Go facade member defined.Count: cannot pass Scala type scalago.go.GoSlice[scalago.go.GoString] as Go type example.com/defined.Names
+Main.scala:14:72: Go facade member defined.Size: cannot pass Scala type scalago.go.GoMap[scalago.go.GoString, Long] as Go type example.com/defined.Table

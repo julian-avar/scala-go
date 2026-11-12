@@ -6,6 +6,8 @@ import scalago.go.*
 object gen:
   def Map(xs: GoSlice[GoInt], f: GoInt => GoString): GoSlice[GoString] = native
   @GoName("Map") def lengths(xs: Array[String], f: String => Int): Array[Int] = native
+  // T is int from the slice; the function's Long converts (Go data decides, not funcs).
+  @GoName("Map") def mapLongs(xs: GoSlice[GoInt], f: Long => GoString): GoSlice[GoString] = native
   def First(xs: GoSlice[GoString]): (GoString, Boolean) = native
   @GoName("First") def firstLong(xs: Array[Long]): (Long, Boolean) = native
   def Larger(a: Long, b: Long): Long = native
@@ -20,6 +22,13 @@ object gen:
   def Count(m: GoMap[GoString, GoInt]): Int = native
   def Ptr(x: Long): GoPtr[Long] = native
   def NewPoint(x: Int, y: Int): Point = native
+  def DurationString(d: Long): String = native
+
+  // A generic Go type: a generic facade class, instantiated by its uses.
+  class Box[T]:
+    def Value: T = native
+    def Value_=(v: T): Unit = native
+    def Get(): T = native
 
   class Point extends fmt.Stringer:
     def String(): String = native
@@ -31,6 +40,9 @@ object fmt:
 
 @GoImport("slices")
 object slices:
+  // Generic members: the call's type arguments instantiate the Go function.
+  def Max[E](xs: GoSlice[E]): E = native
+  @GoName("Index") def indexOf[E](xs: GoSlice[E], x: E): Int = native
   def Reverse(xs: GoSlice[GoString]): Unit = native
   def BinarySearch(xs: GoSlice[GoInt], x: GoInt): (Int, Boolean) = native
   def Equal(a: GoSlice[Long], b: GoSlice[Long]): Boolean = native
@@ -57,6 +69,7 @@ object Main:
     val ints = GoSlice.of(GoInt(1), GoInt(22), GoInt(333))
     println(s"Map: ${strings(gen.Map(ints, n => go"#$n"))}")
     println(s"Map: ${gen.lengths(Array("a", "bb", "ccc"), _.length).mkString(",")}")
+    println(s"Map: ${strings(gen.mapLongs(ints, n => go"${n + 1}"))}")
     println(s"First: ${gen.First(GoSlice.of(go"x", go"y"))} ${gen.First(GoSlice.empty[GoString])._2} ${gen.firstLong(Array(5L))}")
 
     // A type set constraint: each facade names a type of the set.
@@ -83,3 +96,11 @@ object Main:
     copy(go"c") = GoInt(3)
     println(s"Clone: ${copy.size} ${counts.size}")
     println(s"Compare: ${cmp.Compare("a", "b")} ${cmp.Compare("b", "a")} ${cmp.compareDoubles(Double.NaN, 1)} ${cmp.compareDoubles(2, 2)}")
+
+    // Generic facades: members and classes.
+    println(s"Max: ${slices.Max(ints)} ${slices.Max(GoSlice.of[GoString](go"pear", go"apple"))} ${slices.Max(GoSlice.of[Double](0.5, 2.5))}")
+    println(s"Index: ${slices.indexOf(ints, GoInt(333))} ${slices.indexOf(words, go"z")}")
+    val box = new gen.Box[GoString]
+    box.Value = go"boxed"
+    println(s"Box: ${box.Get()} ${box.Value}")
+    println(s"Duration: ${gen.DurationString(1500000000L)}")

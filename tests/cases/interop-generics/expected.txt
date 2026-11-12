@@ -1,5 +1,6 @@
 Map: #1,#22,#333
 Map: 1,2,3
+Map: 2,23,334
 First: (x,true) false (5,true)
 Larger: 7 pear -0.5
 TypeOf: int64 int32 int string []uint8
@@ -13,3 +14,7 @@ IndexFunc: 2
 Insert: 1,10,11,22,333
 Clone: 3 2
 Compare: -1 1 -1 0
+Max: 333 pear 2.5
+Index: 2 -1
+Box: boxed boxed
+Duration: 1.5s

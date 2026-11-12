@@ -1,0 +1,1 @@
+Calls generic Go standard library functions and types through the generated facades (scalago.gostd).

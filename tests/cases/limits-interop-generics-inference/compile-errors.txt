@@ -1,0 +1,1 @@
+Main.scala:10:64: Ambiguous given instances

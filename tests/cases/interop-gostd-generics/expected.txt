@@ -1,0 +1,16 @@
+Sort: [1 2 3], Max: 3, Index(2): 1
+Contains: false, BinarySearch: (2,true)
+Insert: [1 10 11 2 3]
+SortFunc by length: [fig pear banana]
+cmp.Compare: -1 1
+maps.Keys, sorted: [a b c]
+strings.Lines, stopped after 2: ListBuffer(one, two)
+slices.Collect of a Scala iterator: [1 4 9 16]
+iter.Pull: (1,true) (4,true)
+atomic.Pointer: true
+atomic.Pointer: stored
+sql.Null: 42 true 42
+reflect.TypeFor: int []string
+errors.AsType: true open /no/such/file
+computing once
+sync.OnceValue: 14

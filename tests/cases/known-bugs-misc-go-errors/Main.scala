@@ -8,13 +8,6 @@ import scalago.go.*
 class BigInteger10 extends java.math.BigInteger("10"):
   def twice: java.math.BigInteger = add(this)
 
-// slog.Level is an int; UnmarshalText has a pointer receiver, not callable on the held value.
-@GoImport("log/slog")
-object slog:
-  class Level:
-    def UnmarshalText(text: Array[Byte]): Unit = native
-
 object Main:
   def main(args: Array[String]): Unit =
     println(BigInteger10().twice)
-    new slog.Level().UnmarshalText("INFO".getBytes)

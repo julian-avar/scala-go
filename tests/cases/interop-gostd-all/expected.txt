@@ -1,0 +1,24 @@
+regexp: abbbc bbb <b>-<bb>
+sha256: 32 bytes, ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+crc32: 907060870
+csv: name|qty; pear|3
+list: 3 List(0, 1, two)
+text/template: Hello, Gopher!
+html/template: &lt;b&gt;&amp;&lt;/b&gt;
+math/big: 15241578753238836750495351562536198787501905199875019052100
+math: -1 4294967295 9223372036854775807
+mathrand: 81
+randv2: 769
+netip: 10.0.0.1 192.168.0.1
+uuid: f47ac10b-58cc-4372-a567-0e02b2c3d479 01020304-0506-0708-090a-0b0c0d0e0f10
+context: None context canceled
+gzip: 140 bytes back
+flag: 5 rest
+exec: from a subprocess
+binary: 1,2,3,4 67305985 BigEndian
+binary: 2,1
+json/v2: {"a":1,"b":2}
+json/v2: string cannot be passed as Go type jsonopts.Options
+http.NoBody: POST 0
+cmplx: 5.0 (0+1i) (1.5-2.0i)
+complex: (-2+1i) Infinity

@@ -1,1 +1,1 @@
-Linking succeeds; go vet fails.
+Calls Go's slices package through a generic facade.

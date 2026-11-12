@@ -1,4 +1,4 @@
-Main.scala:31:38: Go facade member atomic.Pointer.Load: cannot convert Go type *T to Scala type java.lang.Object
 Main.scala:32:26: Go facade member sha256.Sum256: cannot convert Go type [32]byte to Scala type Array[Byte]
-Main.scala:33:22: Go facade member cmplx.Abs: cannot pass Scala type Double as Go type complex128
-Main.scala:34:27: Go facade member url.ParseQuery: cannot convert Go type net/url.Values to Scala type scalago.go.GoMap[scalago.go.GoString, scalago.go.GoSlice[scalago.go.GoString]]
+Main.scala:33:27: Go facade member url.ParseQuery: cannot convert Go type net/url.Values to Scala type scalago.go.GoMap[scalago.go.GoString, scalago.go.GoSlice[scalago.go.GoString]]
+Main.scala:34:35: Go facade member slog.Level.UnmarshalText: method UnmarshalText of Go type log/slog.Level has a pointer receiver
+Main.scala:36:27: type test against atomic.Pointer: type tests against generic Go types are not supported
