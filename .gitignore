@@ -6,3 +6,5 @@ out/
 .vscode/
 *.class
 .claude/worktrees/
+.direnv/
+result
