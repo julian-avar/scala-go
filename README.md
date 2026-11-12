@@ -149,5 +149,6 @@ mirror the test's setup: `linker.test` compiles the cases itself.
 | `SCALAGO_TEST_PARALLELISM`  | how many cases run at once (they run concurrently)              |
 | `SCALAGO_KEEP_WORK=1`       | keeps the work directory of passing cases too; failing ones are always kept, under `/tmp/scalago-<case>-*` |
 | `SCALAGO_TEST_GOCACHE_GB`   | size cap of the tests' Go build cache, `~/.cache/scalago-tests/go-build` (default 10). At start, entries unused for a day are pruned, then the least recently used beyond the cap |
+| `SCALAGO_TEST_GOCACHE`      | another directory for that cache, so that concurrent runs (in several worktrees) do not prune each other's entries |
 | `SCALAGO_LINE_DIRECTIVES=false` | leaves out line directives (the linker's `--line-directives false`), so Go reports positions in the generated code instead of Scala positions |
 | `SCALAGO_TRACE=1`           | at run time: keeps all Go frames in stack traces                |
