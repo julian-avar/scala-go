@@ -169,7 +169,7 @@ object Linker:
     val entryFile = entryCode(ctx, entry, forwarder, exceptionClasses, hooks)
     val exportsFile = Option.when(config.library)(ctx.exports.internalFile)
     val rootFile = Option.when(config.library)(ctx.exports.rootFile(config.rootPackageName, s"${config.goModulePath}/$ScalaPackageDir"))
-    val support = supportFile(ctx)
+    val support = supportFile(ctx, if config.library then None else Some(config.mainObject))
     if errors.all.nonEmpty then throw LinkingException(errors.all)
 
     val scalaDir = Files.createDirectories(outputDir.resolve(ScalaPackageDir))
@@ -281,8 +281,8 @@ object Linker:
     sb.toString
 
   /** String literals, dispatchers and type tests requested while emitting method bodies. */
-  private def supportFile(ctx: LinkContext): String =
-    val classes = classInfos(ctx) // first: it adds class literals
+  private def supportFile(ctx: LinkContext, mainClass: Option[ClassName]): String =
+    val classes = classInfos(ctx, mainClass) // first: it adds class literals
     val sb = StringBuilder()
     def line(s: String = ""): Unit = sb ++= s ++= "\n"
 
@@ -387,17 +387,17 @@ object Linker:
       line()
     sb.toString
 
-  /** `rt.DefineClasses` for the classes that can have `Class` objects (those of the program's
-   *  objects and those `classOf` names) and the classes they extend or are members of: what the
+  /** `rt.DefineClasses` for the classes that can have `Class` objects (those with Go types, those
+   *  `classOf` names, the main class and the JDK's value classes) and the classes they extend or are members of: what the
    *  reflective methods of `Class` need.
    */
-  private def classInfos(ctx: LinkContext): String =
+  private def classInfos(ctx: LinkContext, mainClass: Option[ClassName]): String =
     val program = ctx.program
     val classes = mutable.LinkedHashSet.empty[ClassName]
     def add(name: ClassName): Unit =
       for c <- program.get(name) if !Hijacked.isHijacked(name) && classes.add(name) do
         (c.superClass.toList ++ c.interfaces ++ c.innerClass.flatMap(_.outer)).foreach(add)
-    (ctx.classLiterals.keys.toList ++ Hijacked.ancestors.values.flatten.toList.distinct.sorted).foreach(add)
+    (ctx.declared.toList.sorted ++ ctx.classLiterals.keys ++ mainClass ++ Hijacked.ancestors.values.flatten.toList.distinct.sorted).foreach(add)
     if classes.isEmpty then return ""
     val sb = StringBuilder("func init() {\n\trt.DefineClasses([]rt.ClassInfo{\n")
     for name <- classes.toList.sorted; c <- program.get(name) do
@@ -411,7 +411,8 @@ object Linker:
         inner.outer.foreach(o => fields += s"Outer: ${ctx.classLiteral(o)}")
       for call <- program.enumValuesCall(name) if ctx.analyzer.enumValues(name) do
         val values = MethodDef(call.method, Nil, Some(call), isStatic = true, isPrivate = true, c.pos)
-        val body = FunctionEmitter(ctx, c, values).emitBody(call).map(l => s"\t\t\t${l.text}\n").mkString
+        // Not in `c`, whose static initializer the call must trigger.
+        val body = FunctionEmitter(ctx, c.copy(name = "scalago.EnumValues"), values).emitBody(call).map(l => s"\t\t\t${l.text}\n").mkString
         fields += s"Values: func() *rt.Array[any] {\n$body\t\t}"
       sb ++= s"\t\t{${fields.result().mkString(", ")}},\n"
     sb ++= "\t})\n}\n\n"

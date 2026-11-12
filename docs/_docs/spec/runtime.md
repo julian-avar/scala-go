@@ -111,7 +111,7 @@ deeper than the JVM's default thread stacks (512 KB–1 MB) succeeds. The `stack
 `Thread` constructors and builders is ignored.
 
 **Deviation:** exhausting the stack is a Go fatal error (`fatal error: stack overflow`, exit
-status 2), not a `StackOverflowError`: no `catch` or `finally` runs, and buffered standard output
+status 2), not a `StackOverflowError`: no `catch` or `finally` runs, and standard output buffered in the last 100 ms
 is lost (`tests/cases/limits-runtime-stack-overflow`).
 
 ## Class and object initialization

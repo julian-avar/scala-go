@@ -10,9 +10,9 @@ object debug:
 
 // Limitations (docs/design.md, "Status", not planned to change): a stack overflow ends the program
 // with a Go fatal error; StackOverflowError is never thrown. The buffered standard output is lost
-// with it, unless the 100 ms flush timer ran first (docs/_docs/spec/runtime.md, "Standard I/O").
-// The program runs itself as a child process, with a 16 MB stack limit, and reports how the child
-// ended.
+// with it, unless the 100 ms flush timer ran first (docs/_docs/spec/runtime.md, "Standard I/O"),
+// so only the fatal error is checked here. The program runs itself as a child process, with a
+// 16 MB stack limit, and reports how the child ended.
 //
 // On the JVM the child prints "caught StackOverflowError" and "after", and exits with status 0.
 object Main:
@@ -33,4 +33,3 @@ object Main:
       println(s"exit status: ${child.waitFor()}")
       println(output.linesIterator.find(_.startsWith("fatal error")).getOrElse("no fatal error"))
       println(s"caught StackOverflowError: ${output.contains("caught")}")
-      println(s"buffered output printed: ${output.contains("buffered before")}")
