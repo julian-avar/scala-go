@@ -137,15 +137,14 @@ A Go value held by Scala code (in an `Any` or a facade type) behaves as follows:
 | `asInstanceOf[F]` | as above; `null` passes; a `T` struct value is copied to a new `*T` |
 | boxes | a Go value is a Scala box exactly when its dynamic type is `bool`, `uint16`, `int8`, `int16`, `int32`, `int64`, `float32` or `float64`. Go `int`, `uint8`, `uint32`, ... are Go values, not numbers; `GoData.toScala` converts them |
 | `==`, `equals` | Go's `==` when the dynamic types are identical and comparable; identity for maps, slices (same array and length), funcs, channels and pointers; `false` for different types |
-| `eq` | Go's `==` on the interface values; see [Equality and hashing](language.md#equality-and-hashing) for uncomparable types |
+| `eq` | Go's `==` on the interface values; two uncomparable values (slices, maps, funcs) are `eq` when they are the same object |
 | `hashCode` | consistent with `==`: the address for maps, slices, funcs, channels and pointers; the value for integers; a hash of the bytes for strings |
 | `toString` | `Error()` for an `error`, else `String()` for a `fmt.Stringer`, else `<Go type>@<hash in hex>` |
 | `getClass.getName` | the Go type (`*strings.Builder`, `int`) |
 | `synchronized` | a monitor keyed by the value, or by its address for uncomparable types |
 
-**Deviation (bug):** a Go struct value of an uncomparable type (with a slice, map or func field)
-is not `==` to itself; an interface field holding an uncomparable value makes `==` throw
-`RuntimeException` ([Known bugs](../contributing/roadmap.md#known-bugs)).
+A Go struct with an uncomparable field (a slice, map or func) is `==` to itself: its fields compare
+as Go values, uncomparable ones by identity.
 
 ## Generic functions
 

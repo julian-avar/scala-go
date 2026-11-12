@@ -109,10 +109,8 @@ concatenation chain evaluates all operands before converting any to a string (as
 
 Go orders calls left to right but leaves unspecified when variables and fields are read
 relative to them (Go: [Order of evaluation][go-order]); operands before one that needs Go
-statements (a conditional, a block, a `try`) are first stored in variables.
-**Deviation (bug):** an operand that reads a field directly (a captured `var`'s `*Ref` cell, a
-private field), followed by a call that changes it, can see the new value: with a captured
-`var i` and `def inc() = { i += 1; i }`, `i + inc()` is `2` (JVM: `1`).
+statements (a conditional, a block, a `try`), or that read a field or array element before a
+call in a later operand, are first stored in variables.
 
 ### Numeric operations
 
@@ -139,10 +137,9 @@ conversions are range-checked first (Go: [Conversions][go-conversions]). What sc
 where Go leaves results to the implementation: [Runtime](runtime.md#go-implementation-dependence).
 `tests/cases/expr-arithmetic-runtime` checks operands the compiler cannot fold.
 
-**Deviation (bug):** `a * b + c` on `Float`/`Double` may be fused into one multiply-add (one
-rounding) on arm64 and on amd64 with `GOAMD64=v3` or higher, as Go permits without an explicit
-conversion of the product (Go: [Floating-point operators][go-floatops]); results can differ from
-the JVM's in the last bit.
+Go may fuse `a * b + c` into one multiply-add, rounded once, on arm64 and on amd64 with
+`GOAMD64=v3` or higher, unless the product is explicitly converted (Go: [Floating-point
+operators][go-floatops]); products of `Float`s and `Double`s are, so results are the JVM's.
 
 `java.lang.Math` and `StrictMath`:
 
@@ -187,17 +184,6 @@ operators][go-compare]); objects, strings and arrays are pointers, so this is id
   (`Integer.valueOf(1000) eq Integer.valueOf(1000)` is `true`), `System.identityHashCode` of a
   box is `0`, and equal boxes share one monitor.
 - **Deviation:** `==` on two references to the *same* boxed `NaN` is `false` (JVM: `true`).
-- **Deviation (bug):** `==` and `!=` throw `NullPointerException` when one operand is a null of
-  static type `String` (also `BigInteger`, `BigDecimal`) and the other is not null, including
-  string-literal matches on a null selector (JVM: `false`); `s == null` and `t.equals(s)` work.
-- **Deviation (bug):** `eq` on two references to the same Go value of a type Go cannot compare
-  (`GoSlice`, `GoMap`, a Go func, a Go struct containing one) throws `RuntimeException` (JVM:
-  `true`); `==` works.
-- **Deviation (bug):** a boxed `Int` or `Long` `==` a boxed `Float` compares as `Double`, not
-  `Float`: `(16777217L: Any) == (16777216f: Any)` is `false`.
-- **Deviation (bug):** `(1: Any) == BigInt(1)` (a box on the left, `BigInt` or `BigDecimal` on
-  the right) is `false`.
-- **Deviation (bug):** `().##` and `().hashCode` are identity hashes (JVM: `0`).
 
 ### Type tests and casts
 
@@ -219,10 +205,6 @@ type of strings, boxes and arrays. Tests use the comma-ok form, which never pani
 - **Deviation:** arrays of references do not know their element type: every `Array[R]` is an
   instance of every `Array[S]`, casts between them succeed, and no `ArrayStoreException` is
   thrown. Primitive arrays are exact ([Arrays](data.md#arrays)).
-- **Deviation (bug):** a cast to a box class is not checked when the operand is typed `String`,
-  `Class`, `BigInteger`, `BigDecimal` or an array: `"a".asInstanceOf[Integer]` returns the string.
-- **Deviation (bug):** a cast from `Any` to a class never instantiated, or to a trait no
-  instantiated class implements, lets every value through.
 
 ### Exceptions
 
@@ -245,8 +227,6 @@ and by gc's messages and become Java exceptions:
 | negative slice length | `NegativeArraySizeException` |
 | any other run-time panic, or a panic in Go code with a non-exception value | `RuntimeException` with Go's message |
 
-- **Deviation (bug):** a negative array index throws `RuntimeException("runtime error: index out
-  of range [-1]")`, not `ArrayIndexOutOfBoundsException`.
 - **Deviation:** `NullPointerException`s have no message (the JVM's name the `null` expression).
 - **Deviation (bug):** `String` index errors have JDK 8's messages (`"abc".charAt(5)`:
   `index 5, length 3`; JDK 25: `Index 5 out of bounds for length 3`), and `Integer.parseInt(s,
@@ -351,7 +331,7 @@ Library code that needs a JDK API javalib lacks fails to link if reached.
 |---------|-------------------|
 | Enums, opaque types | As Scala compiles them ([Data](data.md#enums-and-opaque-types)). `EnumSet`/`EnumMap` are not implemented. **Deviation (bug):** `getDeclaringClass` and `java.lang.Enum.valueOf(classOf[E], name)` do not link |
 | Extension methods, export clauses, `given`/`using`, context functions | Ordinary methods, forwarders, values and lambdas |
-| `inline`, macros | Expanded by the compiler. **Deviation (bug):** stack trace lines of inlined code are the inlined source's (JVM: the call site's) |
+| `inline`, macros | Expanded by the compiler. **Deviation:** stack trace lines of inlined code are the inlined source's (the JVM's are the call site's only where an argument was inlined) |
 | Union and intersection types, match types, type lambdas, kind polymorphism, explicit nulls, capture checking | Erased or compile-time only |
 | `Selectable`, `Dynamic` | See [Types](#3-types); `Dynamic` calls are rewritten at compile time |
 | `@main` | The generated class parses the arguments (`scala.util.CommandLineParser`) |

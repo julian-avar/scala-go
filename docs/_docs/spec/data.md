@@ -104,8 +104,7 @@ methods do not pass ([Design: object model](../contributing/design.md#object-mod
 
 **Null.** An interface holding a nil pointer is not a nil interface (Go: [Comparison
 operators][go-compare]), so null references of pointer types are converted to `any` through
-`rt.AnyRef`, and null tests on `any` values use `rt.IsNull`. Where an operand misses this
-conversion, `==` throws ([Equality and hashing](language.md#equality-and-hashing)).
+`rt.AnyRef`, and null tests on `any` values use `rt.IsNull`.
 
 **Monitors.** `rt.ObjectHeader` is one atomic pointer (8 bytes; a JVM header is 12–16) to the
 object's monitor (a mutex, a condition, an owner goroutine id, a recursion count, a wait set),

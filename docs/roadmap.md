@@ -71,22 +71,11 @@ fail. A fix makes its case fail: move the check to a case run on both the JVM an
 
 | Bug | Fix in |
 |-----|--------|
-| `a * b + c` on `Double` fuses into one FMA on arm64 and amd64 `GOAMD64=v3`: one rounding instead of two | `FunctionEmitter`: wrap products in explicit `float64(…)`/`float32(…)` |
-| `i + inc()`, where `inc` changes a captured `var i`, reads `i` after the call | Go leaves operand order unspecified: spill operands that read mutable fields |
-| A boxed `Int` or `Long` `==` a boxed `Float` (`val l: Any = 16777217L; val f: Any = 16777216f; l == f`) is `false` (JVM: `true`, compared as `Float`). Literal operands fold correctly | `rt.Equals` |
-| `(1: Any) == BigInt(1)` is `false` (JVM: `true`, via `ScalaNumber`) | `rt.Equals`: `ScalaNumber` on the right |
-| `==` with a null `String` throws `NullPointerException` (JVM: `false`); so do string matches on a null selector | `genArithmetic`: `UnivEq` operands reach `rt.Equals` as a nil `*rt.String` in an `any`. Check `BigInteger`/`BigDecimal` too |
-| `().##` and `().hashCode` are identity hashes (JVM: 0) | `rt`: hash of the unit value |
-| `eq` on Go slices, maps or funcs panics | `refEq` emits `any(a) == any(b)` on uncomparable types |
-| A Go struct with a slice, map or func field is not `==` to itself; an interface field holding an uncomparable value makes `==` throw | `rt.foreignEquals` |
-| `asInstanceOf[Integer]` of a `String` (any pointer-typed operand cast to a box class) does not throw | `LinkContext.castTo`: pointer source, `any` target |
-| With the operand typed `Any`, a cast to a class never instantiated, or to a trait no instantiated class implements, passes any value (JVM: `ClassCastException`) | `LinkContext.castTo`: such casts pass only `null` |
 | A user-defined `given TypeTest` used by `case x: T` does not link (it reaches `ClassTag.unapply`, which needs `Class.isInstance`) | Follows [`Class` type tests](#silent-wrong-output) |
 | `getDeclaringClass` and `java.lang.Enum.valueOf(classOf[E], name)` of a Java-style Scala enum do not link | javalib `Enum` |
-| A `throw` inside an `inline` method reports the inlined source's line (JVM: the call site's) | Plugin: positions of inlined trees |
+| A `throw` inside an `inline` method reports the inlined source's line (JVM: the call site's, but only when an argument was inlined: its line table keeps that argument's line) | Not worth imitating: Dotty keeps the inlined line, as scala-go does |
 | `getSimpleName` of a local class is `""`; of an operator-named class, the text after the last `$` (`List(1).getClass.getSimpleName` is `colon`; JVM: `$colon$colon`) | `rt.ClassGetSimpleName` |
 | `Array(Array(1, 2), Array(3, 4)).transpose` throws `NullPointerException` (reference arrays do not know their element type) | `ClassTag` arrays of arrays |
-| A negative array index throws `RuntimeException`, not `ArrayIndexOutOfBoundsException` | `rt.Caught`: gc's message for negative indices has no length |
 | `@GoExport` on a `val` or constructor field is ignored, without an error | Plugin: reject, as for traits |
 | An export's tuple result is rejected with a misleading message (`cannot instantiate a generic Go function with Scala type scala.Tuple2[…]`) | `Exports`: say tuple results are not supported |
 
