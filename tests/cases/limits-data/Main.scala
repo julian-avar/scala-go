@@ -3,7 +3,7 @@
 // casts" and "Exceptions"): each line prints what scala-go does today; the comment says what the
 // JVM does. When one changes, this case fails: move the line to a case that runs on the JVM too
 // (if it now matches), and update the docs. Pinned elsewhere: the class of Array[String] and of
-// copies (limits-runtime), identity of boxes and lambda toString (limits-runtime), String.format
+// copies (limits-runtime), identity of boxes and lambda toString (limits-runtime), locales
 // (limits-jdk-text).
 case class Point(x: Int)
 class Animal

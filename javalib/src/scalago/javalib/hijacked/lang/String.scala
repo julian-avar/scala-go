@@ -20,6 +20,15 @@ object String:
     elements.forEach(e => joiner.add(e))
     joiner.toString
 
+  def format(format: java.lang.String, args: Array[Object]): java.lang.String =
+    new java.util.Formatter().format(format, args).toString
+
+  def format(l: java.util.Locale, format: java.lang.String, args: Array[Object]): java.lang.String =
+    new java.util.Formatter(l).format(format, args).toString
+
+  def formatted(s: java.lang.String, args: Array[Object]): java.lang.String =
+    new java.util.Formatter().format(s, args).toString
+
   /** The lines of `s`, split at `\n`, `\r` and `\r\n`; a final terminator ends the last line. */
   def lines(s: java.lang.String): java.util.stream.Stream[java.lang.String] =
     val result = new java.util.ArrayList[java.lang.String]()

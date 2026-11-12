@@ -5,41 +5,6 @@ import (
 	"testing"
 )
 
-func TestStringFormatFloatingRoundsLikeJava(t *testing.T) {
-	cases := []struct {
-		format string
-		arg    any
-		want   string
-	}{
-		{"%.2f", 0.125, "0.13"}, // half up on the decimal digits (Go: 0.12)
-		{"%.0f", 2.5, "3"},
-		{"%f", 1099511627774.0 / 3, "366503875924.666700"}, // Double.toString's digits, then zeros
-		{"%.1f", 0.05, "0.1"},
-		{"%.2f", 0.0004, "0.00"},
-		{"%.2f", 0.005, "0.01"},
-		{"%.2f", 99.996, "100.00"},
-		{"%08.2f", -3.14159, "-0003.14"},
-		{"%+.1f", 2.0, "+2.0"},
-		{"%-7.1f|", 2.0, "2.0    |"},
-		{"%(.1f", -2.0, "(2.0)"},
-		{"%f", 0.0, "0.000000"},
-		{"%f", math.Copysign(0, -1), "-0.000000"},
-		{"%f", math.NaN(), "NaN"},
-		{"%f", math.Inf(-1), "-Infinity"},
-		{"%e", 12345.678, "1.234568e+04"},
-		{"%.3e", 0.0, "0.000e+00"},
-		{"%.1e", 9.96, "1.0e+01"},
-		{"%.2e", 1.5e-7, "1.50e-07"},
-		{"%.1f", float32(0.15), "0.2"}, // Float.toString(0.15f) is 0.15
-	}
-	for _, c := range cases {
-		got := StringFormat(Str(c.format), ArrayOf[any](c.arg)).GoString()
-		if got != c.want {
-			t.Errorf("String.format(%q, %v) = %q, want %q", c.format, c.arg, got, c.want)
-		}
-	}
-}
-
 func TestArraysBinarySearchProbesLikeTheJDK(t *testing.T) {
 	a := ArrayOf[int32](1, 2, 2, 2, 2, 2, 3)
 	// The JDK's first probe is index 3.

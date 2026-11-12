@@ -28,7 +28,7 @@ scala-go does not implement is a link error naming it, never a silent difference
 
 ## JDK and Scala libraries
 
-- **Missing JDK classes** include `Scanner`, `java.util.Formatter`, `EnumSet`/`EnumMap`,
+- **Missing JDK classes** include `Scanner`, `EnumSet`/`EnumMap`,
   `Calendar`, `Timer`, `Currency`, `ServiceLoader`, `ResourceBundle`, `java.util.logging`,
   `java.text` (so `StdIn.readf*`), `java.util.jar`, TLS configuration and ciphers, UDP and NIO
   socket channels, HTTP proxies, cookies and authenticators, `PhantomReference` and `Cleaner`.
@@ -38,9 +38,6 @@ scala-go does not implement is a link error naming it, never a silent difference
   `BigInteger`, `System`, `Thread`): listed in [roadmap M3](../contributing/roadmap.md#m3-common-programs)
   and pinned by the `limits-jdk-*` cases. Some break Scala library methods: `math.ulp`,
   `Random.between(Double, Double)`, `BigInt.probablePrime`, `Source.fromResource`.
-- **`String.format` and `f"..."`** throw on argument indices (`%1$s`, `%<s`), the `,` flag, `%h`,
-  `%t`, `%a`, and `BigDecimal` with `%f`, with an `IllegalArgumentException` that names the
-  JDK's exception. Output differences: [Differences](differences.md#text).
 - **Regular expressions** are Go's RE2: no lookaround, backreferences, possessive quantifiers or
   atomic groups. Such a pattern throws `UnsupportedOperationException` when compiled.
 - **Charsets:** UTF-8, ISO-8859-1 and US-ASCII only; `Charset.isSupported` is `false` for others,

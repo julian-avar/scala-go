@@ -1,6 +1,6 @@
 /** Small CPU benchmarks covering what typical Scala code spends its time on: allocation and
  *  pattern matching, numeric loops, immutable and mutable collections, strings, virtual
- *  dispatch, closures, exceptions, monitors, java.util.stream and java.time. Each prints its
+ *  dispatch, closures, exceptions, monitors, java.util.stream, java.time and string formatting. Each prints its
  *  time and a checksum (which must agree between the JVM and Go).
  */
 import scala.collection.mutable
@@ -160,6 +160,13 @@ object Main:
       dt = dt.plusMinutes(7)
     acc
 
+  def formatting(): Long =
+    var acc = 0L
+    for i <- 0 until 200000 do
+      acc += String.format("%d: %s = %5d", i, "name", i * 7).length
+      acc += f"$i%08x ${i * 0.5}%.2f".length
+    acc
+
   def time[A](name: String)(f: => A): Unit =
     val t0 = System.nanoTime()
     val r = f
@@ -185,3 +192,4 @@ object Main:
       time("localDates")(localDates())
       time("instants")(instants())
       time("dateFormat")(dateFormat())
+      time("formatting")(formatting())

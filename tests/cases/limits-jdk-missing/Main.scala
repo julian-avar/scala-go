@@ -5,7 +5,6 @@ object Main:
   def main(args: Array[String]): Unit =
     // java.util
     println(new java.util.Scanner("1 2").nextInt())
-    println(new java.util.Formatter().format("%d", 1))
     println(java.util.EnumSet.noneOf(classOf[java.time.DayOfWeek]))
     println(new java.util.EnumMap[java.time.DayOfWeek, Int](classOf[java.time.DayOfWeek]))
     println(java.util.Calendar.getInstance())
@@ -26,7 +25,6 @@ object Main:
     println(java.text.Collator.getInstance())
     println(java.text.BreakIterator.getWordInstance())
     // java.lang
-    println("a".formatted())
     println(" a ".stripLeading())
     println(" a ".stripTrailing())
     println("a".stripIndent())

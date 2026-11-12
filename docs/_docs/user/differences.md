@@ -40,9 +40,6 @@ wraps, `==` and `hashCode` match the JVM, and uncaught exceptions print JVM-styl
 
 ## Text
 
-- **`String.format` and `f"..."`** map onto Go's `fmt`: `%x`/`%o` of negative numbers, `%g`, the
-  `(` flag and `BigInteger` arguments print differently; some conversions throw
-  ([Limitations](limitations.md#jdk-and-scala-libraries)).
 - **Locales:** no locale data; every locale formats as `Locale.ROOT` (English).
 - **Unicode:** character properties and case mappings follow the Go release's tables (Unicode 16
   with Go 1.27, as in JDK 25).
