@@ -93,21 +93,13 @@ fail. A fix makes its case fail: move the check to a case run on both the JVM an
 
 | Bug | Fix in |
 |-----|--------|
-| `Math.round(0.49999999999999994)` is 1 (JVM: 0); large odd doubles round off by one | `rt.MathRound`: not `floor(d + 0.5)` |
-| `Math.pow(1, NaN)` and `Math.pow(-1, Infinity)` are 1.0 (JVM: NaN); `Math.pow(10, 308)` is `1.0000000000000006E308`, beyond the last-bit allowance; `StrictMath.cbrt(0.5)` is not fdlibm's result | `rt` math natives: Java's special cases; fdlibm for `StrictMath` |
-| `scala.math.BigDecimal(1.5)` and `BigDecimal("1.5") == 1.5` throw `ClassCastException` (`*S_java_dmath_dMathContext is not interface { M_goBits_p_rJ() int64 }`) | javalib `BigDecimal` and `MathContext` |
-| `BigInteger.toByteArray` of negative powers of two has an extra byte (-128 gives `ff 80`); radix 1 throws `RuntimeException` and radix 37 parses (JVM: `NumberFormatException`); `new BigInteger(signum, magnitude)` accepts a signum inconsistent with the magnitude | javalib `BigInteger` |
-| `Double.doubleToRawLongBits(Double.NaN)` is `0x7ff8000000000001`, Go's `math.NaN()` (JVM: `0x7ff8000000000000`) | `rt`: the canonical NaN |
-| `parseDouble` rejects `"2.5F"` and `"-NaN"`, and accepts `"1_000"`, `"infinity"`, `"nan"` and a leading U+00A0; `parseFloat` rounds through `double` (`"1.00000017881393432617187499"` gives `1.0000002`) | javalib `Double`/`Float` parsing |
-| `Integer.toString(i, radix)` and `Long.toString` with a radix out of range throw (JVM: radix 10); `parseInt` of non-ASCII digits (`"١٢٣"`) throws | javalib `Integer`/`Long` |
-| `Character.digit` of non-ASCII digits is -1, and accepts radixes out of range; `isUpperCase`/`isLowerCase` ignore Other_Uppercase/Other_Lowercase (U+2160, `ª`); `isAlphabetic` is `isLetter` | javalib `Character` |
 | `" ".isBlank` is `true` (JVM: `false`); `"abc".indexOf("", 20)` is -1 (JVM: 3); `intern()` of a computed string is not `eq` to the equal literal | javalib `String` |
 | `lastIndexOf` of a supplementary code point is -1; `indexOf(0x110000)` finds U+FFFD | `rt` string search natives |
 | `"aaa".replaceAll("a*", "X")` is `X` (JVM: `XX`); a replacement naming a missing group (`$2`) is ignored (JVM: `IndexOutOfBoundsException`); an invalid pattern (`"("`) throws `UnsupportedOperationException` (JVM: `PatternSyntaxException`) | javalib `regex` on Go's `regexp` |
 | A surrogate's UTF-8 bytes (`ED A0 80`) decode to three U+FFFD (JVM: one), in `new String` and in `CharsetDecoder` | `rt` UTF-8 decoder |
 | `StringBuilder.append(cs, 2, 1)` does nothing (JVM: `IndexOutOfBoundsException`); `appendCodePoint(-1)` appends U+FFFF (JVM: `IllegalArgumentException`); `append(chars, 1, 5)` throws `ArrayIndexOutOfBoundsException`, not `IndexOutOfBoundsException` | javalib `StringBuilder` |
 | `StringBuffer` is not synchronized: concurrent appends lose characters or throw. Not pinned (the result is random) | javalib `StringBuffer` |
-| Exception messages are JDK 8's or Go's: index errors (`index 5, length 3`; JVM: `Index 5 out of bounds for length 3`), `parseInt` (no `under radix N`; radix and null messages), `parseDouble` (`empty String`, `multiple points`), `BigInteger` parsing, `Thread.sleep(-1)`, `Thread.Builder.priority` | javalib: JDK 17+'s messages |
+| Exception messages are JDK 8's or Go's: index errors (`index 5, length 3`; JVM: `Index 5 out of bounds for length 3`), `Thread.sleep(-1)`, `Thread.Builder.priority` | javalib: JDK 17+'s messages |
 | String charsets other than the supported three throw `UnsupportedOperationException`, not `UnsupportedEncodingException`/`UnsupportedCharsetException` | javalib charsets |
 
 ### Silent wrong output

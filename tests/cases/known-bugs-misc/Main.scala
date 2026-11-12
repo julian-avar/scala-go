@@ -21,10 +21,6 @@ object Main:
     val value = 1
 
   def main(args: Array[String]): Unit =
-    // JVM: 0 and 4503599627370497
-    attempt("Math.round(0.49999999999999994)")(Math.round(0.49999999999999994))
-    attempt("Math.round(4503599627370497.0)")(Math.round(4503599627370497.0))
-
     // JVM: true, true (compared as Float)
     val long: Any = 16777217L
     val int: Any = 16777217

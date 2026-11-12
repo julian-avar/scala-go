@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -15,54 +16,197 @@ import (
 // Static methods of java.lang classes (Integer, Long, Double, Character, Math, System) that the
 // linker maps to Go directly.
 
-func numberFormat(s *String) {
-	ThrowKind(NumberFormat, "For input string: \""+ToGoString(s)+"\"")
+// numberFormat throws NumberFormatException.forInputString's exception.
+func numberFormat(s string, radix int32) {
+	msg := "For input string: \"" + s + "\""
+	if radix != 10 {
+		msg += " under radix " + itoa(radix)
+	}
+	ThrowKind(NumberFormat, msg)
 }
 
-func ParseInt(s *String, radix int32) int32 {
+func checkRadix(radix int32) {
+	if radix < minRadix {
+		ThrowKind(NumberFormat, "radix "+itoa(radix)+" less than Character.MIN_RADIX")
+	}
+	if radix > maxRadix {
+		ThrowKind(NumberFormat, "radix "+itoa(radix)+" greater than Character.MAX_RADIX")
+	}
+}
+
+const minRadix, maxRadix = 2, 36
+
+func ParseInt(s *String, radix int32) int32  { return int32(parseInteger(s, radix, math.MinInt32)) }
+func ParseLong(s *String, radix int32) int64 { return parseInteger(s, radix, math.MinInt64) }
+
+// parseInteger is Integer.parseInt and Long.parseLong, for results in [min, -(min+1)]: the
+// digits are Character.digit's (any Unicode decimal digit), accumulated negatively as in the JDK
+// so that min itself does not overflow.
+func parseInteger(s *String, radix int32, min int64) int64 {
 	if s == nil {
-		ThrowKind(NumberFormat, "Cannot parse null string: null")
+		ThrowKind(NumberFormat, "Cannot parse null string")
 	}
-	v, err := strconv.ParseInt(s.GoString(), int(radix), 32)
-	if err != nil {
-		numberFormat(s)
+	checkRadix(radix)
+	chars := s.chars
+	limit := min + 1
+	i, negative := 0, false
+	if len(chars) > 0 && chars[0] < '0' {
+		switch chars[0] {
+		case '-':
+			negative, limit = true, min
+		case '+':
+		default:
+			numberFormat(s.GoString(), radix)
+		}
+		i = 1
 	}
-	return int32(v)
+	if i == len(chars) {
+		numberFormat(s.GoString(), radix)
+	}
+	r := int64(radix)
+	multmin := limit / r
+	var result int64
+	for ; i < len(chars); i++ {
+		d := int64(CharDigit(int32(chars[i]), radix))
+		if d < 0 || result < multmin {
+			numberFormat(s.GoString(), radix)
+		}
+		result *= r
+		if result < limit+d {
+			numberFormat(s.GoString(), radix)
+		}
+		result -= d
+	}
+	if negative {
+		return result
+	}
+	return -result
 }
 
-func ParseLong(s *String, radix int32) int64 {
-	if s == nil {
-		ThrowKind(NumberFormat, "Cannot parse null string: null")
-	}
-	v, err := strconv.ParseInt(s.GoString(), int(radix), 64)
-	if err != nil {
-		numberFormat(s)
-	}
-	return v
-}
+func ParseDouble(s *String) float64 { return parseFloating(s, 64) }
 
-func ParseDouble(s *String) float64 {
-	str := strings.TrimSpace(s.GoString())
-	str = strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(str, "d"), "D"), "f")
-	switch str {
-	case "NaN":
-		return math.NaN()
-	case "Infinity", "+Infinity":
+// ParseFloat rounds once, from the decimal: rounding through a double would round twice.
+func ParseFloat(s *String) float32 { return float32(parseFloating(s, 32)) }
+
+// parseFloating checks the syntax of Double.parseDouble (the JDK's
+// FloatingDecimal.readJavaFormatString), then leaves the rounding to strconv: characters up to
+// ' ' around the number are ignored; an optional sign precedes NaN, Infinity, or a decimal or
+// hexadecimal (0x…p…) number with an optional suffix f, F, d or D.
+func parseFloating(s *String, bitSize int) float64 {
+	t := StringTrim(s).chars
+	if len(t) == 0 {
+		ThrowKind(NumberFormat, "empty String")
+	}
+	body := t
+	if t[0] == '-' || t[0] == '+' {
+		body = t[1:]
+	}
+	switch {
+	case charsEqual(body, "NaN"):
+		return NaN()
+	case charsEqual(body, "Infinity"):
+		if t[0] == '-' {
+			return math.Inf(-1)
+		}
 		return math.Inf(1)
-	case "-Infinity":
-		return math.Inf(-1)
 	}
-	v, err := strconv.ParseFloat(str, 64)
-	if err != nil && !strings.Contains(err.Error(), "out of range") {
-		numberFormat(s)
+	var n int // length of the number in body, without the suffix
+	if len(body) > 1 && body[0] == '0' && (body[1] == 'x' || body[1] == 'X') {
+		n = hexFloatLength(body)
+	} else {
+		n = decimalFloatLength(body)
 	}
+	if n == 0 || !(n == len(body) || n == len(body)-1 && strings.IndexByte("fFdD", byte(body[n])) >= 0) {
+		numberFormat(s.GoString(), 10)
+	}
+	// Out of range: ±Infinity or ±0.0, with an error to ignore.
+	v, _ := strconv.ParseFloat(decodeUTF16(t[:len(t)-len(body)+n]), bitSize)
 	return v
+}
+
+func charsEqual(chars []uint16, s string) bool {
+	if len(chars) != len(s) {
+		return false
+	}
+	for i, c := range chars {
+		if c != uint16(s[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// decimalFloatLength is the length of the decimal number body starts with (digits with at most
+// one point, then an optional exponent), or 0 if there is none.
+func decimalFloatLength(body []uint16) int {
+	i, digits, point := 0, false, false
+	for ; i < len(body); i++ {
+		if c := body[i]; c >= '0' && c <= '9' {
+			digits = true
+		} else if c != '.' {
+			break
+		} else if point {
+			ThrowKind(NumberFormat, "multiple points")
+		} else {
+			point = true
+		}
+	}
+	if !digits {
+		return 0
+	}
+	if i < len(body) && (body[i] == 'e' || body[i] == 'E') {
+		return exponentLength(body, i)
+	}
+	return i
+}
+
+// hexFloatLength is the length of the hexadecimal number body starts with (0x, hexadecimal
+// digits with at most one point, then a binary exponent), or 0 if there is none.
+func hexFloatLength(body []uint16) int {
+	i, digits, point := 2, false, false
+	for ; i < len(body); i++ {
+		if c := body[i]; c >= '0' && c <= '9' || c|0x20 >= 'a' && c|0x20 <= 'f' {
+			digits = true
+		} else if c != '.' || point {
+			break
+		} else {
+			point = true
+		}
+	}
+	if !digits || i == len(body) || body[i] != 'p' && body[i] != 'P' {
+		return 0
+	}
+	return exponentLength(body, i)
+}
+
+// exponentLength is the length up to the end of the exponent at body[at] (e or p, an optional
+// sign and digits), or 0 if it has no digits.
+func exponentLength(body []uint16, at int) int {
+	i := at + 1
+	if i < len(body) && (body[i] == '-' || body[i] == '+') {
+		i++
+	}
+	start := i
+	for i < len(body) && body[i] >= '0' && body[i] <= '9' {
+		i++
+	}
+	if i == start {
+		return 0
+	}
+	return i
 }
 
 func ParseBoolean(s *String) bool { return s != nil && strings.EqualFold(s.GoString(), "true") }
 
-func IntToString(i int32, radix int32) *String  { return Str(strconv.FormatInt(int64(i), int(radix))) }
-func LongToString(i int64, radix int32) *String { return Str(strconv.FormatInt(i, int(radix))) }
+// IntToString and LongToString are toString(i, radix): an out-of-range radix means 10.
+func IntToString(i int32, radix int32) *String { return LongToString(int64(i), radix) }
+
+func LongToString(i int64, radix int32) *String {
+	if radix < minRadix || radix > maxRadix {
+		radix = 10
+	}
+	return Str(strconv.FormatInt(i, int(radix)))
+}
 
 func IntToUnsignedString(i int32, shift uint) *String {
 	return Str(strconv.FormatUint(uint64(uint32(i)), 1<<shift))
@@ -165,13 +309,31 @@ func CharIsWhitespace(c int32) bool {
 func CharIsDigit(c int32) bool         { return unicode.IsDigit(rune(c)) }
 func CharIsLetter(c int32) bool        { return unicode.IsLetter(rune(c)) }
 func CharIsLetterOrDigit(c int32) bool { return unicode.IsLetter(rune(c)) || unicode.IsDigit(rune(c)) }
-func CharIsUpperCase(c int32) bool     { return unicode.IsUpper(rune(c)) }
-func CharIsLowerCase(c int32) bool     { return unicode.IsLower(rune(c)) }
 func CharIsSpaceChar(c int32) bool     { return unicode.In(rune(c), unicode.Zs, unicode.Zl, unicode.Zp) }
 func CharToUpperCase(c int32) int32    { return int32(unicode.ToUpper(rune(c))) }
 func CharToLowerCase(c int32) int32    { return int32(unicode.ToLower(rune(c))) }
 
+// CharIsUpperCase and CharIsLowerCase include Other_Uppercase and Other_Lowercase (Roman
+// numerals, ª), as Character's do.
+func CharIsUpperCase(c int32) bool {
+	return unicode.IsUpper(rune(c)) || unicode.Is(unicode.Other_Uppercase, rune(c))
+}
+
+func CharIsLowerCase(c int32) bool {
+	return unicode.IsLower(rune(c)) || unicode.Is(unicode.Other_Lowercase, rune(c))
+}
+
+// CharIsAlphabetic is Character.isAlphabetic: letters, letter numbers (Nl) and Other_Alphabetic.
+func CharIsAlphabetic(c int32) bool {
+	return unicode.IsLetter(rune(c)) || unicode.In(rune(c), unicode.Nl, unicode.Other_Alphabetic)
+}
+
+// CharDigit is Character.digit: the value of a Unicode decimal digit or of a Latin letter (ASCII
+// or fullwidth), if less than radix; otherwise, or if radix is out of range, -1.
 func CharDigit(c int32, radix int32) int32 {
+	if radix < minRadix || radix > maxRadix {
+		return -1
+	}
 	var d int32 = -1
 	switch {
 	case c >= '0' && c <= '9':
@@ -180,13 +342,37 @@ func CharDigit(c int32, radix int32) int32 {
 		d = c - 'a' + 10
 	case c >= 'A' && c <= 'Z':
 		d = c - 'A' + 10
-	case unicode.IsDigit(rune(c)):
-		d = int32(rune(c) - '0') // approximation for non-ASCII digits
+	case c < 0x80:
+	case c >= 0xff21 && c <= 0xff3a:
+		d = c - 0xff21 + 10
+	case c >= 0xff41 && c <= 0xff5a:
+		d = c - 0xff41 + 10
+	default:
+		d = decimalDigitValue(c)
 	}
 	if d >= radix {
 		return -1
 	}
 	return d
+}
+
+// decimalDigitValue is the value of a decimal digit (category Nd), or -1. Unicode encodes these
+// in runs of ten, 0 to 9, so each of unicode.Nd's ranges starts with a 0.
+func decimalDigitValue(c int32) int32 {
+	if c <= math.MaxUint16 {
+		r := unicode.Nd.R16
+		i := sort.Search(len(r), func(i int) bool { return int32(r[i].Hi) >= c })
+		if i < len(r) && int32(r[i].Lo) <= c {
+			return (c - int32(r[i].Lo)) % 10
+		}
+		return -1
+	}
+	r := unicode.Nd.R32
+	i := sort.Search(len(r), func(i int) bool { return int32(r[i].Hi) >= c })
+	if i < len(r) && int32(r[i].Lo) <= c {
+		return (c - int32(r[i].Lo)) % 10
+	}
+	return -1
 }
 
 func CharForDigit(d int32, radix int32) uint16 {
@@ -201,18 +387,19 @@ func CharForDigit(d int32, radix int32) uint16 {
 
 // ---- Math ---------------------------------------------------------------------------------
 
-func MathRound(d float64) int64 {
-	if math.IsNaN(d) {
-		return 0
-	}
-	return D2L(math.Floor(d + 0.5))
-}
+// MathRound and MathRoundFloat are Math.round: the closest integer, ties toward positive
+// infinity. Not floor(d + 0.5): the sum rounds (0.49999999999999994 + 0.5 is 1).
+func MathRound(d float64) int64 { return D2L(roundTiesUp(d)) }
 
-func MathRoundFloat(f float32) int32 {
-	if f != f {
-		return 0
+func MathRoundFloat(f float32) int32 { return D2I(roundTiesUp(float64(f))) }
+
+// roundTiesUp keeps NaN, which D2L and D2I map to 0. d - floor(d) is exact.
+func roundTiesUp(d float64) float64 {
+	r := math.Floor(d)
+	if d-r >= 0.5 {
+		r++
 	}
-	return D2I(math.Floor(float64(f) + 0.5))
+	return r
 }
 
 func MathSignum(d float64) float64 {

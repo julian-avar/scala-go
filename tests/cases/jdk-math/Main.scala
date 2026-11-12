@@ -1,7 +1,7 @@
 // java.lang.Math and StrictMath: exact operations and their ArithmeticExceptions, floor division,
 // rounding, special values (NaN, infinities, signed zeros), and the transcendental functions
-// (printed to 12 places: the JDK allows Math's results to differ in the last bit).
-// Known differences in pow and cbrt are pinned in known-bugs-jdk.
+// (printed to 12 places: the JDK allows Math's results to differ in the last bit; StrictMath's are
+// printed in full, as they must equal fdlibm's).
 object Main:
   def attempt(label: String)(body: => Any): Unit =
     val r =
@@ -70,10 +70,11 @@ object Main:
   def rounding(): Unit =
     println("== rounding")
     val ds = Seq(0.0, -0.0, 0.4, 0.5, 0.6, 1.5, 2.5, -0.4, -0.5, -0.6, -1.5, -2.5, 1e15 + 0.5, 1e300, -1e300,
-      Double.NaN, Double.PositiveInfinity, Double.NegativeInfinity, Double.MinPositiveValue, -Double.MinPositiveValue)
+      Double.NaN, Double.PositiveInfinity, Double.NegativeInfinity, Double.MinPositiveValue, -Double.MinPositiveValue,
+      0.49999999999999994, -0.49999999999999994, 4503599627370497.0, 4503599627370495.5, 9007199254740991.0, -4503599627370497.0)
     for d <- ds do
       println(s"$d: floor=${Math.floor(d)} ceil=${Math.ceil(d)} rint=${Math.rint(d)} round=${Math.round(d)} roundF=${Math.round(d.toFloat)}")
-    println(s"round(Float) ${Math.round(2.5f)} ${Math.round(-2.5f)} ${Math.round(1e20f)} ${Math.round(-1e20f)} ${Math.round(Float.NaN)}")
+    println(s"round(Float) ${Math.round(2.5f)} ${Math.round(-2.5f)} ${Math.round(1e20f)} ${Math.round(-1e20f)} ${Math.round(Float.NaN)} ${Math.round(0.49999997f)} ${Math.round(8388609f)} ${Math.round(-0.5f)}")
     println(s"RichDouble ${2.5.round} ${(-2.5).round} ${2.7.floor} ${2.2.ceil}")
 
   def special(): Unit =
@@ -85,6 +86,8 @@ object Main:
     println(s"max/min ${Math.max(Int.MinValue, -1)} ${Math.min(Long.MaxValue, 0L)} ${Math.max(Double.NaN, 1.0)} ${Math.min(Double.NaN, 1.0)} ${Math.max(1.0f, 2.0f)} ${Math.min(-0.0, 0.0)}")
     println(s"exact ${Math.sqrt(2.25)} ${Math.sqrt(1e-300)} ${Math.cbrt(-27.0)} ${Math.cbrt(1e-300)} ${Math.hypot(3, 4)} ${Math.hypot(Double.NaN, Double.PositiveInfinity)} ${Math.hypot(-5e200, 12e200)}")
     println(s"pow ${Math.pow(2, 10)} ${Math.pow(-2, 3)} ${Math.pow(2, -2)} ${Math.pow(0, 0)} ${Math.pow(Double.NaN, 0)} ${Math.pow(-8, 1.0 / 3)} ${Math.pow(-0.0, -1)} ${Math.pow(-0.0, -2)} ${Math.pow(10, 22)} ${Math.pow(2, 1023)} ${Math.pow(10, 309)}")
+    println(s"pow special ${Math.pow(1, Double.NaN)} ${Math.pow(-1, Double.PositiveInfinity)} ${Math.pow(-1, Double.NegativeInfinity)} ${Math.pow(1, Double.PositiveInfinity)} ${Math.pow(Double.NaN, 1)} ${Math.pow(2, Double.NaN)} ${Math.pow(0.5, Double.PositiveInfinity)} ${Math.pow(2, Double.NegativeInfinity)} ${Math.pow(-0.0, 3)} ${Math.pow(-8, 3)} ${Math.pow(Double.NegativeInfinity, 3)} ${Math.pow(Double.NegativeInfinity, -3)}")
+    println(s"pow accuracy ${Math.pow(10, 308)} ${Math.pow(10, -300)} ${Math.pow(1.0001, 10000)} ${Math.pow(3, 100)} ${Math.pow(7, -50)} ${Math.pow(Math.E, 700)}")
     println(s"log ${Math.log(0)} ${Math.log(-1)} ${Math.log(1)} ${Math.log10(1000)} ${Math.log10(0.001)} ${Math.log10(-0.0)} ${Math.log1p(-1)} ${Math.log1p(0)} ${Math.exp(0)} ${Math.exp(Double.NegativeInfinity)} ${Math.expm1(0)} ${Math.exp(1000)}")
     println(s"trig ${Math.sin(0)} ${Math.sin(-0.0)} ${Math.cos(0)} ${Math.tan(-0.0)} ${Math.asin(2)} ${Math.acos(1)} ${Math.atan(Double.PositiveInfinity) == Math.PI / 2} ${Math.sin(Double.PositiveInfinity)}")
     println(s"atan2 ${Math.atan2(0.0, -0.0) == Math.PI} ${Math.atan2(-0.0, -0.0) == -Math.PI} ${Math.atan2(0.0, 0.0)} ${Math.atan2(-0.0, 0.0)} ${Math.atan2(1, 0) == Math.PI / 2} ${Math.atan2(Double.NaN, 1)}")
@@ -109,5 +112,13 @@ object Main:
     println("== StrictMath")
     println(s"${StrictMath.sqrt(16)} ${StrictMath.abs(-3)} ${StrictMath.max(2, 9)} ${StrictMath.floor(-1.5)} ${StrictMath.ceil(-1.5)} ${StrictMath.round(2.5)} ${StrictMath.floorMod(-7, 3)} ${StrictMath.floorDiv(-7, 3)}")
     println(s"${approx(StrictMath.sin(1))} ${approx(StrictMath.exp(1))} ${approx(StrictMath.log(10))} ${StrictMath.pow(3, 4)} ${StrictMath.hypot(5, 12)} ${StrictMath.cbrt(64)} ${StrictMath.signum(-9.0)} ${StrictMath.rint(3.5)}")
+    // fdlibm's results, bit for bit.
+    val xs = Seq(0.5, 1.0, 1e-5, 0.1, 2.0, 3.0, 10.0, -0.75, 100.5, 12345.678, 1e22, 1e-300, 709.7, 0.3, 1.5707963267948966)
+    for x <- xs do
+      println(s"$x: sin=${StrictMath.sin(x)} cos=${StrictMath.cos(x)} tan=${StrictMath.tan(x)} atan=${StrictMath.atan(x)} exp=${StrictMath.exp(x)} " +
+        s"expm1=${StrictMath.expm1(x)} sinh=${StrictMath.sinh(x)} cosh=${StrictMath.cosh(x)} tanh=${StrictMath.tanh(x)} cbrt=${StrictMath.cbrt(x)}")
+      println(s"$x: log=${StrictMath.log(x)} log10=${StrictMath.log10(x)} log1p=${StrictMath.log1p(x)} asin=${StrictMath.asin(x / 100)} acos=${StrictMath.acos(x / 100)} " +
+        s"pow=${StrictMath.pow(x, 2.7)} pow2=${StrictMath.pow(1.0001, x)} atan2=${StrictMath.atan2(x, 0.3)} hypot=${StrictMath.hypot(x, 7)}")
+    println(s"StrictMath.cbrt ${StrictMath.cbrt(0.5)} ${StrictMath.cbrt(-3.0)} ${StrictMath.cbrt(1e-310)} ${StrictMath.pow(10, 308)} ${StrictMath.pow(1, Double.NaN)} ${StrictMath.pow(-1, Double.PositiveInfinity)}")
     attempt("StrictMath.addExact")(StrictMath.addExact(Int.MaxValue, 1))
     attempt("StrictMath.toIntExact")(StrictMath.toIntExact(Long.MaxValue))

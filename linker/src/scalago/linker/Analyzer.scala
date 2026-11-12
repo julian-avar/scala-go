@@ -175,6 +175,7 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
         scan(expr)
 
       case New(cls, ctor, args) =>
+        Natives.calledBy(cls, ctor).foreach(callVirtual)
         if Natives.lookup(cls, ctor).isEmpty then
           program.get(cls) match
             case Some(c) if program.isInstantiable(c) && program.findMethod(cls, ctor).isDefined =>
