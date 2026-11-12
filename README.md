@@ -114,8 +114,10 @@ and runs the binary. Both outputs must equal `expected.txt`. Optional files chan
 | `env.txt`           | environment variables, `NAME=value` lines (such as a fixed `TZ`)        |
 | `exit-status.txt`   | expected exit status (default 0; an uncaught exception exits with 1)    |
 | `go-only.txt`       | skips the JVM run (the program calls Go); says why                      |
-| `facades.txt`       | Go packages to generate facades of (package `gofacades`); `facades-<name>.txt` adds a set compiled first, in package `<name>`; `facade-notes.txt` lists notes the generator must give |
+| `facades.txt`       | Go packages to generate facades of (package `gofacades`); `facades-<name>.txt` adds a set compiled first, in package `<name>`; `facade-notes.txt` lists notes the generator must give; `facade-left-out.txt` members it must leave out |
+| `compile-errors.txt` | errors compiling must report, instead of running                       |
 | `link-errors.txt`   | errors linking must report, instead of running                          |
+| `go-errors.txt`     | errors `go vet` and `go build` must report on the linked code (known bugs only) |
 | `missing-apis.txt`  | links with `--missing-apis throw`                                       |
 | `race.txt`          | also runs under Go's race detector; `allow-race: <Go function>` lines tolerate known races in third-party libraries |
 | `library.txt`       | links the case as a library, used by the Go program in `consumer/`      |

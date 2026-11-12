@@ -13,6 +13,10 @@ import scala.util.Using
 /** For each directory under `tests/cases/`: compiles its `.scala` files with the plugin, runs the
  *  program on the JVM and as Go, and checks that both print exactly `expected.txt`.
  *
+ *  Cases that pin a limitation or a known bug instead expect it to fail: `compile-errors.txt`,
+ *  `link-errors.txt` and `go-errors.txt` list errors that must occur. Cases named `limits-*` and
+ *  `known-bugs*` pin what does not work yet (see README.md, "End-to-end tests").
+ *
  *  Cases run concurrently (`SCALAGO_TEST_PARALLELISM`, by default a quarter of the processors,
  *  since each `go build` is itself parallel); each test waits for its own case.
  */
@@ -67,7 +71,9 @@ class EndToEndTests extends munit.FunSuite:
 
   private def runCase(dir: Path): Unit =
     val expectedErrors = dir.resolve("link-errors.txt")
-    val expected = if Files.exists(expectedErrors) then "" else Files.readString(dir.resolve("expected.txt"), UTF_8)
+    // Cases that must fail (compile, link or Go errors) have no expected output.
+    val expectedFile = dir.resolve("expected.txt")
+    val expected = if Files.exists(expectedFile) then Files.readString(expectedFile, UTF_8) else ""
     // The entry point is `Main` unless the case names another one in `main.txt`.
     val mainClass =
       if Files.exists(dir.resolve("main.txt")) then Files.readString(dir.resolve("main.txt"), UTF_8).trim else "Main"
@@ -103,7 +109,24 @@ class EndToEndTests extends munit.FunSuite:
         if Files.exists(notesFile) then
           for line <- Files.readAllLines(notesFile, UTF_8).asScala if line.trim.nonEmpty do
             assert(result.notes.exists(_.contains(line.trim)), s"missing FacadeGen note: $line\nnotes:\n${result.notes.mkString("\n")}")
+        // `facade-left-out.txt` lists members that the generated facades must leave out (their
+        // `// not generated:` comments).
+        val leftOutFile = dir.resolve("facade-left-out.txt")
+        if Files.exists(leftOutFile) then
+          val leftOut = result.files.flatMap(f => Files.readAllLines(f, UTF_8).asScala).map(_.trim)
+            .collect { case s"// not generated: $member" => member }
+          for line <- Files.readAllLines(leftOutFile, UTF_8).asScala if line.trim.nonEmpty do
+            assert(leftOut.exists(_.contains(line.trim)), s"not left out: $line\nleft out:\n${leftOut.mkString("\n")}")
         result.files
+    // `compile-errors.txt`: the case must fail to compile, with (at least) the errors it lists.
+    val expectedCompileErrors = dir.resolve("compile-errors.txt")
+    if Files.exists(expectedCompileErrors) then
+      val errors = compileErrors(sourcesIn(dir) ++ generated, classes, dependencies)
+      assert(errors.nonEmpty, "compilation succeeded; compile-errors.txt expects errors")
+      for line <- Files.readAllLines(expectedCompileErrors, UTF_8).asScala if line.trim.nonEmpty do
+        assert(errors.exists(_.contains(line.trim)), s"missing compile error: $line\nactual errors:\n${errors.mkString("\n")}")
+      deleteRecursively(work)
+      return
     compile(sourcesIn(dir) ++ generated, classes, dependencies)
     // A library (`library.txt`) is linked and used by the Go module in `consumer/`.
     val isLibrary = Files.exists(dir.resolve("library.txt"))
@@ -126,7 +149,20 @@ class EndToEndTests extends munit.FunSuite:
     )
     val goDir = work.resolve("go")
     val classpath = (classes +: dependencies) ++ (Path.of(userLibrary) +: extraIR) ++ libraryIR
-    if Files.exists(expectedErrors) then
+    // `go-errors.txt` (known bugs only): the case links, but Go rejects the generated code, or
+    // for a library the consumer using it, with (at least) the errors it lists.
+    val expectedGoErrors = dir.resolve("go-errors.txt")
+    if Files.exists(expectedGoErrors) then
+      Linker.link(classpath, goDir, config)
+      val vetDirs = if isLibrary then Seq(goDir, copyConsumer(dir, work, goDir)) else Seq(goDir)
+      // go vet reports only the first type error; go build reports them all.
+      val output = vetDirs.iterator.map(d => (d, runStatus(Seq("go", "vet", "./..."), d, goEnv))).collectFirst {
+        case (d, (exit, vet)) if exit != 0 => vet + runStatus(Seq("go", "build", "./..."), d, goEnv)._2
+      }.getOrElse(fail("go vet passed; go-errors.txt expects errors"))
+      for line <- Files.readAllLines(expectedGoErrors, UTF_8).asScala if line.trim.nonEmpty do
+        assert(output.contains(line.trim), s"missing Go error: $line\ngo vet and go build output:\n$output")
+      deleteRecursively(work)
+    else if Files.exists(expectedErrors) then
       // The case must fail to link, with (at least) the errors listed in `link-errors.txt`.
       val e = intercept[Linker.LinkingException](Linker.link(classpath, goDir, config))
       for line <- Files.readAllLines(expectedErrors, UTF_8).asScala if line.trim.nonEmpty do
@@ -135,11 +171,7 @@ class EndToEndTests extends munit.FunSuite:
     else if isLibrary then
       Linker.link(classpath, goDir, config)
       assertEquals(run(Seq("go", "vet", "./..."), goDir, goEnv), "", "go vet output (library)")
-      val consumer = copyDirectory(dir.resolve("consumer"), work.resolve("consumer"))
-      Files.writeString(consumer.resolve("go.mod"),
-        s"\nrequire $LibraryModule v0.0.0\n\nreplace $LibraryModule => ${goDir.toAbsolutePath}\n",
-        java.nio.file.StandardOpenOption.APPEND)
-      runGo(consumer, expected, raceCheck(dir), io)
+      runGo(copyConsumer(dir, work, goDir), expected, raceCheck(dir), io)
       deleteRecursively(work)
     else
       linkAndRun(classpath, goDir, config, expected, raceCheck(dir), io)
@@ -147,6 +179,14 @@ class EndToEndTests extends munit.FunSuite:
 
   /** Module path of libraries linked by the tests (their consumers import it). */
   private val LibraryModule = "scalagolib"
+
+  /** The case's Go program `consumer/`, set up to use the library linked into `goDir`. */
+  private def copyConsumer(dir: Path, work: Path, goDir: Path): Path =
+    val consumer = copyDirectory(dir.resolve("consumer"), work.resolve("consumer"))
+    Files.writeString(consumer.resolve("go.mod"),
+      s"\nrequire $LibraryModule v0.0.0\n\nreplace $LibraryModule => ${goDir.toAbsolutePath}\n",
+      java.nio.file.StandardOpenOption.APPEND)
+    consumer
 
   private def copyDirectory(from: Path, to: Path): Path =
     Using.resource(Files.walk(from)) { paths =>
@@ -258,14 +298,25 @@ class EndToEndTests extends munit.FunSuite:
     FacadeGen.run(FacadeGen.Config(scalaPackage, packages, goRequires, goModules, classpath), work.resolve(s"facades-$scalaPackage"))
 
   private def compile(sources: Seq[Path], outDir: Path, dependencies: Seq[Path]): Unit =
-    val args = Array(
+    val reporter = dotty.tools.dotc.Main.process(compilerArgs(sources, outDir, dependencies))
+    assert(!reporter.hasErrors, s"compilation of ${sources.mkString(", ")} failed (see output above)")
+
+  /** Compiles, returning the errors as `File.scala:line:column: message`. */
+  private def compileErrors(sources: Seq[Path], outDir: Path, dependencies: Seq[Path]): Seq[String] =
+    val reporter = dotty.tools.dotc.Main.process(compilerArgs(sources, outDir, dependencies),
+      dotty.tools.dotc.reporting.StoreReporter(null))
+    reporter.allErrors.map { e =>
+      val pos = e.pos
+      if pos.exists then s"${pos.source.name}:${pos.line + 1}:${pos.column + 1}: ${e.message}" else e.message
+    }
+
+  private def compilerArgs(sources: Seq[Path], outDir: Path, dependencies: Seq[Path]): Array[String] =
+    Array(
       "-d", outDir.toString,
       "-classpath", compileClasspath(dependencies).mkString(File.pathSeparator),
       s"-Xplugin:$pluginClasspath",
       "-color:never"
     ) ++ sources.map(_.toString)
-    val reporter = dotty.tools.dotc.Main.process(args)
-    assert(!reporter.hasErrors, s"compilation of ${sources.mkString(", ")} failed (see output above)")
 
   private def javaBinary: String = Path.of(sys.props("java.home"), "bin", "java").toString
 
@@ -274,12 +325,17 @@ class EndToEndTests extends munit.FunSuite:
    */
   private def run(command: Seq[String], cwd: Path, env: Map[String, String] = Map.empty,
       io: ProgramIO = ProgramIO(None, 0)): String =
+    val (exit, output) = runStatus(command, cwd, env, io)
+    assertEquals(exit, io.exitStatus, s"`${command.mkString(" ")}` exited with $exit:\n$output")
+    output
+
+  /** Runs a process to completion. Returns its exit status and stdout+stderr. */
+  private def runStatus(command: Seq[String], cwd: Path, env: Map[String, String] = Map.empty,
+      io: ProgramIO = ProgramIO(None, 0)): (Int, String) =
     val builder = ProcessBuilder(command.asJava).directory(cwd.toFile).redirectErrorStream(true)
     builder.environment.putAll((io.env ++ env).asJava)
     io.stdin.foreach(f => builder.redirectInput(f.toFile))
     val process = builder.start()
     if io.stdin.isEmpty then process.getOutputStream.close()
     val output = String(process.getInputStream.readAllBytes(), UTF_8)
-    val exit = process.waitFor()
-    assertEquals(exit, io.exitStatus, s"`${command.mkString(" ")}` exited with $exit:\n$output")
-    output
+    (process.waitFor(), output)
