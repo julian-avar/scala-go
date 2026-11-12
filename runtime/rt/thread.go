@@ -2,9 +2,11 @@ package rt
 
 import (
 	"os"
+	"os/signal"
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 )
 
@@ -21,6 +23,26 @@ type threadState struct {
 	wake        chan struct{} // signaled (without blocking) by interrupt
 	permit      chan struct{} // LockSupport's permit: full when available
 	parkTimer   *time.Timer   // for timed parks, reused (only the thread itself parks)
+	blockedIn   atomic.Int32  // what the thread waits for, for Thread.getState
+}
+
+// What a thread waits for (threadState.blockedIn): javalib's Thread.getState maps these to its
+// states.
+const (
+	notBlocked       int32 = iota
+	blockedOnMonitor       // BLOCKED: entering a monitor another thread holds
+	waiting                // WAITING: wait, join, park
+	timedWaiting           // TIMED_WAITING: sleep, and wait, join and park with a timeout
+)
+
+// ThreadBlockedIn returns what the thread whose state is given waits for (Thread.getState).
+func ThreadBlockedIn(state any) int32 { return state.(*threadState).blockedIn.Load() }
+
+// setBlockedIn records what t (nil for a goroutine without a Thread) waits for.
+func (t *threadState) setBlockedIn(how int32) {
+	if t != nil {
+		t.blockedIn.Store(how)
+	}
 }
 
 var (
@@ -80,7 +102,11 @@ func (t *threadState) block(done <-chan struct{}, timeout time.Duration) bool {
 		timer := time.NewTimer(timeout)
 		defer timer.Stop()
 		expired = timer.C
+		t.setBlockedIn(timedWaiting)
+	} else {
+		t.setBlockedIn(waiting)
 	}
+	defer t.setBlockedIn(notBlocked)
 	var wake chan struct{}
 	if t != nil {
 		wake = t.wake
@@ -258,7 +284,11 @@ func Park(state any, nanos int64) {
 		}
 		defer stopTimer(t.parkTimer)
 		expired = t.parkTimer.C
+		t.setBlockedIn(timedWaiting)
+	} else {
+		t.setBlockedIn(waiting)
 	}
+	defer t.setBlockedIn(notBlocked)
 	for {
 		select {
 		case <-t.permit:
@@ -297,11 +327,19 @@ func Unpark(state any) {
 	}
 }
 
+// checkTimeout checks the arguments of Thread.sleep and Object.wait, with the JDK's messages.
+func checkTimeout(millis int64, nanos int32) {
+	if millis < 0 {
+		ThrowKind(IllegalArgument, "timeout value is negative")
+	}
+	if nanos < 0 || nanos > 999999 {
+		ThrowKind(IllegalArgument, "nanosecond timeout value out of range")
+	}
+}
+
 // Sleep implements Thread.sleep: interruptible.
 func Sleep(millis int64, nanos int32) {
-	if millis < 0 || nanos < 0 || nanos > 999999 {
-		ThrowKind(IllegalArgument, "timeout value is negative or out of range")
-	}
+	checkTimeout(millis, nanos)
 	t := currentThreadState(GoID())
 	if t != nil && t.interrupted.Swap(false) {
 		ThrowKind(Interrupted, "sleep interrupted")
@@ -318,21 +356,25 @@ func Sleep(millis int64, nanos int32) {
 
 func Yield() { runtime.Gosched() }
 
-// RunMain runs the program's entry point like the JVM's launcher: an uncaught exception is
-// reported, the program waits for the non-daemon threads it started, runs the shutdown hooks,
-// then exits (with status 1 after an uncaught exception in main).
+// EndMainThread ends the main thread's Thread object when main returns or throws (the
+// throwable, else nil): it gives the exception to the uncaught-exception handlers and terminates
+// the Thread. Programs that use threads install it (javalib's Thread.exitMain).
+var EndMainThread func(throwable any)
+
+// RunMain runs the program's entry point like the JVM's launcher: the main thread ends (an
+// exception it throws is handled as in other threads), the program waits for the non-daemon
+// threads it started, runs the shutdown hooks, then exits (with status 1 after an uncaught
+// exception in main). SIGINT, SIGTERM and SIGHUP also run the shutdown hooks, and exit with
+// status 128 + the signal's number, as on the JVM.
 func RunMain(body func()) {
 	mainGoroutine.Store(GoID())
-	status := 0
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				ReportUncaught("main", Caught(r))
-				status = 1
-			}
-		}()
-		body()
-	}()
+	exitOnSignals()
+	thrown := Try(body)
+	if EndMainThread != nil {
+		EndMainThread(thrown)
+	} else if thrown != nil {
+		ReportUncaught("main", thrown)
+	}
 	liveMu.Lock()
 	for liveCount > 0 {
 		liveCond.Wait()
@@ -340,7 +382,17 @@ func RunMain(body func()) {
 	liveMu.Unlock()
 	runShutdownHooks()
 	FlushStdout()
-	if status != 0 {
-		os.Exit(status)
+	if thrown != nil {
+		os.Exit(1)
 	}
+}
+
+// exitOnSignals makes SIGINT, SIGTERM and SIGHUP exit as System.exit does.
+func exitOnSignals() {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	go func() {
+		s := <-signals
+		Exit(128 + int32(s.(syscall.Signal)))
+	}()
 }

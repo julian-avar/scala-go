@@ -25,8 +25,20 @@ type InitLock struct {
 	mu      sync.Mutex
 	owner   uint64        // goroutine running the initializer, 0 if none
 	failed  bool          // the initializer threw: later uses fail, as on the JVM
+	failure any           // what InitializerRecorded made of the exception
 	running chan struct{} // closed when the running initializer finishes
 }
+
+// The exceptions of failed initializers, as the JVM makes them: functions the generated program
+// installs (javalib's scalago.runtime.Initializers). The use that runs an initializer that
+// throws a Throwable throws InitializerThrown's result (an ExceptionInInitializerError unless the
+// Throwable is an Error); later uses throw InitializerNoClassDefFound's, whose cause is what
+// InitializerRecorded made of the Throwable.
+var (
+	InitializerThrown          func(throwable any) any
+	InitializerRecorded        func(throwable any) any
+	InitializerNoClassDefFound func(className, recorded any) any
+)
 
 // Done reports whether initialization has completed (the fast path, inlined at call sites).
 func (l *InitLock) Done() bool { return l.done.Load() }
@@ -43,7 +55,11 @@ func (l *InitLock) Run(className string, init func()) {
 			l.mu.Unlock()
 			return
 		case l.failed:
+			failure := l.failure
 			l.mu.Unlock()
+			if failure != nil && InitializerNoClassDefFound != nil {
+				panic(Exc(InitializerNoClassDefFound(Str(className), failure)))
+			}
 			ThrowKind(NoClassDefFound, "Could not initialize class "+className)
 		case l.owner == g:
 			l.mu.Unlock()
@@ -65,15 +81,32 @@ func (l *InitLock) Run(className string, init func()) {
 func (l *InitLock) run(init func()) {
 	ok := false
 	defer func() {
+		var thrown, failure any
+		if !ok {
+			if r := recover(); r != nil {
+				thrown = Caught(r)
+				// Before releasing the lock: other threads must find the failure.
+				if InitializerRecorded != nil {
+					failure = InitializerRecorded(thrown)
+				}
+				if InitializerThrown != nil {
+					thrown = InitializerThrown(thrown)
+				}
+			}
+		}
 		l.mu.Lock()
 		l.owner = 0
 		if ok {
 			l.done.Store(true)
 		} else {
 			l.failed = true
+			l.failure = failure
 		}
 		close(l.running)
 		l.mu.Unlock()
+		if thrown != nil {
+			panic(Exc(thrown))
+		}
 	}()
 	init()
 	ok = true
@@ -132,8 +165,13 @@ func newMonitor() *Monitor {
 }
 
 func (m *Monitor) acquire(g uint64, count int) {
-	for m.owner != 0 && m.owner != g {
-		m.free.Wait()
+	if m.owner != 0 && m.owner != g {
+		t := currentThreadState(g)
+		t.setBlockedIn(blockedOnMonitor)
+		for m.owner != 0 && m.owner != g {
+			m.free.Wait()
+		}
+		t.setBlockedIn(notBlocked)
 	}
 	m.owner = g
 	m.count += count
@@ -183,9 +221,7 @@ func Synchronized(x any, body func()) {
 
 // ObjectWait implements Object.wait(timeoutMillis, nanos); zero means no timeout.
 func ObjectWait(x any, millis int64, nanos int32) {
-	if millis < 0 || nanos < 0 || nanos > 999999 {
-		ThrowKind(IllegalArgument, "timeout value is negative or out of range")
-	}
+	checkTimeout(millis, nanos)
 	m := MonitorOf(x)
 	m.wait(&m.waiters, time.Duration(millis)*time.Millisecond+time.Duration(nanos))
 }

@@ -1,0 +1,1 @@
+The child process runs the Go binary itself; expected.txt is what the JVM does.

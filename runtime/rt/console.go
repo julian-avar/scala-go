@@ -2,29 +2,59 @@ package rt
 
 import (
 	"bufio"
+	"bytes"
 	"os"
 	"strconv"
 	"sync"
+	"time"
 	"unicode/utf16"
 	"unicode/utf8"
 )
 
 // Standard output is buffered and flushed at exit, before writing to standard error, before
-// reading standard input and around calls into Go code, which keeps println fast. Standard error
-// is unbuffered. Writes are atomic: concurrent printlns do not interleave within a line.
+// reading standard input and around calls into Go code, which keeps println fast. On a terminal,
+// lines are also flushed as they end; otherwise, output is flushed at most flushDelay after it was
+// written, so that little is lost when a Go fatal error ends the process. Standard error is
+// unbuffered. Writes are atomic: concurrent printlns do not interleave within a line.
 //
 // System.out and System.err (javalib's java.io.PrintStream for the console) print through
 // ConsoleWrite and ConsoleWriteLine: one call per print or println, which transcodes the value
 // straight into the buffer.
 var (
-	stdoutMu sync.Mutex
-	stdout   = bufio.NewWriterSize(os.Stdout, 32*1024)
+	stdoutMu         sync.Mutex
+	stdout           = bufio.NewWriterSize(os.Stdout, 32*1024)
+	stdoutIsTerminal = isTerminal(os.Stdout)
+	flushTimer       *time.Timer // flushes the output written since the buffer was last empty
 )
+
+const flushDelay = 100 * time.Millisecond
+
+func isTerminal(f *os.File) bool {
+	info, err := f.Stat()
+	return err == nil && info.Mode()&os.ModeCharDevice != 0
+}
 
 func writeStdoutBytes(b []byte) {
 	stdoutMu.Lock()
+	wasEmpty := stdout.Buffered() == 0
 	stdout.Write(b)
+	written(wasEmpty, bytes.IndexByte(b, '\n') >= 0)
 	stdoutMu.Unlock()
+}
+
+// written applies the flush policy after a write to standard output's buffer (stdoutMu held):
+// `wasEmpty` tells whether the buffer was empty before, `line` whether a line ended.
+func written(wasEmpty, line bool) {
+	switch {
+	case stdoutIsTerminal && line:
+		stdout.Flush()
+	case wasEmpty && stdout.Buffered() > 0:
+		if flushTimer == nil {
+			flushTimer = time.AfterFunc(flushDelay, FlushStdout)
+		} else {
+			flushTimer.Reset(flushDelay)
+		}
+	}
 }
 
 func FlushStdout() {
@@ -56,6 +86,7 @@ func ConsoleWrite(stderr bool, x any, newline bool) {
 		return
 	}
 	stdoutMu.Lock()
+	wasEmpty := stdout.Buffered() == 0
 	buf := stdout.AvailableBuffer()
 	if direct {
 		buf = appendValue(buf, x)
@@ -66,6 +97,7 @@ func ConsoleWrite(stderr bool, x any, newline bool) {
 		buf = append(buf, '\n')
 	}
 	stdout.Write(buf)
+	written(wasEmpty, newline || (stdoutIsTerminal && bytes.IndexByte(buf, '\n') >= 0))
 	stdoutMu.Unlock()
 }
 

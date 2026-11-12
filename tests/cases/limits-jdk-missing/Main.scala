@@ -52,7 +52,6 @@ object Main:
     println(Integer.parseUnsignedInt("1"))
     println(java.lang.Long.parseUnsignedLong("1"))
     println(System.console())
-    println(System.gc())
     println(System.runFinalization())
     println(Thread.currentThread().getStackTrace.length)
     println(Thread.currentThread().getContextClassLoader)

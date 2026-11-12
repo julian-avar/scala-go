@@ -64,16 +64,16 @@ object Main:
   def main(args: Array[String]): Unit =
     println(s"A.x=${A.x} B.y=${B.y}")
 
-    // The JVM wraps the first failure in ExceptionInInitializerError, scala-go does not (see the
-    // spec), so only what both agree on is printed: the original exception, then
-    // NoClassDefFoundError.
+    // The first access throws ExceptionInInitializerError, caused by the original exception;
+    // later ones NoClassDefFoundError, caused by an ExceptionInInitializerError that names it.
     try println(Failing.v)
     catch
-      case e: Throwable =>
-        val original = if e.getCause != null then e.getCause else e
-        println(s"Failing, first access: ${original.getMessage}")
+      case e: ExceptionInInitializerError =>
+        println(s"Failing, first access: ${e.getClass.getName} ${e.getMessage} ${e.getCause.getMessage} ${e.getException eq e.getCause}")
     try println(Failing.v)
-    catch case e: NoClassDefFoundError => println(s"Failing, second access: ${e.getMessage}")
+    catch
+      case e: NoClassDefFoundError =>
+        println(s"Failing, second access: ${e.getMessage}, cause ${e.getCause.getClass.getName}: ${e.getCause.getMessage}")
 
     val r = Retry()
     for _ <- 1 to 3 do

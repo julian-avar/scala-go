@@ -49,7 +49,7 @@ Each item is a silent or surprising deviation from the JVM; the spec marks those
 ### Known bugs
 
 All **S**. Each is pinned by an end-to-end case named after its area: `known-bugs-lang`,
-`-expr`, `-runtime`, `-jdk`, `-scala-lib`, `-interop`, and `-misc` (several areas, found first).
+`-expr`, `-jdk`, `-scala-lib`, `-interop`, and `-misc` (several areas, found first).
 Cases ending in `-go-errors`, `-links` or the like expect `go vet`, `go build` or the linker to
 fail. A fix makes its case fail: move the check to a case run on both the JVM and Go.
 
@@ -81,29 +81,11 @@ fail. A fix makes its case fail: move the check to a case run on both the JVM an
 | A Go struct with a slice, map or func field is not `==` to itself; an interface field holding an uncomparable value makes `==` throw | `rt.foreignEquals` |
 | `asInstanceOf[Integer]` of a `String` (any pointer-typed operand cast to a box class) does not throw | `LinkContext.castTo`: pointer source, `any` target |
 | With the operand typed `Any`, a cast to a class never instantiated, or to a trait no instantiated class implements, passes any value (JVM: `ClassCastException`) | `LinkContext.castTo`: such casts pass only `null` |
-| A user-defined `given TypeTest` used by `case x: T` does not link (it reaches `ClassTag.unapply`, which needs `Class.isInstance`) | Follows [`Class` type tests](#silent-wrong-output) |
-| `getDeclaringClass` and `java.lang.Enum.valueOf(classOf[E], name)` of a Java-style Scala enum do not link | javalib `Enum` |
 | A `throw` inside an `inline` method reports the inlined source's line (JVM: the call site's) | Plugin: positions of inlined trees |
-| `getSimpleName` of a local class is `""`; of an operator-named class, the text after the last `$` (`List(1).getClass.getSimpleName` is `colon`; JVM: `$colon$colon`) | `rt.ClassGetSimpleName` |
 | `Array(Array(1, 2), Array(3, 4)).transpose` throws `NullPointerException` (reference arrays do not know their element type) | `ClassTag` arrays of arrays |
 | A negative array index throws `RuntimeException`, not `ArrayIndexOutOfBoundsException` | `rt.Caught`: gc's message for negative indices has no length |
 | `@GoExport` on a `val` or constructor field is ignored, without an error | Plugin: reject, as for traits |
 | An export's tuple result is rejected with a misleading message (`cannot instantiate a generic Go function with Scala type scala.Tuple2[…]`) | `Exports`: say tuple results are not supported |
-
-#### Runtime and threads
-
-| Bug | Fix in |
-|-----|--------|
-| Uncaught exceptions in `main` skip `Thread.setDefaultUncaughtExceptionHandler` | `rt.RunMain` |
-| An overridden `ThreadGroup.uncaughtException` is never called; with a default handler set, `getUncaughtExceptionHandler` returns it (JVM: the group); a default handler that throws ends the program with a Go panic, exit 2 (JVM: prints the exception, continues) | javalib `Thread.uncaught` |
-| `getState` is `RUNNABLE` in `sleep`, `wait`, `join` and while blocked on a monitor (JVM: `TIMED_WAITING`, `WAITING`, `BLOCKED`); only `LockSupport` parking is reported | javalib `Thread` |
-| After `main` returns or throws, the main `Thread` stays alive: `isAlive` is `true`, `join()` on it never returns | `rt.RunMain` |
-| A new thread's priority is 5, not its creator's, and its `ThreadGroup`'s maximum does not cap it | javalib `Thread` |
-| `NonFatal(StackOverflowError())` and `NonFatal(OutOfMemoryError())` are `true`: no `VirtualMachineError` | javalib |
-| A throwing object initializer gives no `ExceptionInInitializerError`; the later `NoClassDefFoundError` has no cause | javalib, module initialization |
-| `initCause` on an exception that has a cause overwrites it (JVM: `IllegalStateException`) | javalib `Throwable` |
-| `System.gc()` is a link error (`Runtime.gc()` works) | javalib |
-| `classOf[Array[Int]].getTypeName` is `[I` (JVM: `int[]`); an interface's `Class.toString` says `class` (JVM: `interface`) | `rt` class natives |
 
 #### JDK and Scala library
 
@@ -123,7 +105,7 @@ fail. A fix makes its case fail: move the check to a case run on both the JVM an
 | A surrogate's UTF-8 bytes (`ED A0 80`) decode to three U+FFFD (JVM: one), in `new String` and in `CharsetDecoder` | `rt` UTF-8 decoder |
 | `StringBuilder.append(cs, 2, 1)` does nothing (JVM: `IndexOutOfBoundsException`); `appendCodePoint(-1)` appends U+FFFF (JVM: `IllegalArgumentException`); `append(chars, 1, 5)` throws `ArrayIndexOutOfBoundsException`, not `IndexOutOfBoundsException` | javalib `StringBuilder` |
 | `StringBuffer` is not synchronized: concurrent appends lose characters or throw. Not pinned (the result is random) | javalib `StringBuffer` |
-| Exception messages are JDK 8's or Go's: index errors (`index 5, length 3`; JVM: `Index 5 out of bounds for length 3`), `parseInt` (no `under radix N`; radix and null messages), `parseDouble` (`empty String`, `multiple points`), `BigInteger` parsing, `Thread.sleep(-1)`, `Thread.Builder.priority` | javalib: JDK 17+'s messages |
+| Exception messages are JDK 8's or Go's: index errors (`index 5, length 3`; JVM: `Index 5 out of bounds for length 3`), `parseInt` (no `under radix N`; radix and null messages), `parseDouble` (`empty String`, `multiple points`), `BigInteger` parsing | javalib: JDK 17+'s messages |
 | String charsets other than the supported three throw `UnsupportedOperationException`, not `UnsupportedEncodingException`/`UnsupportedCharsetException` | javalib charsets |
 
 #### Go interop
@@ -139,8 +121,6 @@ fail. A fix makes its case fail: move the check to a case run on both the JVM an
 | Item | Problem | Size |
 |------|---------|------|
 | `String.format`, `f"…"` | `rt.StringFormat` maps onto Go's `fmt`. Wrong output: `%x`/`%o` of negatives (`-1`, not `ffffffff`), `%g`, `BigInt`/`BigInteger` arguments (a Go struct dump), `%(d`. Throws, as an `IllegalArgumentException` whose message names the JDK's exception: `%1$s`, `%<s`, the `,` flag, `%h`, `%t`, `%a`, `BigDecimal` with `%f`. Missing: `java.util.Formatter`, `String.formatted`. Fix: port Scala.js's or Scala Native's `Formatter` to javalib | M |
-| Signals and fatal errors | SIGINT, SIGTERM and SIGHUP exit without shutdown hooks and without flushing standard output (up to 32 KB lost); so do Go's fatal errors (stack overflow, out of memory, concurrent map writes, deadlock). Fix: an `os/signal` handler that runs hooks and exits 128+signal; flush at line ends on a terminal, on a timer otherwise | S |
-| `Class` type tests | `Class.isInstance`/`cast` are missing, so `ClassTag` patterns (`case x: T`), `Future.mapTo` and `PartialFunction.elementWise` do not link (with `--missing-apis throw`: `NoSuchMethodError`). `Class.forName` returns a `Class` for any name, so `Try(Class.forName(…))` probes conclude wrongly. Also missing: `getSuperclass`, `getInterfaces`, `isInterface`, `isEnum`, `getEnumConstants`, `getCanonicalName`. Build on the class hierarchy the linker emits for `isAssignableFrom` | S |
 
 ## M1: Released
 

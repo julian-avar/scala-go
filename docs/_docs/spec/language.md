@@ -76,10 +76,10 @@ a superclass calling an overridden `def` that returns a subclass `val` sees `nul
 - A thread accessing an object during its own construction of it (directly or through a cycle)
   gets the partially constructed object. With `object A { val x = B.y + 1 }` and
   `object B { val y = A.x + 1 }`, accessing `A.x` first gives `A.x == 2` and `B.y == 1`.
-- If the constructor throws, the exception propagates to the triggering access, and every later
-  access throws `NoClassDefFoundError("Could not initialize class A$")`. **Deviation (bug):** the
-  first failure is not wrapped in `ExceptionInInitializerError` (javalib has none), so the later
-  errors have no cause ([known bugs](../contributing/roadmap.md#known-bugs)).
+- If the constructor throws, the triggering access throws `ExceptionInInitializerError` caused by
+  the exception (an `Error` propagates as it is), and every later access throws
+  `NoClassDefFoundError("Could not initialize class A$")`, caused by an
+  `ExceptionInInitializerError` that names the first exception.
 - Static members (`@static`, Java statics in javalib, cases of Java-style Scala 3 enums) are set
   by the class's static initializer, run once, under its own lock, before the first
   instantiation, static field access or static method call
@@ -91,10 +91,9 @@ and private methods are called statically.
 
 **Case classes.** Their members are compiler-generated; even `hashCode` values equal the JVM's.
 
-**Class names.** `getSimpleName` follows the JVM for top-level, nested and anonymous (`""`)
-classes and arrays. **Deviation (bug):** for a local class (`Main$LocalC$1`) it is `""`, not
-`LocalC`; for an operator-named class it keeps only the text after the last `$`
-(`List(1).getClass.getSimpleName` is `colon`, JVM `$colon$colon`).
+**Class names.** `getSimpleName` and `getCanonicalName` follow the JVM for top-level, nested,
+local and anonymous (`""`, canonical name `null`) classes and arrays; the IR records the JVM's
+`InnerClasses` entry of each nested class.
 
 ## 6. Expressions
 
@@ -254,8 +253,8 @@ and by gc's messages and become Java exceptions:
 - Go fatal errors (stack or heap exhaustion, Go's own fatal conditions) are not exceptions: the
   process ends with exit status 2 without running `catch` or `finally`
   ([Runtime: stack](runtime.md#stack)).
-- **Deviation (bug):** `scala.util.control.NonFatal` matches `StackOverflowError` and
-  `OutOfMemoryError` (javalib has no `VirtualMachineError`); the runtime never throws them.
+- `StackOverflowError` and `OutOfMemoryError` are `VirtualMachineError`s, so `NonFatal` rejects
+  them; the runtime never throws them.
 - A `Throwable` captures its stack trace when constructed
   ([Runtime: stack traces](runtime.md#stack-traces)).
 
@@ -290,8 +289,7 @@ At run time, givens and implicit values are ordinary `val`s, `lazy val`s, `def`s
 Scala compiles patterns into type tests, `unapply` calls, equality tests and jumps; the
 evaluation order of extractors and guards, and `MatchError`, are therefore the JVM's. Type
 patterns are type tests ([Type tests and casts](#type-tests-and-casts)), including the array
-deviation. Literal patterns compare with `==`. **Deviation (bug):** a user-defined
-`given TypeTest` used by `case x: T` does not link (it reaches `Class.isInstance`).
+deviation. Literal patterns compare with `==`.
 
 ## 9. Top-level definitions
 
@@ -349,7 +347,7 @@ Library code that needs a JDK API javalib lacks fails to link if reached.
 
 | Feature | Run-time behavior |
 |---------|-------------------|
-| Enums, opaque types | As Scala compiles them ([Data](data.md#enums-and-opaque-types)). `EnumSet`/`EnumMap` are not implemented. **Deviation (bug):** `getDeclaringClass` and `java.lang.Enum.valueOf(classOf[E], name)` do not link |
+| Enums, opaque types | As Scala compiles them ([Data](data.md#enums-and-opaque-types)). `EnumSet`/`EnumMap` are not implemented |
 | Extension methods, export clauses, `given`/`using`, context functions | Ordinary methods, forwarders, values and lambdas |
 | `inline`, macros | Expanded by the compiler. **Deviation (bug):** stack trace lines of inlined code are the inlined source's (JVM: the call site's) |
 | Union and intersection types, match types, type lambdas, kind polymorphism, explicit nulls, capture checking | Erased or compile-time only |

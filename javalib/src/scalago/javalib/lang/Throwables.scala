@@ -33,10 +33,17 @@ class Throwable protected (
   def getLocalizedMessage(): String = getMessage()
   def getCause(): Throwable = cause
 
-  def initCause(cause: Throwable): Throwable =
-    if cause eq this then throw new java.lang.IllegalArgumentException("Self-causation not permitted")
+  /** Whether the cause was set, by `initCause` or a constructor (given a non-null cause). */
+  private var causeSet: scala.Boolean = cause != null
+
+  def initCause(cause: Throwable): Throwable = synchronized {
+    if causeSet then
+      throw new java.lang.IllegalStateException("Can't overwrite cause with " + java.util.Objects.toString(cause, "a null"), this.asInstanceOf[java.lang.Throwable])
+    if cause eq this then throw new java.lang.IllegalArgumentException("Self-causation not permitted", this.asInstanceOf[java.lang.Throwable])
     this.cause = cause
+    causeSet = true
     this
+  }
 
   override def toString(): String =
     val m = getLocalizedMessage()
@@ -258,10 +265,15 @@ class AssertionError(message: String, cause: Throwable) extends Error(message, c
     this(String.valueOf(detail), if detail.isInstanceOf[Throwable] then detail.asInstanceOf[Throwable] else null)
   def this() = this(null, null)
 
-class StackOverflowError(message: String) extends Error(message):
+abstract class VirtualMachineError(message: String, cause: Throwable) extends Error(message, cause):
+  def this(message: String) = this(message, null)
+  def this(cause: Throwable) = this(if cause == null then null else cause.toString(), cause)
+  def this() = this(null, null)
+
+class StackOverflowError(message: String) extends VirtualMachineError(message):
   def this() = this(null)
 
-class OutOfMemoryError(message: String) extends Error(message):
+class OutOfMemoryError(message: String) extends VirtualMachineError(message):
   def this() = this(null)
 
 class IllegalMonitorStateException(message: String) extends RuntimeException(message):
@@ -276,6 +288,12 @@ class LinkageError(message: String, cause: Throwable) extends Error(message, cau
 
 class NoClassDefFoundError(message: String) extends LinkageError(message):
   def this() = this(null)
+
+class ExceptionInInitializerError private (message: String, cause: Throwable) extends LinkageError(message, cause):
+  def this(thrown: Throwable) = this(null, thrown)
+  def this(message: String) = this(message, null)
+  def this() = this(null, null)
+  def getException(): Throwable = getCause()
 
 class IncompatibleClassChangeError(message: String) extends LinkageError(message):
   def this() = this(null)

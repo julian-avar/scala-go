@@ -3,7 +3,6 @@ BigDecimal(1.5): throws java.lang.ClassCastException: interface conversion: *sca
 BigDecimal("1.5") == 1.5: throws java.lang.ClassCastException: interface conversion: *scala.S_java_dmath_dMathContext is not interface { M_goBits_p_rJ() int64 }: missing method M_goBits_p_rJ
 ().## == 0: false
 ().hashCode == 0: false
-initCause twice: java.lang.RuntimeException
 Array(Array(1, 2), Array(3, 4)).transpose: throws java.lang.NullPointerException
 1 asInstanceOf NeverInstantiated: true
 1 asInstanceOf NeverImplemented: true

@@ -36,13 +36,12 @@ class Thread private (group: ThreadGroup, target: Runnable, private var name: St
     else if attached then ThreadGroup.main
     else Thread.currentThread().getThreadGroup()
   private var daemon: scala.Boolean = virtual || (!attached && Thread.currentThread().isDaemon())
-  private var priority: Int = Thread.NORM_PRIORITY
+  private var priority: Int =
+    if attached || virtual then Thread.NORM_PRIORITY
+    else math.min(Thread.currentThread().getPriority(), if threadGroup != null then threadGroup.getMaxPriority() else Thread.MAX_PRIORITY)
   private var handler: Thread.UncaughtExceptionHandler = null
   /** 0: new, 1: alive, 2: terminated. */
   @volatile private var state: Int = if attached then 1 else 0
-  /** WAITING or TIMED_WAITING while parked (`LockSupport`), else null. */
-  @volatile private var parkState: Thread.State = null
-
   /** The object a parked thread is blocked on (`LockSupport.getBlocker`; javalib internal). */
   @volatile var parkBlocker: Object = null
 
@@ -71,21 +70,27 @@ class Thread private (group: ThreadGroup, target: Runnable, private var name: St
   /** The body of the thread's goroutine (called by the runtime). */
   def runOnGoroutine(): Unit =
     try run()
-    catch case e: java.lang.Throwable => uncaught(e)
-    finally
-      threadLocals = null
-      inheritableThreadLocals = null
-      synchronized {
-        state = 2
-        notifyAll()
-      }
+    catch case e: java.lang.Throwable => dispatchUncaught(e)
+    finally terminate()
 
-  private def uncaught(e: java.lang.Throwable): Unit =
-    val h = if handler != null then handler else Thread.defaultHandler
-    if h != null then h.uncaughtException(this, e)
-    else
-      java.lang.System.err.print("Exception in thread \"" + name + "\" ")
-      e.printStackTrace(java.lang.System.err)
+  private[lang] def terminate(): Unit =
+    threadLocals = null
+    inheritableThreadLocals = null
+    synchronized {
+      state = 2
+      notifyAll()
+    }
+
+  /** Gives an exception that ended this thread to its handler: its own, else its group's, which
+   *  passes it to the default handler and finally prints it. An exception the handler throws is
+   *  reported and ignored.
+   */
+  private[lang] def dispatchUncaught(e: java.lang.Throwable): Unit =
+    val h = if handler != null then handler else if threadGroup != null then threadGroup else ThreadGroup.virtualThreads
+    try h.uncaughtException(this, e)
+    catch
+      case t: java.lang.Throwable =>
+        java.lang.System.err.print("\nException: " + t.getClass().getName() + " thrown from the UncaughtExceptionHandler in thread \"" + name + "\"\n")
 
   def join(): Unit = synchronized {
     while isAlive() do wait()
@@ -138,7 +143,6 @@ class Thread private (group: ThreadGroup, target: Runnable, private var name: St
   def getUncaughtExceptionHandler(): Thread.UncaughtExceptionHandler =
     if state == 2 then null
     else if handler != null then handler
-    else if Thread.defaultHandler != null then Thread.defaultHandler
     else getThreadGroup()
   def setUncaughtExceptionHandler(h: Thread.UncaughtExceptionHandler): Unit = handler = h
 
@@ -146,16 +150,17 @@ class Thread private (group: ThreadGroup, target: Runnable, private var name: St
     case 0 => Thread.State.NEW
     case 2 => Thread.State.TERMINATED
     case _ =>
-      val parked = parkState
-      if parked != null then parked else Thread.State.RUNNABLE
+      Threads.blockedIn(native) match
+        case 1 => Thread.State.BLOCKED
+        case 2 => Thread.State.WAITING
+        case 3 => Thread.State.TIMED_WAITING
+        case _ => Thread.State.RUNNABLE
 
   /** Parks the current thread (this one) for `nanos` (forever if negative): `LockSupport`'s
    *  native side (javalib internal).
    */
   def parkCurrent(nanos: scala.Long): Unit =
-    parkState = if nanos < 0 then Thread.State.WAITING else Thread.State.TIMED_WAITING
-    try Threads.park(native, nanos)
-    finally parkState = null
+    Threads.park(native, nanos)
 
   override def toString(): String =
     if virtual then
@@ -248,7 +253,7 @@ object Thread:
       this
     override def daemon(): ThreadBuilder = daemon(true)
     def priority(priority: Int): ThreadBuilder =
-      if priority < MIN_PRIORITY || priority > MAX_PRIORITY then throw new java.lang.IllegalArgumentException("Thread priority out of range")
+      if priority < MIN_PRIORITY || priority > MAX_PRIORITY then throw new java.lang.IllegalArgumentException()
       prio = priority
       this
     def stackSize(stackSize: scala.Long): ThreadBuilder =
@@ -327,6 +332,14 @@ object Thread:
       val t = new Thread(null, null, if Threads.isMainGoroutine() then "main" else nextName(), true, false, false)
       Threads.attach(t.native)
       t
+
+  /** Ends the main thread when `main` returns or throws `e` (null), called by the runtime: an
+   *  exception goes to the handlers, and the Thread terminates (`join` returns).
+   */
+  @static def exitMain(e: java.lang.Throwable): Unit =
+    val main = currentThread()
+    try if e != null then main.dispatchUncaught(e)
+    finally main.terminate()
 
   @static def ofPlatform(): Builder.OfPlatform = new ThreadBuilder(true)
   @static def ofVirtual(): Builder.OfVirtual = new ThreadBuilder(false)

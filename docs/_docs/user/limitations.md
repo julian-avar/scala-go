@@ -14,12 +14,9 @@ scala-go does not implement is a link error naming it, never a silent difference
 ## Language and runtime
 
 - **Runtime reflection** (`getMethods`, `Method.invoke`, run-time annotations, dynamic proxies,
-  class loading) does not exist; `getClass`, class names and `isAssignableFrom` work. Use macros,
+  class loading) does not exist; `getClass`, class names, the class hierarchy (`getSuperclass`,
+  `isAssignableFrom`, `isInstance`, ...) and `getEnumConstants` work. Use macros,
   givens and `Mirror`s. [Runtime: reflection](../spec/runtime.md#reflection-and-class-loading).
-- **Type tests with a `ClassTag`** (`case x: T`), user-defined `TypeTest` givens in patterns,
-  `Future.mapTo` and `PartialFunction.elementWise` do not link: `Class.isInstance`/`cast` are
-  missing, with other `Class` members
-  ([roadmap](../contributing/roadmap.md#silent-wrong-output)). Match on concrete types.
 - **Structural types** (`reflectiveSelectable`) do not link. Use a trait.
 - **Classpath resources** are not embedded: `getResourceAsStream` returns `null`, and
   `Source.fromResource` does not link. Read files, or embed data in code.
