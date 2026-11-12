@@ -352,12 +352,14 @@ object Analyzer:
 
   final case class MissingUse(kind: MissingKind, message: String)
 
-  /** Methods the runtime calls dynamically: java.lang.Object's (`rt.ToString`, `rt.Equals`, ...)
-   *  and `Throwable.printStackTrace()` (`rt.ReportUncaught`).
+  /** Methods the runtime calls dynamically: java.lang.Object's (`rt.ToString`, `rt.Equals`, ...),
+   *  `Throwable.printStackTrace()` (`rt.ReportUncaught`), and javalib's marker of `ScalaNumber`s
+   *  (`rt.Equals`).
    */
   val runtimeCalledMethods: List[MethodName] = List(
     Natives.parseMethod("toString()Ljava.lang.String;"),
     Natives.parseMethod("equals(Ljava.lang.Object;)Z"),
     Natives.parseMethod("hashCode()I"),
-    Natives.parseMethod("printStackTrace()V")
+    Natives.parseMethod("printStackTrace()V"),
+    Natives.parseMethod("scalaNumber()V")
   )

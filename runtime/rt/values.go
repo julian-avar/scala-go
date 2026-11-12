@@ -139,7 +139,7 @@ func ObjectEquals(a, b any) bool {
 }
 
 // Equals implements Scala's universal equality (==) on references: null-safe, and cooperative
-// between boxed numeric types (1 == 1L is true).
+// between boxed numeric types (1 == 1L is true), as BoxesRunTime.equals is.
 func Equals(a, b any) bool {
 	if a == nil || b == nil {
 		return a == nil && b == nil
@@ -148,25 +148,55 @@ func Equals(a, b any) bool {
 		if y, ok := numericValue(b); ok {
 			return x.equals(y)
 		}
+		// A box never equals another class, but BigInt and BigDecimal equal numbers.
+		if n, ok := b.(scalaNumber); ok {
+			return n.M_equals_pO_rZ(a)
+		}
 	}
 	return ObjectEquals(a, b)
 }
 
+// scalaNumber is implemented by the instances of scala.math.ScalaNumber (see javalib's).
+type scalaNumber interface {
+	M_scalaNumber_p_rV()
+	M_equals_pO_rZ(that any) bool
+}
+
+// numericKind is the type in which boxes compare (BoxesRunTime's typeCode): the wider of the two.
+type numericKind uint8
+
+const (
+	numInt numericKind = iota // Char, Byte, Short, Int
+	numLong
+	numFloat
+	numDouble
+)
+
 type numeric struct {
-	isFloating bool
-	i          int64
-	f          float64
+	kind numericKind
+	i    int64   // integers
+	f    float64 // Float and Double
 }
 
 func (x numeric) equals(y numeric) bool {
-	if x.isFloating || y.isFloating {
-		return x.float() == y.float()
+	switch max(x.kind, y.kind) {
+	case numFloat:
+		return x.float32() == y.float32()
+	case numDouble:
+		return x.float64() == y.float64()
 	}
 	return x.i == y.i
 }
 
-func (x numeric) float() float64 {
-	if x.isFloating {
+func (x numeric) float32() float32 {
+	if x.kind == numFloat {
+		return float32(x.f)
+	}
+	return float32(x.i) // rounded once, as Java's long-to-float conversion
+}
+
+func (x numeric) float64() float64 {
+	if x.kind >= numFloat {
 		return x.f
 	}
 	return float64(x.i)
@@ -183,11 +213,11 @@ func numericValue(x any) (numeric, bool) {
 	case int32:
 		return numeric{i: int64(v)}, true
 	case int64:
-		return numeric{i: v}, true
+		return numeric{kind: numLong, i: v}, true
 	case float32:
-		return numeric{isFloating: true, f: float64(v)}, true
+		return numeric{kind: numFloat, f: float64(v)}, true
 	case float64:
-		return numeric{isFloating: true, f: v}, true
+		return numeric{kind: numDouble, f: v}, true
 	}
 	return numeric{}, false
 }
@@ -203,6 +233,8 @@ func HashCode(x any) int32 {
 		return BigIntegerHashCode(v)
 	case *BigDecimal:
 		return BigDecimalHashCode(v)
+	case *BoxedUnit:
+		return 0
 	case bool:
 		if v {
 			return 1231

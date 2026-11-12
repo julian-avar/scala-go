@@ -206,6 +206,8 @@ object Main:
     val zero = args.length
     show("array index past the end")(arr(arr.length + zero))
     show("array index Int.MaxValue")(arr(Int.MaxValue))
+    show("negative array index")(arr(zero - 1))
+    show("negative array store")(arr(Int.MinValue + zero) = 1)
     show("string charAt past the end")(Try("abc".charAt(3 + zero)).failed.get.getClass.getName)
     show("division by zero")(1 / zero)
     show("long remainder by zero")(1L % zero)

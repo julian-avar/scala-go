@@ -22,3 +22,17 @@ null as Number: false
 sort plain objects: 2
 arrays are Serializable: true
 arrays are Cloneable: true
+String as Integer: ClassCastException
+String as Number: ClassCastException
+String as Comparable: true
+array as Integer: ClassCastException
+BigInteger as Long: ClassCastException
+BigInteger as Number: true
+Integer as NeverInstantiated: ClassCastException
+Integer as NeverImplemented: ClassCastException
+String as NeverInstantiated: ClassCastException
+String as NeverImplemented: ClassCastException
+Stone as NeverInstantiated: ClassCastException
+Stone as NeverImplemented: ClassCastException
+null as NeverInstantiated: true
+null as NeverImplemented: true

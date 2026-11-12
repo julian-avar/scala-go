@@ -20,6 +20,10 @@ true == 1 boxed: false
 Integer == Long via ==: true
 BigInt(1) == 1, BigInt(1) == 1L, BigDecimal("1.5") == BigDecimal("1.50"): true true true
 BigInt(2).pow(70) == 2^70 as Double: true
+16777217L == 16777216f boxed (as Float): true
+16777217 == 16777216f boxed (as Float): true
+16777217L == 16777216.0 boxed: false
+box == BigInt, BigDecimal: true true true true false false
 1 equals 1L: false
 1 equals 1: true
 'a' equals 97: false
@@ -39,6 +43,7 @@ Float NaN.##, 0.1f.##: 2143289344 1036831949
 Double ## of large whole: 1410065410 1410065410 2139730611
 null.##: 0
 true.##, false.##: 1231 1237
+().##, ().hashCode: 0 0
 "abc".## == hashCode: true
 Integer hashCode: -7 -2147483648
 Long hashCode: 0 1 -2147483648
@@ -91,6 +96,10 @@ arrays wrapped: true
 null == null: true
 P == null, null == P: false false false false
 null eq null: true
+null String == String: false false true true
+null String == Any: false false true
+null BigInteger, BigDecimal, array ==: false false false false false
+null String match: other
 null equals via Objects: true
 plain objects: true false true true true
 plain hashCode stable: true

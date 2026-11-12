@@ -2,8 +2,7 @@ import scala.collection.mutable
 
 // Equality and hashing (docs/_docs/spec/language.md, "Equality and hashing"): ==, equals, eq,
 // ##, hashCode of boxes, strings, case classes, tuples and collections; cooperative equality of
-// boxed numbers. Not here: the documented deviations (boxed Int/Long == boxed Float, boxed
-// primitive == BigInt, null String operands, identity of boxes), pinned in known-bugs-misc and
+// boxed numbers. Not here: the identity of boxes (a documented deviation), pinned in
 // limits-runtime.
 case class P(x: Int, y: String)
 case class D(v: Double)
@@ -45,6 +44,10 @@ object Main:
     p("Integer == Long via ==")(Integer.valueOf(5) == java.lang.Long.valueOf(5))
     p("BigInt(1) == 1, BigInt(1) == 1L, BigDecimal(\"1.5\") == BigDecimal(\"1.50\")")(s"${BigInt(1) == 1} ${BigInt(1) == 1L} ${BigDecimal("1.5") == BigDecimal("1.50")}")
     p("BigInt(2).pow(70) == 2^70 as Double")(BigInt(2).pow(70) == math.pow(2, 70))
+    p("16777217L == 16777216f boxed (as Float)")(any(16777217L) == any(16777216f))
+    p("16777217 == 16777216f boxed (as Float)")(any(16777217) == any(16777216f))
+    p("16777217L == 16777216.0 boxed")(any(16777217L) == any(16777216.0))
+    p("box == BigInt, BigDecimal")(s"${any(1) == BigInt(1)} ${any(1L) == BigInt(1)} ${any('a') == BigInt(97)} ${any(1) == BigDecimal(1)} ${any(2) == BigInt(1)} ${any(true) == BigInt(1)}")
 
     // equals: type and value
     p("1 equals 1L")(any(1).equals(any(1L)))
@@ -68,6 +71,7 @@ object Main:
     p("Double ## of large whole")(s"${any(1e10).##} ${any(10000000000L).##} ${any(1e30).##}")
     p("null.##")((null: Any).##)
     p("true.##, false.##")(s"${any(true).##} ${any(false).##}")
+    p("().##, ().hashCode")(s"${any(()).##} ${any(()).hashCode}")
     p("\"abc\".## == hashCode")("abc".## == "abc".hashCode)
 
     // hashCode of boxes and strings (Java's)
@@ -134,6 +138,19 @@ object Main:
     p("null == null")(nullP == null)
     p("P == null, null == P")(s"${P(1, "a") == nullP} ${nullP == P(1, "a")} ${nullAny == 1} ${any(1) == nullAny}")
     p("null eq null")(nullP eq null)
+    val text = "a"
+    val nullString: String = null
+    val nullString2: String = null
+    p("null String == String")(s"${nullString == text} ${text == nullString} ${nullString != text} ${nullString == nullString2}")
+    p("null String == Any")(s"${nullString == any("a")} ${any("a") == nullString} ${nullString == nullAny}")
+    val nullBig: java.math.BigInteger = null
+    val nullDec: java.math.BigDecimal = null
+    val nullInts: Array[Int] = null
+    p("null BigInteger, BigDecimal, array ==")(s"${nullBig == java.math.BigInteger.ONE} ${java.math.BigInteger.ONE == nullBig} ${nullDec == java.math.BigDecimal.ONE} ${nullInts == a1} ${a1 == nullInts}")
+    p("null String match")(nullString match
+      case "a" => "a"
+      case "b" => "b"
+      case _   => "other")
     p("null equals via Objects")(java.util.Objects.equals(null, null))
     val pl = Plain(1)
     p("plain objects")(s"${pl == pl} ${pl == Plain(1)} ${pl eq pl} ${pl ne Plain(1)} ${pl.equals(pl)}")

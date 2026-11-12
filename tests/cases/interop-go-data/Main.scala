@@ -32,6 +32,9 @@ object Main:
     attempt("write out of range")(window(2) = 0)
     val copied = GoSlice.make[Int](5).copyFrom(GoSlice.of(1, 2))
     println(s"copy: $copied")
+    val slice: AnyRef = GoSlice.make[Int](1).asInstanceOf[AnyRef]
+    val map: AnyRef = GoMap.make[Int, Int].asInstanceOf[AnyRef]
+    println(s"eq: ${slice eq slice} ${map eq map} ${slice eq GoSlice.make[Int](1).asInstanceOf[AnyRef]} ${slice ne slice}")
     println(s"toSeq/toArray: ${GoSlice.of(go"a", go"b").toSeq} ${GoSlice.of(1.5, 2.5).toArray.toSeq}")
 
     // Unsigned values are kept bit for bit.

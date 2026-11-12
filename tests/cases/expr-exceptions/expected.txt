@@ -50,6 +50,8 @@ Try: Failure(java.lang.ArithmeticException: / by zero) Success(8) Success(0)
 Try toEither: Left(Problem: e) Some(5)
 array index past the end: throws java.lang.ArrayIndexOutOfBoundsException(Index 3 out of bounds for length 3) []
 array index Int.MaxValue: throws java.lang.ArrayIndexOutOfBoundsException(Index 2147483647 out of bounds for length 3) []
+negative array index: throws java.lang.ArrayIndexOutOfBoundsException(Index -1 out of bounds for length 3) []
+negative array store: throws java.lang.ArrayIndexOutOfBoundsException(Index -2147483648 out of bounds for length 3) []
 string charAt past the end: java.lang.StringIndexOutOfBoundsException []
 division by zero: throws java.lang.ArithmeticException(/ by zero) []
 long remainder by zero: throws java.lang.ArithmeticException(/ by zero) []

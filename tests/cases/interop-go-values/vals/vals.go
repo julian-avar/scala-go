@@ -44,3 +44,18 @@ var Map = map[string]int{"a": 1}
 func AnySlice() any   { return Slice }
 func AnyMap() any     { return Map }
 func OtherSlice() any { return []int{1, 2} }
+
+// Tagged has a slice field, so Go cannot compare it; Boxed can be compared, but panics if its
+// field holds a slice.
+type Tagged struct {
+	Name string
+	Tags []string
+}
+type Boxed struct{ V any }
+
+var tags = []string{"a"}
+
+func AnyTagged() any       { return Tagged{"t", tags} }
+func OtherTagged() any     { return Tagged{"t", []string{"a"}} }
+func AnyBoxedSlice() any   { return Boxed{Slice} }
+func OtherBoxedSlice() any { return Boxed{[]int{1, 2}} }

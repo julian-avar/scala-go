@@ -176,26 +176,31 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
     to match
       case _ if from == to                       => e
       case Type.Class(c) if program.isFacade(c)  => interop.cast(e, c)
-      case _                                     => castTo(e, to, source, target)
+      case _                                     => castTo(e, from, to, source, target)
 
-  private def castTo(e: String, to: Type, source: String, target: String): String =
-    if target.isEmpty then e
-    else if target == "any" && source == "any" then
-      // A downcast between types that are both Go `any`.
-      to match
-        case Type.Class(c) if needsCheckedCast(c) => checkedCast(c, e)
-        case _                                    => e
-    else if target == source then e
+  private def castTo(e: String, from: Type, to: Type, source: String, target: String): String =
+    if target.isEmpty || target == source && target != "any" then e
     else if target == "any" then
+      val value =
+        if source == "any" then e
+        else if source.startsWith("*") then s"rt.AnyRef($e)" // a nil pointer becomes a nil `any`
+        else s"any($e)"
       to match
-        case Type.Class(c) if program.contains(c) && !declared(c) && !Hijacked.hijackedAncestors(c) => s"rt.CastNull($e)"
-        case _ =>
-          if source == "any" then e
-          else if source.startsWith("*") then s"rt.AnyRef($e)" // a nil pointer becomes a nil `any`
-          else s"any($e)"
+        case Type.Class(c) if needsCheckedCast(c) => if isUpcast(from, c) then value else checkedCast(c, value)
+        // A class that no instantiated class is or extends: only null passes.
+        case Type.Class(c) if program.contains(c) && !declared(c) && !Hijacked.hijackedAncestors(c) =>
+          s"rt.CastNull($value)"
+        case _ => value
     else to match
       case Type.Class(c) if target == Mangling.iface(c) => ifaceCast(c, e)
       case _                                            => s"rt.Cast[$target]($e)"
+
+  /** Whether every value of IR type `from` is an instance of `cls`. */
+  private def isUpcast(from: Type, cls: ClassName): Boolean = from match
+    case Type.Class(f) =>
+      f == cls || program.ancestors(f).contains(cls) || Hijacked.ancestors.get(f).exists(_.contains(cls))
+    case _: Type.Array => Hijacked.arrayAncestors(cls)
+    case _             => false
 
   // ---- Casts to types that strings and boxes implement ---------------------------------------------
 

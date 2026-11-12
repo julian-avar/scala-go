@@ -92,6 +92,11 @@ func TestRuntimeErrorsBecomeJavaExceptions(t *testing.T) {
 	if got := ToGoString(exc); got != "java.lang.ArrayIndexOutOfBoundsException: Index 3 out of bounds for length 0" {
 		t.Errorf("got %q", got)
 	}
+	arr = make([]int32, 2)
+	i = -1
+	if got := ToGoString(Try(func() { _ = arr[i] })); got != "java.lang.ArrayIndexOutOfBoundsException: Index -1 out of bounds for length 2" {
+		t.Errorf("got %q", got)
+	}
 	var s *String
 	if got := ToGoString(Try(func() { StringLength(s) })); got != "java.lang.NullPointerException" {
 		t.Errorf("got %q", got)

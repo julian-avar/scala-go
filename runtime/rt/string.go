@@ -144,6 +144,23 @@ func StringEquals(s *String, other any) bool {
 	return ok && stringEq(s, o)
 }
 
+// EqualsString is Equals on two Strings.
+func EqualsString(a, b *String) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return stringEq(a, b)
+}
+
+// MatchString is what a `match` on string literals switches on: s as a Go string; for null, a
+// string no literal is (invalid UTF-8), so that null takes the default case, as on the JVM.
+func MatchString(s *String) string {
+	if s == nil {
+		return "\xff"
+	}
+	return s.GoString()
+}
+
 func stringEq(a, b *String) bool {
 	if a == b {
 		return true

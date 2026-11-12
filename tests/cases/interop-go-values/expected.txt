@@ -18,6 +18,9 @@ defined ints: true false
 different types: false false
 Go ints: true true
 slices: true false; maps: true
+uncomparable structs: true false
+interface fields: true false
+eq: true true false
 hashes: true true true
 in a set: 2
 toString: an error | named n | debug | *vals.Pair@<hash>

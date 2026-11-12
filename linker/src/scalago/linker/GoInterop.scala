@@ -274,7 +274,7 @@ final class GoInterop(ctx: LinkContext):
   /** Whether values of Scala type `cls` can be Go values (and Go structs, which go to Go
    *  interfaces by value or by pointer, see `rt.ToGoInterface`): facades and `Any`.
    */
-  private def holdsGoValues(cls: ClassName): Boolean = cls == ClassName.Object || program.isFacade(cls)
+  def holdsGoValues(cls: ClassName): Boolean = cls == ClassName.Object || program.isFacade(cls)
 
   // ---- Scala to Go ------------------------------------------------------------------------------
 

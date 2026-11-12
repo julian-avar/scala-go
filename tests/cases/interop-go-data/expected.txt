@@ -7,6 +7,7 @@ slice: 2,3 capacity 3; reslice within capacity: 2,3,4
 index -1: throws ArrayIndexOutOfBoundsException
 write out of range: throws ArrayIndexOutOfBoundsException
 copy: 2
+eq: true true false false
 toSeq/toArray: Vector(a, b) ArraySeq(1.5, 2.5)
 uint64: -1 uint32: -1 byte: 255 -1
 NaN key: None size 2; -0.0 is 0.0: Some(3)

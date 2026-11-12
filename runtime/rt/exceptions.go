@@ -2,8 +2,10 @@ package rt
 
 import (
 	"os"
+	"reflect"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -106,7 +108,10 @@ func Try(body func()) (throwable any) {
 	return nil
 }
 
-var indexOutOfRange = regexp.MustCompile(`index out of range \[(-?\d+)\] with length (\d+)`)
+var (
+	indexOutOfRange = regexp.MustCompile(`index out of range \[(-?\d+)\] with length (\d+)`)
+	negativeIndex   = regexp.MustCompile(`index out of range \[(-\d+)\]$`)
+)
 
 // Caught converts a recovered panic value into a Throwable, translating Go runtime errors into
 // the corresponding Java exceptions. It must be called by the deferred function that recovers:
@@ -134,10 +139,26 @@ func Caught(r any) any {
 		case indexOutOfRange.MatchString(msg):
 			m := indexOutOfRange.FindStringSubmatch(msg)
 			return NewException(ArrayIndexOutOfBounds, "Index "+m[1]+" out of bounds for length "+m[2])
+		case negativeIndex.MatchString(msg):
+			if length, ok := boundsLength(e); ok {
+				m := negativeIndex.FindStringSubmatch(msg)
+				return NewException(ArrayIndexOutOfBounds, "Index "+m[1]+" out of bounds for length "+strconv.FormatInt(length, 10))
+			}
 		}
 		return NewException(RuntimeError, msg)
 	}
 	return NewException(RuntimeError, ToGoString(r))
+}
+
+// boundsLength is the length in an index error, which gc's message for a negative index leaves
+// out: its error value (runtime.boundsError) holds it.
+func boundsLength(e runtime.Error) (int64, bool) {
+	if v := reflect.ValueOf(e); v.Kind() == reflect.Struct {
+		if y := v.FieldByName("y"); y.Kind() == reflect.Int {
+			return y.Int(), true
+		}
+	}
+	return 0, false
 }
 
 // ReportUncaught prints an exception that ended a thread, as the JVM's default handler does:

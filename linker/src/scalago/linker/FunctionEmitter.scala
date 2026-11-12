@@ -11,7 +11,8 @@ import scalago.ir.Tree.*
  *  ([[Dest]]): control structures push the destination into their branches, and any statements
  *  an expression needs are emitted before it. When a later operand emits statements, earlier
  *  operands with possible side effects are first saved in temporaries, preserving Scala's
- *  left-to-right evaluation order.
+ *  left-to-right evaluation order; so are earlier field reads when a later operand calls a
+ *  function, which Go may evaluate first.
  *
  *  `try` blocks run inside Go closures (`rt.Try`) so that `recover` can catch panics. A `return`
  *  or a jump to a label outside the closure sets the variable `ctl` to a jump code and returns
@@ -208,7 +209,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     case Match(selector, cases, default, _) =>
       val sel = genExpr(selector)
       val isString = selector.tpe == Type.String
-      emit(if isString then s"switch $sel.GoString() {" else s"switch $sel {")
+      emit(if isString then s"switch rt.MatchString($sel) {" else s"switch $sel {")
       for (alts, body) <- cases do
         val values = alts.map {
           case StringLiteral(s) => goStringLiteral(s)
@@ -598,7 +599,8 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
 
   /** Go expressions `gen(t)` for `trees`, evaluated in order: when generating one emits
    *  statements, the impure expressions before it are first evaluated into variables (of Go type
-   *  `goType(t)`).
+   *  `goType(t)`); so are those Go could evaluate after a call in a later expression (see
+   *  [[isUnordered]]).
    */
   private def genInOrder(trees: List[Tree], goType: Tree => String)(gen: Tree => String): List[String] =
     val exprs = mutable.ArrayBuffer.empty[String]
@@ -607,12 +609,15 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       exprs += gen(t)
       marks += out.size
     val end = out.size
-    for i <- trees.indices.reverse if marks(i) < end && !isPure(trees(i)) do
-      val temp = freshTemp()
-      val t = goType(trees(i))
-      val p = if trees(i).pos.line > 0 then trees(i).pos else pos
-      out.insert(marks(i), GoLine(s"var $temp ${if t.isEmpty then "any" else t} = ${exprs(i)}", p))
-      exprs(i) = temp
+    var callsLater = false
+    for i <- trees.indices.reverse do
+      if (marks(i) < end && !isPure(trees(i))) || (callsLater && isUnordered(trees(i))) then
+        val temp = freshTemp()
+        val t = goType(trees(i))
+        val p = if trees(i).pos.line > 0 then trees(i).pos else pos
+        out.insert(marks(i), GoLine(s"var $temp ${if t.isEmpty then "any" else t} = ${exprs(i)}", p))
+        exprs(i) = temp
+      callsLater ||= mayCall(trees(i))
     exprs.toList
 
   /** Converts a Go value of IR type `from` for a location of IR type `to`. Scala upcasts need no
@@ -788,6 +793,9 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       case _                               => false
     op match
       case Div | Rem if zeroDivisor => s"rt.DivByZero($a)"
+      // An explicit conversion rounds the product, which Go may otherwise fuse with an addition
+      // into one multiply-add, rounded once (Go: Floating-point operators).
+      case Mul if opType == Type.Double || opType == Type.Float => s"${ctx.goType(opType)}($a * $b)"
       case Add | Sub | Mul | Div =>
         infix(op match { case Add => "+"; case Sub => "-"; case Mul => "*"; case _ => "/" })
       case Rem =>
@@ -811,20 +819,33 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       case Ge     => infix(">=")
       case RefEq  => refEq(lhs, a, rhs, b)
       case RefNe  => s"(!${refEq(lhs, a, rhs, b)})"
-      case UnivEq => s"rt.Equals($a, $b)"
-      case UnivNe => s"(!rt.Equals($a, $b))"
+      case UnivEq => univEq(lhs, a, rhs, b)
+      case UnivNe => s"(!${univEq(lhs, a, rhs, b)})"
       case StringConcat => s"rt.Concat($a, $b)"
 
+  /** Universal equality (`==`). Strings, arrays, `BigInteger`s and `BigDecimal`s are Go pointers,
+   *  which must reach `rt.Equals` as a nil `any` when null.
+   */
+  private def univEq(lhs: Tree, a: String, rhs: Tree, b: String): String =
+    def operand(t: Tree, e: String) = if t.isInstanceOf[StringLiteral] then e else adapt(e, t.tpe, Type.Object)
+    if lhs.tpe == Type.String && rhs.tpe == Type.String then s"rt.EqualsString($a, $b)"
+    else s"rt.Equals(${operand(lhs, a)}, ${operand(rhs, b)})"
+
   /** Reference equality. Null tests compare with Go's nil directly, except on `any` values, which
-   *  may hold a nil pointer (see `rt.IsNull`).
+   *  may hold a nil pointer (see `rt.IsNull`). Go's `==` panics on two Go values of the same type
+   *  it cannot compare (slices, maps, ...), which only operands that can be Go values can be.
    */
   private def refEq(lhs: Tree, a: String, rhs: Tree, b: String): String =
     def nullTest(t: Tree, e: String) = if ctx.goType(t.tpe) == "any" then s"rt.IsNull($e)" else s"($e == nil)"
+    def holdsGoValues(t: Tree) = t.tpe match
+      case Type.Class(c) => ctx.interop.holdsGoValues(c)
+      case _             => false
     (lhs, rhs) match
-      case (_: Null, _: Null) => "true"
-      case (_, _: Null)       => nullTest(lhs, a)
-      case (_: Null, _)       => nullTest(rhs, b)
-      case _                  => s"(any($a) == any($b))"
+      case (_: Null, _: Null)                           => "true"
+      case (_, _: Null)                                 => nullTest(lhs, a)
+      case (_: Null, _)                                 => nullTest(rhs, b)
+      case _ if holdsGoValues(lhs) && holdsGoValues(rhs) => s"rt.RefEq($a, $b)"
+      case _                                            => s"(any($a) == any($b))"
 
   /** Converts a numeric literal with JVM semantics (Scala's own conversions are the JVM's). */
   private def foldConversion(lit: Tree, to: Type): Option[Tree] =
@@ -914,6 +935,24 @@ object FunctionEmitter:
     case While(cond, _)                    => isInfinite(cond)
     case _: Skip | _: VarDef | _: Assign   => false
     case _                                 => true
+
+  /** Whether the Go code of `tree` may call a function, which could change fields and array
+   *  elements.
+   */
+  private def mayCall(tree: Tree): Boolean = tree match
+    case _: Apply | _: ApplyStatically | _: ApplyStatic | _: New | _: LoadModule => true
+    // `equals` and `toString`
+    case Binary(BinaryOp.UnivEq | BinaryOp.UnivNe | BinaryOp.StringConcat, _, _, _) => true
+    case _ => Traversal.children(tree).exists(mayCall)
+
+  /** Whether the Go code of `tree` reads a field or an array element, or may fail, other than in a
+   *  call: Go evaluates the calls of an expression in order, but leaves the order of those
+   *  operations relative to the calls unspecified (Go: Order of evaluation).
+   */
+  private def isUnordered(tree: Tree): Boolean = tree match
+    case _: Select | _: SelectStatic | _: ArraySelect | _: ArrayLength => true
+    case Binary(BinaryOp.Div | BinaryOp.Rem, Type.Int | Type.Long, _, _) => true
+    case _ => Traversal.children(tree).exists(isUnordered)
 
   private def isControlStructure(tree: Tree): Boolean = tree match
     case _: If | _: Labeled | _: Block | _: While | _: Return | _: VarDef | _: Assign | _: Skip | _: Throw | _: Match |

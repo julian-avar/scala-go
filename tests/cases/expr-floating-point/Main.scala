@@ -3,7 +3,7 @@ import java.lang.{Double as JDouble, Float as JFloat}
 // Floating point (docs/_docs/spec/language.md, "Numeric operations"): IEEE arithmetic on Float
 // and Double, special values, %, conversions to and from every primitive type with edge values,
 // comparison by value and by bits. Operands pass through `d`/`f` so that the compiler cannot
-// fold them. No `a * b + c` on inexact values: it may be fused on arm64 (a documented deviation).
+// fold them.
 object Main:
   def d(x: Double): Double = x
   def f(x: Float): Float = x
@@ -37,6 +37,11 @@ object Main:
     p("16777216f + 1f")(f(16777216f) + 1f)
     p("0.1 * 3")(d(0.1) * 3)
     p("100.0 * 1.1")(d(100.0) * 1.1)
+    // Rounded twice, not fused into one multiply-add (as Go may on arm64 and amd64 v3)
+    p("0.1 * 10 - 1")(d(0.1) * d(10) - d(1))
+    p("0.1f * 10 - 1")(f(0.1f) * f(10) - f(1))
+    p("x * x - y * y")({ val x = d(1 + 1e-8); val y = d(1); x * x - y * y })
+    p("0.1 * 10 in a val, - 1")({ val p = d(0.1) * d(10); p - d(1) })
     p("Double.MaxValue + Double.MaxValue")(d(Double.MaxValue) + Double.MaxValue)
     p("-(0.0)")(-d(0.0))
     p("0.0 * -1")(d(0.0) * -1)

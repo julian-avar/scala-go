@@ -20,6 +20,10 @@ object vals:
   def AnySlice(): Any = native
   def AnyMap(): Any = native
   def OtherSlice(): Any = native
+  def AnyTagged(): Any = native
+  def OtherTagged(): Any = native
+  def AnyBoxedSlice(): Any = native
+  def OtherBoxedSlice(): Any = native
 
   class Pair:
     def A: Int = native
@@ -82,6 +86,12 @@ object Main:
     println(s"different types: ${vals.AnyInt() == vals.AnyInt64()} ${vals.AnyInt() == vals.AnyLevel(1)}")
     println(s"Go ints: ${vals.AnyInt() == vals.AnyInt()} ${vals.AnyInt().equals(vals.AnyInt())}")
     println(s"slices: ${vals.AnySlice() == vals.AnySlice()} ${vals.AnySlice() == vals.OtherSlice()}; maps: ${vals.AnyMap() == vals.AnyMap()}")
+    // Structs (and interfaces in them) holding values Go cannot compare: by their parts.
+    println(s"uncomparable structs: ${vals.AnyTagged() == vals.AnyTagged()} ${vals.AnyTagged() == vals.OtherTagged()}")
+    println(s"interface fields: ${vals.AnyBoxedSlice() == vals.AnyBoxedSlice()} ${vals.AnyBoxedSlice() == vals.OtherBoxedSlice()}")
+    // eq is Go's ==, extended to them as ==.
+    val tagged = vals.AnyTagged().asInstanceOf[AnyRef]
+    println(s"eq: ${tagged eq tagged} ${vals.AnySlice().asInstanceOf[AnyRef] eq vals.AnySlice().asInstanceOf[AnyRef]} ${vals.AnySlice().asInstanceOf[AnyRef] eq vals.OtherSlice().asInstanceOf[AnyRef]}")
 
     // hashCode is consistent with ==.
     println(s"hashes: ${vals.PairValue(5, 6).hashCode == vals.PairValue(5, 6).hashCode} ${vals.AnyInt().hashCode == vals.AnyInt().hashCode} ${vals.AnyMap().hashCode == vals.AnyMap().hashCode}")

@@ -1,17 +1,5 @@
 Math.round(0.49999999999999994): 1
 Math.round(4503599627370497.0): 4503599627370498
-(16777217L: Any) == (16777216f: Any): false
-(16777217: Any) == (16777216f: Any): false
-(1: Any) == BigInt(1): false
-(1: Any) == BigDecimal(1): false
-nullString == "a": throws java.lang.NullPointerException
-"a" == nullString: throws java.lang.NullPointerException
-nullString match: throws java.lang.NullPointerException
-slice eq slice: throws java.lang.RuntimeException: runtime error: comparing uncomparable type []int32
-map eq map: throws java.lang.RuntimeException: runtime error: comparing uncomparable type map[int32]int32
-"a".asInstanceOf[Integer]: java.lang.String
-i + inc(): 2
-ints(-1): throws java.lang.RuntimeException: runtime error: index out of range [-1]
 "\uD83D\uDE00".lastIndexOf(0x1F600): -1
 "\uFFFD".indexOf(0x110000): 0
 NonFatal(StackOverflowError()): true

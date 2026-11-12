@@ -146,22 +146,60 @@ func ConvertToArray[T, U any](s []T, f func(T) U) *Array[U] {
 
 // ---- Foreign values in Scala code -----------------------------------------------------------------
 
-// foreignEquals is reference equality for Go values held by Scala code; values Go cannot compare
-// (maps, slices, funcs) are equal when they are the same object.
+// foreignEquals is Go's == for Go values held by Scala code, extended to the values Go cannot
+// compare: maps, slices and funcs are equal when they are the same object, and structs, arrays
+// and interfaces holding them compare by their parts.
 func foreignEquals(a, b any) bool {
 	ta, tb := reflect.TypeOf(a), reflect.TypeOf(b)
 	if ta != tb {
 		return false
 	}
-	if ta == nil || ta.Comparable() {
+	if ta == nil {
+		return true
+	}
+	if k := ta.Kind(); k != reflect.Struct && k != reflect.Array && ta.Comparable() {
+		return a == b // structs and arrays may have interface parts holding uncomparable values
+	}
+	return foreignValueEquals(reflect.ValueOf(a), reflect.ValueOf(b))
+}
+
+// foreignValueEquals is foreignEquals on two values of the same type.
+func foreignValueEquals(a, b reflect.Value) bool {
+	switch a.Kind() {
+	case reflect.Map, reflect.Slice, reflect.Func, reflect.Pointer, reflect.Chan, reflect.UnsafePointer:
+		return a.Pointer() == b.Pointer() && (a.Kind() != reflect.Slice || a.Len() == b.Len())
+	case reflect.Struct:
+		for i := range a.NumField() {
+			if !foreignValueEquals(a.Field(i), b.Field(i)) {
+				return false
+			}
+		}
+		return true
+	case reflect.Array:
+		for i := range a.Len() {
+			if !foreignValueEquals(a.Index(i), b.Index(i)) {
+				return false
+			}
+		}
+		return true
+	case reflect.Interface:
+		if a.IsNil() || b.IsNil() {
+			return a.IsNil() && b.IsNil()
+		}
+		return a.Elem().Type() == b.Elem().Type() && foreignValueEquals(a.Elem(), b.Elem())
+	}
+	return a.Equal(b) // booleans, numbers and strings
+}
+
+// RefEq implements `eq` on operands that may hold Go values: Go's ==, which panics on two values
+// of the same uncomparable type (maps, slices, funcs, structs holding them); those compare as ==
+// (foreignEquals) does.
+func RefEq(a, b any) bool {
+	// Objects, strings, arrays and boxes first.
+	if k := reflect.ValueOf(a).Kind(); k == reflect.Pointer || k <= reflect.Complex128 {
 		return a == b
 	}
-	va, vb := reflect.ValueOf(a), reflect.ValueOf(b)
-	switch va.Kind() {
-	case reflect.Map, reflect.Slice, reflect.Func, reflect.Pointer, reflect.Chan, reflect.UnsafePointer:
-		return va.Pointer() == vb.Pointer() && (va.Kind() != reflect.Slice || va.Len() == vb.Len())
-	}
-	return false
+	return foreignEquals(a, b)
 }
 
 // foreignHashCode hashes Go values held by Scala code consistently with foreignEquals.

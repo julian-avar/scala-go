@@ -21,6 +21,14 @@ object Main:
     def add(k: Int): Box = { log += s"add$k"; n += k; this }
     def get: Int = n
 
+  /** Reads its private field directly. */
+  final class Counter:
+    private var n = 1
+    private def bump(): Int = { n += 10; n }
+    private def reset(): Int = { n = 0; -1 }
+    def nPlusBump: Int = n + bump()
+    def maxOfNAndReset: Int = Math.max(n, reset())
+
   final class Shown(name: String):
     override def toString: String = { log += s"toString-$name"; name }
 
@@ -74,6 +82,18 @@ object Main:
     val zero = args.length
     show("dividend then divisor")(t("dividend", 7) / t("divisor", zero))
     show("throwing left operand")(t("left", Integer.parseInt("?")) + t("right", 1))
+    show("failing division, then a call")(t("dividend", 7) / zero + t("right", 1))
+    val cells = Array(1, 2, 3)
+    show("failing index, then a call")(cells(zero + 5) + t("right", 1))
+
+    // Fields and array elements read before a call that changes them.
+    var i = 0
+    def inc(): Int = { i += 1; i }
+    show("captured var + call changing it")(i + inc())
+    show("field + call changing it")(Counter().nPlusBump)
+    show("field, then an argument changing it")(Counter().maxOfNAndReset)
+    def setFirst(): Int = { cells(0) = 50; 0 }
+    show("array element + call changing it")(cells(0) + setFirst())
 
     // Constructor arguments, tuple and collection elements.
     show("constructor args")({ val b = new Box(t("init", 3)); b.add(t("k", 1)).get })
