@@ -57,9 +57,6 @@ fail. A fix makes its case fail: move the check to a case run on both the JVM an
 
 | Bug | Fix in |
 |-----|--------|
-| `try throw e finally return x`, `try throw a finally throw b`, and a `try` around an inlined `throw` passed by name: unreachable code, which `go vet` rejects | `FunctionEmitter` |
-| A `throw` typed as a primitive and boxed (`def h(): Any = (throw e): Int`; `boundary[Int] { throw e }` used as `Any`) emits `any()` with no argument | `FunctionEmitter` |
-| A `throw` argument followed by other arguments (`pair(throw e, 1)`): Go syntax error | `FunctionEmitter` |
 | Constant arguments to natives give constant expressions Go rejects: overflow in `Integer.sum(Int.MaxValue, 1)`, `Long.sum`; division by zero in `Integer.divideUnsigned(1, 0)`, `Long.remainderUnsigned(1L, 0L)`; `uint32`/`uint64` overflow in `Character.isISOControl(-1)`, `Float.intBitsToFloat(0xff800000)`, `Double.longBitsToDouble(0x8000000000000000L)` | Natives emitted as Go expressions: convert through variables, not constants |
 | A string literal containing `math.` (`println("math.abs")`) adds an unused `import "math"` to `support.go` | `Linker.goFile`: scan code, not literals |
 | A class `Entry` in the empty package collides with the linker's `entry.go` (Go rejects file names differing only in case); `support.go` likewise | `Linker`: reserve the names |

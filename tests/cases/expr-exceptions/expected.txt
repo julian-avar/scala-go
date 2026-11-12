@@ -29,6 +29,21 @@ throw expression: Success(1) Failure(java.lang.IllegalArgumentException: n=-1)
 throw in getOrElse: throws java.util.NoSuchElementException(none) []
 throw null: java.lang.NullPointerException []
 throw a null variable: java.lang.NullPointerException []
+return in finally after a throw: 1 []
+throw in finally after a throw: throws java.lang.UnsupportedOperationException(from finally) []
+throw as an argument: throws Problem(argument) [first;]
+call returning Nothing as an argument: throws java.lang.RuntimeException(nothing) []
+throwing if as an argument: throws Problem(then) []
+inline throw in a try, by name: 0 []
+boxed throw: throws Problem(boxed) []
+boxed boundary that throws: throws Problem(boundary) []
+boxed throw in a try: throws Problem(in try) []
+boundary that throws, in a try: f []
+throw in a condition: throws Problem(condition) []
+throw after &&: throws Problem(rhs) []
+throw in a concatenation: throws Problem(concat) []
+val of a throwing if: throws Problem(a) []
+throwing match as an operand: throws Problem(zero) []
 NonFatal: RuntimeException=true Exception=true AssertionError=true NotImplementedError=true InterruptedException=false LinkageError=false =false Problem=true Error=true
 recovered q
 no message: null | null | java.lang.RuntimeException
