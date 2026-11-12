@@ -1,0 +1,89 @@
+-- Option
+Some(8) None Some(44) None
+None Some(4) true true true
+4 0 Some(9) Some(4) null
+4 empty true true
+List(4) List() List(4) Right(4) Right(1)
+Some((4,a)) None (Some(1),Some(b)) Some(3) Some(four)
+None Some(x) Some(1) None None
+1 0 4 List(4, 5)
+Some(6)
+None
+Some(10)
+4
+big 4
+List(1, 3) List(1, 3)
+None.get
+true true true
+List(None, Some(1), Some(2))
+List(4) 8 defined 4
+-- Either
+Right(11) Left(bad) Right(5) Left(10 / 0)
+Right(10) Left(3) Right(bad) Left(10)
+20 3 10 0
+Some(10) None List(10) true Success(10)
+true true true true true
+Left(too small) Right(10)
+Right(0) Right(10) bad None
+Right(1) Left(no)
+Right(1) Left(x) 3
+Left(10 / 0)
+Right(9)
+List(2 / 0, 3 / 0) List(1, 3)
+error: bad
+no value
+List(1, 2)
+foreach 10
+() ()
+-- Try
+Success(25) Failure(IllegalArgumentException: negative: -1) Failure(ArithmeticException: zero)
+Success(50) Failure(IllegalArgumentException: negative: -1) Failure(ArithmeticException: zero)
+25 -1 Success(7) true true
+Success(12)
+Failure(ArithmeticException: zero)
+Success(100)
+Failure(NoSuchElementException: Predicate does not hold for 25) Success(25)
+Some(25) None Right(25) Left(negative: -1)
+25 negative: -1
+Success(2525)
+Success(negative: -1)
+Success(java.lang.IllegalArgumentException: negative: -1) Failure(UnsupportedOperationException: Success.failed)
+Success(1)
+Success(quarter)
+Success(52)
+Failure(IllegalArgumentException: negative: -50)
+Failure(NumberFormatException: For input string: "12a")
+Failure(IndexOutOfBoundsException: 5)
+Success(java.lang.NullPointerException)
+Failure(Exception: plain)
+get threw negative: -1
+Failure(IllegalStateException: in map)
+true true 5
+List(100, 20) 2
+Failure(RuntimeException: custom)
+Failure(NotImplementedError: an implementation is missing)
+-- scala.util.control.Exception, NonFatal
+non-fatal RuntimeException
+non-fatal Exception
+fatal InterruptedException
+fatal Control
+fatal LinkageError
+non-fatal Quiet
+0 quiet
+Some(12)
+None
+Left(NumberFormatException)
+true
+None
+None Right(20)
+None
+escaped: negative: -5
+handled zero
+-1
+()
+42
+rethrown 2
+-4 -12 2
+recovered r
+body List(cleanup, cleanup, finally)
+true

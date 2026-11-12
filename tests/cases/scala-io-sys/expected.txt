@@ -1,0 +1,69 @@
+-- Source from strings and streams
+List(first line, second, with comma, third, , last)
+37
+cba
+helo
+List(a, b, c)
+List((x,1), (y,2))
+List(ab, c)
+ok
+List(héllo wörld, zwei)
+16
+café
+one true List(two, three)
+a b 2050 ef
+15
+true
+List(no newline at end)
+List(trailing)
+read by | a reader | null
+a
+List(tab, separated, values)
+UTF-8 ISO-8859-1 US-ASCII UTF-8
+Success(closed by Using)
+-- Source from files
+List((apple,3), (pear,5), (fig,12))
+20
+4
+4
+fig,12
+List(ünïcödé ✓, zweite Zeile)
+22
+200010000
+List(written by PrintWriter, second)
+WRITTEN BY PRINTWRITER|SECOND
+FileNotFoundException
+Vector(8, 7, 6, 6)
+name,qty;apple,3
+-- StdIn, Console.withIn
+line: Ada Lovelace
+int 42, double 2.5, boolean true
+split: x 7 y
+prompt> prompted: answer
+rest: List(rest one, rest two ünï)
+at EOF: null
+withIn: from a reader 43
+withIn stream: bytes in
+-- sys.props
+None
+value value true
+2
+None default
+List(scala-io-sys.key)
+Some(value) None
+true / :
+true
+java.awt.headless false
+true
+fallback None
+1 false
+-- sys.env
+hello from env.txt
+Some(42)
+None
+default
+List((SCALA_IO_SYS_COUNT,21), (SCALA_IO_SYS_EMPTY,), (SCALA_IO_SYS_GREETING,hello from env.txt))
+true []
+true
+21
+SCALA_IO_SYS_UNSET

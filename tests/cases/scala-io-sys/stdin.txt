@@ -1,0 +1,8 @@
+Ada Lovelace
+42
+2.5
+true
+x 7 y
+answer
+rest one
+rest two ünï

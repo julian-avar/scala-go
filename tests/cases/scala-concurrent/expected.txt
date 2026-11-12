@@ -1,0 +1,52 @@
+-- Promise
+false None
+42
+false false false Some(Success(42))
+IllegalStateException: Promise already completed.
+Success(s) Failure(java.lang.ArithmeticException: f)
+Success(t)
+Failure(java.lang.IllegalArgumentException: completed with failure)
+winners: 1 completed: true
+-- combinators
+10 List(first 10, third Success(10))
+15
+Failure(java.lang.IllegalStateException: thrown by delegate)
+() true false None
+Success(java.util.concurrent.TimeoutException)
+List(1, 2)
+ab
+List(1, 4, 9)
+20
+7
+6
+Failure(scala.concurrent.Future$$anon$2: Future.filter predicate is not satisfied)
+only one completes
+((1,one),1.0)
+List(3, 2, 1)
+-- failures
+Failure(java.util.concurrent.ExecutionException: Boxed Exception)
+ExecutionException caused by InterruptedException
+Failure(java.util.concurrent.ExecutionException: Boxed Exception)
+Failure(java.lang.IllegalStateException: wrapped original)
+Success(-8)
+Failure(java.lang.RuntimeException: original) Failure(java.lang.RuntimeException: original)
+Failure(java.lang.RuntimeException: original)
+Success(Some(4))
+Failure(java.lang.RuntimeException: original)
+Success(original)
+Failure(scala.concurrent.Future$$anon$3: Future.failed not completed with a throwable.)
+Some(true)
+-- Channel, SyncVar, Deadline
+55
+put by another thread
+false None
+true again
+true false true
+true true
+-- ExecutionContext
+6
+reported to the handler
+true
+List(1, 2) 1
+36
+Duration.Inf

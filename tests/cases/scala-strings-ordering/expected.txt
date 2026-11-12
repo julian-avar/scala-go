@@ -1,0 +1,134 @@
+-- StringOps
+dlroW ,olleH HELLO, WORLD hello, world 12
+Hello World rld Hello ll
+H d o Some(H) None e
+HW ,  3 false
+hELLO, wORLD
+HHeellll
+4 8 7 6
+true true true false false
+List(Hello, World)
+List(a, b, c)
+List(a, b, c)
+List(one, two, , three)
+padded|x...|
+abcabcabc
+Scala Scala
+first
+second
+line1
+line2
+file x
+List(a, b, c)
+List(2, 2)
+43 -7 7.0 true 1000.0
+Some(12) None None Some(1.5) None
+None Some(127) Some(-32768) Some(5)
+For input string: "abc"
+Hello World
+ban aaabnn List((a,3), (b,1), (n,2))
+List(ab, cd, ef) List(abc, bcd)
+ha,eb,lc
+a+b+c baa x#y#
+-1 1 true true
+2 7 語本日
+72,101,108,108,111
+HEO (e,hllo)
+cba 0x1y2z
+(mi,ssissippi) (miss,issippi) 2
+List(H, e, l, l, o) ab 2 Jello
+x true 294 97 aa
+Jello abc abc abcd
+3 items k=v
+-- Interpolators
+Ada has 6 items; $5; many
+no\tescape\n Ada
+tab	here
+Ada is 3, pi is 3.142, padded [   3] [Ada  ] [003]
+1.5 100 c true 1.23e-04
+Point(1,2) List(1, 2) Some(x) (1,a) null
+HELLO ADA!
+a1b2c
+x	y
+key -> value
+2048
+-- format
+42|   42|42   |00042|+42|-42
+abc|       abc|abc       |ab
+3.14|   2.718|1.1     |3|1.000000
+ff|FF|10|0000beef|0xff
+z|false|%|1.234568e+04|1.235e-04
+List(1, 2) Some(1) null
+9223372036854775807 -2147483648 7
+-0.001 0.1 10000000000.00
+    2.7183|7         |
+a-b1
+c 3.00 1.5
+-- Rich wrappers
+5 3 5 -1 0 -1
+1010 ff 10 ffffffff 101
+Range 3 until 6 Range 3 to 9 by 3 Vector(1, 2, 3)
+3 2.0 3.0 -2 2.4 -1.0
+true false true true true
+3 44 4464 A 65 1.0E10
+180.0 3.141592653589793
+true true true true A z
+7 15 true false true
+List(a, b, c, d, e) 2 c
+true false true false true
+2147483647 -2147483648 9223372036854775807 -128 32767 65535
+1.7976931348623157E308 4.9E-324 3.4028235E38 1.4E-45
+true 1 2 3.0
+-- Ordering, Ordered
+List(0.9, 1.2, 1.10)
+true true 1.10 0.9
+0 3.0
+List(Person(Cy,25), Person(Bo,30), Person(Al,30))
+List(Person(Cy,25), Person(Al,30), Person(Bo,30))
+List(Person(Bo,30), Person(Al,30), Person(Cy,25))
+List(Person(Cy,25), Person(Al,30), Person(Bo,30))
+List(Person(Al,30), Person(Bo,30), Person(Cy,25))
+Person(Cy,25) Person(Cy,25)
+List(a, bb, ccc)
+List(ccc, bb, a)
+List(a, b)
+-1 true 7 true
+1 List(-1.0, 2.0, NaN)
+List(None, Some(1), Some(2))
+List((1,z), (2,a), (2,b))
+List(List(0, 5), List(1), List(1, 2))
+List(Left(3), Left(1), Right(a))
+1 -1 1
+true true true
+true List(3, 2, 1)
+List(Person(Al,30), Person(Bo,30), Person(Cy,25))
+Person(Cy,25)
+-- Sorting
+List(Apple, Banana, apple, banana, cherry)
+List(Apple, apple, banana, Banana, cherry)
+List(Apple, apple, banana, Banana, cherry)
+List(Apple, apple, Banana, banana, cherry)
+List(Apple, apple, banana, Banana, cherry)
+List((y,1), (w,1), (x,2), (z,2))
+1,2,5,9
+abc
+Vector(-1.0, 2.25, 3.5)
+Vector(20, 15, 10, 5, 16, 11)
+List(1, 3, 5, 2, 4, 6)
+List(0.5, 1.10, 1.1)
+List(-1, 100000000000000000000)
+List(A, a, b) List(false, true) List(1, 3)
+-- Numeric, Integral, Fractional
+6 4.0 100000000000000000001 3
+2.3333333333333335 1.5 2
+6 12 1048576 7
+10 3 -3 -3.0 3 -1 -1
+7.25 -2.5 2 2.5 2.5 1.0 1
+3.25 1.5 -1 -1.5 1.5 -1 -1
+50 7 -7 -7.0 7 -1 -1
+Some(12) None 5
+6 3.0 0.0
+(3,2) (3,2) -2
+-3 -1 9 -1 2
+0.125 3 -2.0 6.0
+3 -2.0 b

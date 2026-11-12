@@ -1,0 +1,5 @@
+List(1).getClass.getSimpleName: colon
+classOf[::[?]].getSimpleName: colon
+classOf[++].getSimpleName: plus
+NonFatal(OutOfMemoryError()): true
+OutOfMemoryError is a VirtualMachineError: false
