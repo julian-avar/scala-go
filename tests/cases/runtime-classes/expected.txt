@@ -13,17 +13,17 @@ java.lang.Integer | java.lang.Integer | Integer | class java.lang.Integer | arra
 java.lang.String | java.lang.String | String | class java.lang.String | array=false primitive=false component=-
 java.lang.Object | java.lang.Object | Object | class java.lang.Object | array=false primitive=false component=-
 java.util.ArrayList | java.util.ArrayList | ArrayList | class java.util.ArrayList | array=false primitive=false component=-
-java.util.Map$Entry | java.util.Map$Entry | Entry | array=false primitive=false component=-
+java.util.Map$Entry | java.util.Map$Entry | Entry | interface java.util.Map$Entry | array=false primitive=false component=-
 java.lang.Thread$State | java.lang.Thread$State | State | class java.lang.Thread$State | array=false primitive=false component=-
-[I | int[] | class [I | array=true primitive=false component=int
-[[D | double[][] | class [[D | array=true primitive=false component=[D
-[B | byte[] | class [B | array=true primitive=false component=byte
-[C | char[] | class [C | array=true primitive=false component=char
-[Ljava.lang.String; | String[] | class [Ljava.lang.String; | array=true primitive=false component=java.lang.String
-[[Ljava.lang.String; | String[][] | class [[Ljava.lang.String; | array=true primitive=false component=[Ljava.lang.String;
-[Ljava.lang.Object; | Object[] | class [Ljava.lang.Object; | array=true primitive=false component=java.lang.Object
+[I | int[] | int[] | class [I | array=true primitive=false component=int
+[[D | double[][] | double[][] | class [[D | array=true primitive=false component=[D
+[B | byte[] | byte[] | class [B | array=true primitive=false component=byte
+[C | char[] | char[] | class [C | array=true primitive=false component=char
+[Ljava.lang.String; | java.lang.String[] | String[] | class [Ljava.lang.String; | array=true primitive=false component=java.lang.String
+[[Ljava.lang.String; | java.lang.String[][] | String[][] | class [[Ljava.lang.String; | array=true primitive=false component=[Ljava.lang.String;
+[Ljava.lang.Object; | java.lang.Object[] | Object[] | class [Ljava.lang.Object; | array=true primitive=false component=java.lang.Object
 rtclasses.Square | rtclasses.Square | Square | class rtclasses.Square | array=false primitive=false component=-
-rtclasses.Shape | rtclasses.Shape | Shape | array=false primitive=false component=-
+rtclasses.Shape | rtclasses.Shape | Shape | interface rtclasses.Shape | array=false primitive=false component=-
 rtclasses.Point | rtclasses.Point | Point | class rtclasses.Point | array=false primitive=false component=-
 rtclasses.Registry$Entry | rtclasses.Registry$Entry | Entry | class rtclasses.Registry$Entry | array=false primitive=false component=-
 rtclasses.Registry$ | rtclasses.Registry$ | Registry$ | class rtclasses.Registry$ | array=false primitive=false component=-
@@ -39,7 +39,7 @@ scala.None$ | scala.None$ | None$ | class scala.None$ | array=false primitive=fa
 scala.collection.immutable.List | scala.collection.immutable.List | List | class scala.collection.immutable.List | array=false primitive=false component=-
 scala.collection.immutable.Nil$ | scala.collection.immutable.Nil$ | Nil$ | class scala.collection.immutable.Nil$ | array=false primitive=false component=-
 java.lang.RuntimeException | java.lang.RuntimeException | RuntimeException | class java.lang.RuntimeException | array=false primitive=false component=-
-java.lang.Runnable | java.lang.Runnable | Runnable | array=false primitive=false component=-
+java.lang.Runnable | java.lang.Runnable | Runnable | interface java.lang.Runnable | array=false primitive=false component=-
 -- getClass
 java.lang.Integer
 java.lang.Long
@@ -85,6 +85,40 @@ int[] <- int[]: true
 long[] <- int[]: false
 Exception <- IllegalStateException: true
 RuntimeException <- Exception: false
+-- hierarchy
+rtclasses.Square: super=class java.lang.Object interfaces=[rtclasses.Shape] interface=false enum=false canonical=rtclasses.Square
+rtclasses.Shape: super=null interfaces=[] interface=true enum=false canonical=rtclasses.Shape
+rtclasses.Point: super=class java.lang.Object interfaces=[java.io.Serializable,scala.Product] interface=false enum=false canonical=rtclasses.Point
+java.lang.Object: super=null interfaces=[] interface=false enum=false canonical=java.lang.Object
+int: super=null interfaces=[] interface=false enum=false canonical=int
+java.lang.String: super=class java.lang.Object interfaces=[java.io.Serializable,java.lang.CharSequence,java.lang.Comparable,java.lang.constant.Constable,java.lang.constant.ConstantDesc] interface=false enum=false canonical=java.lang.String
+[I: super=class java.lang.Object interfaces=[java.io.Serializable,java.lang.Cloneable] interface=false enum=false canonical=int[]
+[Ljava.lang.String;: super=class java.lang.Object interfaces=[java.io.Serializable,java.lang.Cloneable] interface=false enum=false canonical=java.lang.String[]
+rtclasses.Registry$Entry: super=class java.lang.Object interfaces=[] interface=false enum=false canonical=rtclasses.Registry.Entry
+Outer$Nested: super=class java.lang.Object interfaces=[] interface=false enum=false canonical=Outer.Nested
+java.lang.IllegalStateException: super=class java.lang.RuntimeException interfaces=[] interface=false enum=false canonical=java.lang.IllegalStateException
+java.lang.Thread$State: super=class java.lang.Enum interfaces=[] interface=false enum=true canonical=java.lang.Thread.State
+java.lang.Runnable: super=null interfaces=[] interface=true enum=false canonical=java.lang.Runnable
+java.util.Map$Entry: super=null interfaces=[] interface=true enum=false canonical=java.util.Map.Entry
+Main$Local$1: super=class java.lang.Object interfaces=[] interface=false enum=false canonical=null
+[LMain$Local$1;: super=class java.lang.Object interfaces=[java.io.Serializable,java.lang.Cloneable] interface=false enum=false canonical=null
+Cat: super=class java.lang.Object interfaces=[rtclasses.Shape] interface=false enum=false canonical=Cat
+Color: super=class java.lang.Object interfaces=[scala.reflect.Enum] interface=false enum=false canonical=Color
+List(NEW, RUNNABLE, BLOCKED, WAITING, TIMED_WAITING, TERMINATED) true true
+-- isInstance, cast, forName
+true false true false
+true false true true
+rtclasses.Square
+null
+cast: ClassCastException
+rtclasses.Square
+[I
+[Ljava.lang.String;
+true
+ClassNotFoundException: no.such.Class
+ClassNotFoundException: rtclasses.Square2
+ClassNotFoundException: int
+ClassNotFoundException: no.Such
 -- loaders, assertions
 null null null
 desiredAssertionStatus: false

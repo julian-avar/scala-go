@@ -57,6 +57,9 @@ func ToGoString(x any) string {
 	case *BoxedUnit:
 		return "()"
 	case *Class:
+		if v == nil {
+			return "null"
+		}
 		return ClassToString(v).GoString()
 	case *BigInteger:
 		return v.String()

@@ -125,3 +125,4 @@ object Main:
     val blockingSum = Future.traverse((1 to 8).toList)(i => Future(blocking { Thread.sleep(5); i }))
     println(await(blockingSum).sum)
     println(Await.result(Future(Duration.Inf.toString), Duration.Inf))
+    println(s"mapTo: ${await(Future.successful[Any]("a").mapTo[String])} ${Try(await(Future.successful[Any](1).mapTo[String])).failed.get.getClass.getName}")

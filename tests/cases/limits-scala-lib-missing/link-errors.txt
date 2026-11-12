@@ -3,5 +3,3 @@ class java.text.MessageFormat is not available (no IR)
 static method java.lang.Math.ulp(D)D is not available
 static method java.lang.Math.ulp(F)F is not available
 static method java.math.BigInteger.probablePrime(ILjava.util.Random;)Ljava.math.BigInteger; is not available
-method java.lang.Class.cast(Ljava.lang.Object;)Ljava.lang.Object; is not available
-method java.lang.Class.isInstance(Ljava.lang.Object;)Z is not available

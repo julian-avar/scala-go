@@ -1,1 +1,0 @@
-Pins what scala-go does today; the JVM's results are in comments.

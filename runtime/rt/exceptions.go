@@ -36,6 +36,7 @@ const (
 	IO
 	NoSuchMethod
 	NoSuchField
+	ClassNotFound
 )
 
 var kindNames = [...]string{
@@ -47,7 +48,7 @@ var kindNames = [...]string{
 	"java.lang.RuntimeException", "java.lang.IllegalMonitorStateException",
 	"java.lang.InterruptedException", "java.lang.NoClassDefFoundError",
 	"java.lang.IndexOutOfBoundsException", "java.io.IOException",
-	"java.lang.NoSuchMethodError", "java.lang.NoSuchFieldError",
+	"java.lang.NoSuchMethodError", "java.lang.NoSuchFieldError", "java.lang.ClassNotFoundException",
 }
 
 // MakeException is installed by the generated program: it instantiates the Scala exception

@@ -4,6 +4,8 @@ import scala.collection.mutable
 
 import dotty.tools.backend.ScalaPrimitives
 import dotty.tools.backend.ScalaPrimitivesOps.*
+import dotty.tools.backend.jvm.BCodeUtils.isAnonymousOrLocalClass
+import dotty.tools.backend.jvm.SymbolUtils.given
 import dotty.tools.dotc.CompilationUnit
 import dotty.tools.dotc.ast.tpd.*
 import dotty.tools.dotc.core.Constants.*
@@ -94,7 +96,24 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
     val methods = members.collect { case dd: DefDef => genMethod(dd).copy(goExport = goExport(dd, exportedType)) }
 
     ir.ClassDef(className(sym), kind, sym.is(Abstract), superClass, interfaces, fields, methods, position(td),
-      goExport = exportedType)
+      goExport = exportedType, innerClass = innerClass(sym))
+
+  /** The class's entry in the JVM's `InnerClasses` attribute, made as the JVM backend makes it
+   *  (`BTypeLoader.buildNestedInfo`); `None` for a top-level class.
+   */
+  private def innerClass(sym: ClassSymbol): Option[ir.InnerClass] =
+    val enclosing = sym.originalOwner.originalLexicallyEnclosingClass
+    if enclosing.is(PackageClass) then None
+    else
+      val outer =
+        if isAnonymousOrLocalClass(sym) then None
+        // A member of a top-level object is one of its mirror class, as in Java.
+        else if enclosing.isTopLevelModuleClass then Some(className(enclosing).stripSuffix("$"))
+        else Some(className(enclosing))
+      val name =
+        if sym.isAnonymousClass || sym.isAnonymousFunction then ""
+        else atPhase(sym.initial.validFor.lastPhaseId)(sym.targetName).mangledString
+      Some(ir.InnerClass(outer, name))
 
   // -------------------------------------------------------------------------------------------
   // Static forwarders

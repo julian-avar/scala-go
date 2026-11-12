@@ -16,3 +16,5 @@ CanEqual: true false false true
 derived instances: 6 ab (3,xy)
 ClassTag: s,s,s 14 java.lang.String int scala.collection.immutable.List [I
 ClassTag newArray: 3 true
+TypeTest: List(Num(1), Num(2)) List(a, b) List(1, 2)
+elementWise: Some(List(1, 2)) None

@@ -30,6 +30,8 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
   val usedNatives = mutable.HashSet.empty[(ClassName, MethodName)]
   /** Go facades used by reachable code: their packages' APIs are loaded for code generation. */
   val usedFacades = mutable.LinkedHashSet.empty[ClassName]
+  /** Classes named by `classOf` in reachable code. */
+  val classLiterals = mutable.LinkedHashSet.empty[ClassName]
   private val bodies = mutable.HashMap.empty[(ClassName, MethodName), Tree]
   private val queue = mutable.Queue.empty[(ClassName, MethodName)]
 
@@ -90,7 +92,27 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
       bodies((cls, m)) = lowered
       current = Some((cls, m))
       scan(lowered)
+      if queue.isEmpty then
+        current = None
+        reachEnumValues()
     current = None
+
+  /** Enum classes whose `values()` is reachable for `Class.getEnumConstants`. */
+  val enumValues = mutable.HashSet.empty[ClassName]
+  private val enumCandidates = mutable.HashSet.empty[ClassName]
+
+  /** `Class.getEnumConstants` calls `values()` of the enum classes it may be asked about: those
+   *  the program's objects are instances of, and those `classOf` names (see Linker.classInfos).
+   */
+  private def reachEnumValues(): Unit =
+    if usedNatives.contains(Natives.ClassGetEnumConstants) then
+      for
+        c <- (instantiated ++ classLiterals).toList.flatMap(c => program.ancestors(c) + c).distinct
+        if enumCandidates.add(c)
+        call <- program.enumValuesCall(c)
+      do
+        enumValues += c
+        scan(call)
 
   private def error(tree: Tree, msg: String): Unit =
     errors.add(tree.pos, s"$msg\n${reachabilityChain(current)}")
@@ -247,6 +269,9 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
           else program.staticFieldViaCompanion(sel) match
             case Some(read) => scan(read)
             case None       => missing(tree, Analyzer.MissingKind.Field, s"static field $cls.$field is not available")
+
+      case ClassOf(Type.Class(cls)) =>
+        classLiterals += cls
 
       case Unsupported(msg, _) =>
         missing(tree, Analyzer.MissingKind.Unsupported, msg)

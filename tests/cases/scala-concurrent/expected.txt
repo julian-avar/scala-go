@@ -50,3 +50,4 @@ true
 List(1, 2) 1
 36
 Duration.Inf
+mapTo: a java.lang.ClassCastException

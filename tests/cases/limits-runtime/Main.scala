@@ -7,6 +7,8 @@ import java.lang.ref.WeakReference
 class Finalizable:
   override def finalize(): Unit = Main.finalized = true
 
+class NeverUsed
+
 object Main:
   @volatile var finalized = false
 
@@ -21,8 +23,9 @@ object Main:
   def main(args: Array[String]): Unit =
     // Classpath resources are not embedded. JVM: true
     attempt("resource found")(classOf[Main.type].getResourceAsStream("/Main.class") != null)
-    // JVM: throws ClassNotFoundException
-    attempt("Class.forName of a missing class")(Class.forName("no.such.Class").getName)
+
+    // Class.forName finds only the classes the program uses. JVM: NeverUsed
+    attempt("Class.forName of a class the program never uses")(Class.forName("NeverUsed").getName)
 
     // Weak references hold their referents strongly; finalizers never run. JVM: true, 0, true
     // (after a collection, nothing else refers to the referents)

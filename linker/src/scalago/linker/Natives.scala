@@ -191,18 +191,27 @@ object Natives:
   // ---- java.lang.Class ------------------------------------------------------------------------
 
   private val C = Hijacked.ClassClass
+  // The runtime knows the program's classes from the linker (rt.DefineClasses, Linker.supportFile).
   instanceFn(C, "getName()Ljava.lang.String;", "rt.ClassGetName")
-  instanceFn(C, "getTypeName()Ljava.lang.String;", "rt.ClassGetName")
+  instanceFn(C, "getTypeName()Ljava.lang.String;", "rt.ClassGetTypeName")
   instanceFn(C, "getSimpleName()Ljava.lang.String;", "rt.ClassGetSimpleName")
+  instanceFn(C, "getCanonicalName()Ljava.lang.String;", "rt.ClassGetCanonicalName")
   // A Go binary carries no class path resources.
   methods((C, parseMethod("getResourceAsStream(Ljava.lang.String;)Ljava.io.InputStream;"))) = NullResult
   instanceFn(C, "isArray()Z", "rt.ClassIsArray")
   instanceFn(C, "isPrimitive()Z", "rt.ClassIsPrimitive")
+  instanceFn(C, "isInterface()Z", "rt.ClassIsInterface")
+  instanceFn(C, "isEnum()Z", "rt.ClassIsEnum")
   instanceFn(C, "getComponentType()Ljava.lang.Class;", "rt.ClassGetComponentType")
+  instanceFn(C, "getSuperclass()Ljava.lang.Class;", "rt.ClassGetSuperclass")
+  instanceFn(C, "getInterfaces()[Ljava.lang.Class;", "rt.ClassGetInterfaces")
+  instanceFn(C, "getEnumConstants()[Ljava.lang.Object;", "rt.ClassGetEnumConstants")
+  /** When reachable, the `values()` of enum classes are (see Analyzer.reachEnumValues). */
+  val ClassGetEnumConstants: (ClassName, MethodName) = (C, parseMethod("getEnumConstants()[Ljava.lang.Object;"))
   instanceFn(C, "toString()Ljava.lang.String;", "rt.ClassToString")
   instanceFn(C, "isAssignableFrom(Ljava.lang.Class;)Z", "rt.ClassIsAssignableFrom")
-  /** When reachable, the linker gives the runtime the program's class hierarchy (Linker.supportFile). */
-  val ClassIsAssignableFrom: (ClassName, MethodName) = (C, parseMethod("isAssignableFrom(Ljava.lang.Class;)Z"))
+  instanceFn(C, "isInstance(Ljava.lang.Object;)Z", "rt.ClassIsInstance")
+  instanceFn(C, "cast(Ljava.lang.Object;)Ljava.lang.Object;", "rt.ClassCastValue")
   instance(C, "desiredAssertionStatus()Z")((_, _) => "false")
   instance(C, "getClassLoader()Ljava.lang.ClassLoader;")((_, _) => "nil")
   staticFn(C, "forName(Ljava.lang.String;)Ljava.lang.Class;", "rt.ClassForName")
@@ -436,6 +445,7 @@ object Natives:
   staticFn(System, "identityHashCode(Ljava.lang.Object;)I", "rt.IdentityHashCode")
   staticFn(System, "exit(I)V", "rt.Exit")
   staticFn(System, "getenv(Ljava.lang.String;)Ljava.lang.String;", "rt.Getenv")
+  staticFn(System, "gc()V", "rt.GC")
 
   private val ReflectArray = "java.lang.reflect.Array"
   staticFn(ReflectArray, "newInstance(Ljava.lang.Class;I)Ljava.lang.Object;", "rt.NewArrayOf")
@@ -733,6 +743,7 @@ object Natives:
       "yieldNow()V" -> "rt.Yield",
       "holdsLock(Ljava.lang.Object;)Z" -> "rt.MonitorHeldByCurrent",
       "activeCount()I" -> "rt.ActiveThreadCount",
+      "blockedIn(Ljava.lang.Object;)I" -> "rt.ThreadBlockedIn",
       "park(Ljava.lang.Object;J)V" -> "rt.Park",
       "unpark(Ljava.lang.Object;)V" -> "rt.Unpark"
     )
