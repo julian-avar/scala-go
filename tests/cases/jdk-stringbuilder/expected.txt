@@ -1,0 +1,56 @@
+== append
+sc121.52.25truenullxybc345[sb]List(1, 2)null{buf}
+NaN -Infinity -0.0 1.0E10 -9223372036854775808
+A😀é 4
+init cs [] 100
+== insert, delete, replace
+null1.5a7true01b2345678942
+null<cs>List(x)1.5a7true01b2345678942
+<cs>List(x)1.5a7true01b2345678942
+<cs>L
+cs>L
+cREPLACEDL
+cR!
+cR!-end
+ZR!-end
+abc bc ab bc c
+== reverse
+olleh
+0
+c𝄞b😀a 63,1d11e,62,1f600,61
+7a,dc00,79,d800,78
+d800,dc00
+== length and capacity
+[abc] 3
+97,98,99,0,0 5
+[] 0 true
+capacity 16
+ensureCapacity true
+after 100 100 true
+.ell.
+compareTo -1 1 0
+equals by identity false
+== indexOf
+1 4 -1 7 4 0 9
+104,233,108,108,111
+== StringBuffer
+one 2 3 4.5 6.75 false!?bxynull+ 32
+> 2 3 4.5 6.75 false!?bxynull+
+# 2 3 4.   2 3 4. 2  # 2 5
+cs [] 10
+== errors
+charAt(3): java.lang.StringIndexOutOfBoundsException
+charAt(-1): java.lang.StringIndexOutOfBoundsException
+setCharAt(5): java.lang.StringIndexOutOfBoundsException
+insert(4): java.lang.StringIndexOutOfBoundsException
+insert(-1): java.lang.StringIndexOutOfBoundsException
+delete(2, 1): java.lang.StringIndexOutOfBoundsException
+delete(-1, 1): java.lang.StringIndexOutOfBoundsException
+deleteCharAt(3): java.lang.StringIndexOutOfBoundsException
+replace(4, 5): java.lang.StringIndexOutOfBoundsException
+replace(2, 1): java.lang.StringIndexOutOfBoundsException
+substring(2, 5): java.lang.StringIndexOutOfBoundsException
+substring(4): java.lang.StringIndexOutOfBoundsException
+setLength(-1): java.lang.StringIndexOutOfBoundsException: String index out of range: -1
+new StringBuilder(-1): java.lang.NegativeArraySizeException: -1
+StringBuffer charAt(9): java.lang.StringIndexOutOfBoundsException

@@ -1,0 +1,94 @@
+== construction
+-9223372036854775808 0 0 42 123 0
+255 -255 1295 -5 511
+1512366075204170929049582354406559215
+new BigInteger("12a"): java.lang.NumberFormatException: For input string: "12a"
+new BigInteger(" 1"): java.lang.NumberFormatException: For input string: " 1"
+new BigInteger("1 "): java.lang.NumberFormatException: For input string: "1 "
+new BigInteger("1.0"): java.lang.NumberFormatException: For input string: "1.0"
+new BigInteger("1e3"): java.lang.NumberFormatException: For input string: "1e3"
+new BigInteger(""): java.lang.NumberFormatException
+new BigInteger("-"): java.lang.NumberFormatException
+new BigInteger("+"): java.lang.NumberFormatException
+new BigInteger("--1"): java.lang.NumberFormatException
+new BigInteger("+-1"): java.lang.NumberFormatException
+new BigInteger("0x10"): java.lang.NumberFormatException
+digit out of radix: java.lang.NumberFormatException
+bytes 256 -1 -32768 255 -1
+signum+magnitude 65535 -256 0 0
+empty bytes: java.lang.NumberFormatException: Zero length BigInteger
+== arithmetic
+123456789011358024580135802458 123456789013333333222333333322 -121932631137021795212620027521140070120989178480 -124999998860 925925953827160370 124999998860 -925925953827160370
+divideAndRemainder -17636684144620811271604938270 0 -3,-1 -3,1
+pow 1267650600228229401496703205376 -243 1 1 1000000000000000000000000000000
+abs 987654321098765432 123456789012345678901234567890 signum -1 1 0 min -987654321098765432 max 123456789012345678901234567890
+factorial 30 265252859812191058636308480000000
+fib 150 9969216677189303386214405760200
+divide by zero: java.lang.ArithmeticException: BigInteger divide by zero
+remainder by zero: java.lang.ArithmeticException: BigInteger divide by zero
+divideAndRemainder by zero: java.lang.ArithmeticException: BigInteger divide by zero
+pow(-1): java.lang.ArithmeticException: Negative exponent
+== modular
+mod 2 1 0 802565165 rem -1
+mod(-3): java.lang.ArithmeticException: BigInteger: modulus not positive
+mod(0): java.lang.ArithmeticException: BigInteger: modulus not positive
+modPow 445 976371285 2 5 0 1
+modPow(m = 0): java.lang.ArithmeticException: BigInteger: modulus not positive
+modPow(-1, not invertible): java.lang.ArithmeticException: BigInteger not invertible.
+modInverse 4 7 12 700683479 0
+modInverse not invertible: java.lang.ArithmeticException: BigInteger not invertible.
+modInverse(-5): java.lang.ArithmeticException: BigInteger: modulus not positive
+gcd 6 6 5 0 1234567890
+== bits
+0: bitLength=0 bitCount=0 lowest=-1 not=-1 shl3=0 shr3=0 shr-2=0 shr200=0 test0=false test70=false set5=32 clear0=0 flip7=128
+1: bitLength=1 bitCount=1 lowest=0 not=-2 shl3=8 shr3=0 shr-2=4 shr200=0 test0=true test70=false set5=33 clear0=0 flip7=129
+2: bitLength=2 bitCount=1 lowest=1 not=-3 shl3=16 shr3=0 shr-2=8 shr200=0 test0=false test70=false set5=34 clear0=2 flip7=130
+10: bitLength=4 bitCount=2 lowest=1 not=-11 shl3=80 shr3=1 shr-2=40 shr200=0 test0=false test70=false set5=42 clear0=10 flip7=138
+-1: bitLength=0 bitCount=0 lowest=0 not=0 shl3=-8 shr3=-1 shr-2=-4 shr200=-1 test0=true test70=true set5=-1 clear0=-2 flip7=-129
+127: bitLength=7 bitCount=7 lowest=0 not=-128 shl3=1016 shr3=15 shr-2=508 shr200=0 test0=true test70=false set5=127 clear0=126 flip7=255
+128: bitLength=8 bitCount=1 lowest=7 not=-129 shl3=1024 shr3=16 shr-2=512 shr200=0 test0=false test70=false set5=160 clear0=128 flip7=0
+-128: bitLength=7 bitCount=7 lowest=7 not=127 shl3=-1024 shr3=-16 shr-2=-512 shr200=-1 test0=false test70=true set5=-96 clear0=-128 flip7=-256
+-129: bitLength=8 bitCount=1 lowest=0 not=128 shl3=-1032 shr3=-17 shr-2=-516 shr200=-1 test0=true test70=true set5=-129 clear0=-130 flip7=-1
+255: bitLength=8 bitCount=8 lowest=0 not=-256 shl3=2040 shr3=31 shr-2=1020 shr200=0 test0=true test70=false set5=255 clear0=254 flip7=127
+65536: bitLength=17 bitCount=1 lowest=16 not=-65537 shl3=524288 shr3=8192 shr-2=262144 shr200=0 test0=false test70=false set5=65568 clear0=65536 flip7=65664
+-2147483648: bitLength=31 bitCount=31 lowest=31 not=2147483647 shl3=-17179869184 shr3=-268435456 shr-2=-8589934592 shr200=-1 test0=false test70=true set5=-2147483616 clear0=-2147483648 flip7=-2147483520
+9223372036854775807: bitLength=63 bitCount=63 lowest=0 not=-9223372036854775808 shl3=73786976294838206456 shr3=1152921504606846975 shr-2=36893488147419103228 shr200=0 test0=true test70=false set5=9223372036854775807 clear0=9223372036854775806 flip7=9223372036854775679
+-9223372036854775809: bitLength=64 bitCount=1 lowest=0 not=9223372036854775808 shl3=-73786976294838206472 shr3=-1152921504606846977 shr-2=-36893488147419103236 shr200=-1 test0=true test70=true set5=-9223372036854775809 clear0=-9223372036854775810 flip7=-9223372036854775937
+123456789012345678901234567890: bitLength=97 bitCount=54 lowest=1 not=-123456789012345678901234567891 shl3=987654312098765431209876543120 shr3=15432098626543209862654320986 shr-2=493827156049382715604938271560 shr200=0 test0=false test70=true set5=123456789012345678901234567922 clear0=123456789012345678901234567890 flip7=123456789012345678901234567762
+-123456789012345678901234567890: bitLength=97 bitCount=54 lowest=1 not=123456789012345678901234567889 shl3=-987654312098765431209876543120 shr3=-15432098626543209862654320987 shr-2=-493827156049382715604938271560 shr200=-1 test0=false test70=false set5=-123456789012345678901234567890 clear0=-123456789012345678901234567890 flip7=-123456789012345678901234567762
+and 333356889211408416 or -11691381468458321985 xor -12024738357669730401 andNot -12679035790445976306 654297432776245905
+and neg -8 or neg -1 xor -256
+testBit(-1): java.lang.ArithmeticException: Negative bit address
+setBit(-1): java.lang.ArithmeticException: Negative bit address
+== conversions
+0: int=0 long=0 short=0 byte=0 double=0.0 float=0.0 bytes=[00] hex=0 r36=0 r2=1 r1=0 hash=0
+1: int=1 long=1 short=1 byte=1 double=1.0 float=1.0 bytes=[01] hex=1 r36=1 r2=1 r1=1 hash=1
+2: int=2 long=2 short=2 byte=2 double=2.0 float=2.0 bytes=[02] hex=2 r36=2 r2=2 r1=2 hash=2
+10: int=10 long=10 short=10 byte=10 double=10.0 float=10.0 bytes=[0a] hex=a r36=a r2=4 r1=10 hash=10
+127: int=127 long=127 short=127 byte=127 double=127.0 float=127.0 bytes=[7f] hex=7f r36=3j r2=7 r1=127 hash=127
+128: int=128 long=128 short=128 byte=-128 double=128.0 float=128.0 bytes=[00 80] hex=80 r36=3k r2=8 r1=128 hash=128
+-129: int=-129 long=-129 short=-129 byte=127 double=-129.0 float=-129.0 bytes=[ff 7f] hex=-81 r36=-3l r2=9 r1=-129 hash=-129
+255: int=255 long=255 short=255 byte=-1 double=255.0 float=255.0 bytes=[00 ff] hex=ff r36=73 r2=8 r1=255 hash=255
+65536: int=65536 long=65536 short=0 byte=0 double=65536.0 float=65536.0 bytes=[01 00 00] hex=10000 r36=1ekg r2=17 r1=65536 hash=65536
+9223372036854775807: int=-1 long=9223372036854775807 short=-1 byte=-1 double=9.223372036854776E18 float=9.223372E18 bytes=[7f ff ff ff ff ff ff ff] hex=7fffffffffffffff r36=1y2p0ij32e8e7 r2=63 r1=9223372036854775807 hash=2147483616
+-9223372036854775809: int=-1 long=9223372036854775807 short=-1 byte=-1 double=-9.223372036854776E18 float=-9.223372E18 bytes=[ff 7f ff ff ff ff ff ff ff] hex=-8000000000000001 r36=-1y2p0ij32e8e9 r2=65 r1=-9223372036854775809 hash=2147483647
+123456789012345678901234567890: int=1312754386 long=-4362896299872285998 short=2770 byte=-46 double=1.2345678901234568E29 float=1.2345679E29 bytes=[01 8e e9 0f f6 c3 73 e0 ee 4e 3f 0a d2] hex=18ee90ff6c373e0ee4e3f0ad2 r36=byw97um9s91dlz68tsi r2=97 r1=123456789012345678901234567890 hash=1915528825
+-123456789012345678901234567890: int=-1312754386 long=4362896299872285998 short=-2770 byte=46 double=-1.2345678901234568E29 float=-1.2345679E29 bytes=[fe 71 16 f0 09 3c 8c 1f 11 b1 c0 f5 2e] hex=-18ee90ff6c373e0ee4e3f0ad2 r36=-byw97um9s91dlz68tsi r2=98 r1=-123456789012345678901234567890 hash=-1915528825
+huge double Infinity -Infinity Infinity 8.98846567431158E307
+rounding 9.007199254740992E15 9.007199254740996E15 1.6777216E7 1.8014398509481984E16
+Number 1312754386 -4362896299872285998
+round trip true true
+== primes and comparison
+0=false 1=false 2=true 3=true 4=false 17=true 561=false 7919=true 1000003=true 1000001=false
+mersenne true false negative true certainty0 true
+compareTo 1 -1 0 equals true false false
+[-123456789012345678901234567890, -5, 0, 10, 123456789012345678901234567890]
+hash set true false
+== scala.math.BigInt
+123456789012345678901234567793 123456789012345678901234567987 -11975308534197530853419753085330 -1272750402189130710322005854 52 (-1272750402189130710322005854,52) 52 97 15241578753238836750495351562536198787501905199875019052100 -123456789012345678901234567890
+30 1 5 97 54 true 126419751948641975194864197519360 120563270519868827051986882 159 -97 96 96
+false true true -4362896299872285998 1312754386 1.2345678901234568E29 1 byw97um9s91dlz68tsi -1295 18446744073709551615
+true true true true 1 List(-1, 3, 123456789012345678901234567890)
+false true -9223372036854775809 13 66051
+BigInt / 0: java.lang.ArithmeticException: BigInteger divide by zero
+BigInt("x"): java.lang.NumberFormatException: For input string: "x"

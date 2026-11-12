@@ -1,0 +1,169 @@
+== Double.toString
+0.0 0.0 true
+-0.0 -0.0 true
+1.0 1.0 true
+-1.5 -1.5 true
+0.1 0.1 true
+0.30000000000000004 0.30000000000000004 true
+0.3333333333333333 0.3333333333333333 true
+0.6666666666666666 0.6666666666666666 true
+100.0 100.0 true
+1000000.0 1000000.0 true
+9999999.0 9999999.0 true
+1.0E7 1.0E7 true
+1.00000005E7 1.00000005E7 true
+1.23456789E7 1.23456789E7 true
+0.001 0.001 true
+0.001 0.001 true
+9.999E-4 9.999E-4 true
+1.0E-4 1.0E-4 true
+1.2345678901234568E17 1.2345678901234568E17 true
+1.0E21 1.0E21 true
+1.0E22 1.0E22 true
+1.0E23 1.0E23 true
+4.9E-324 4.9E-324 true
+4.9E-324 4.9E-324 true
+2.2250738585072014E-308 2.2250738585072014E-308 true
+1.7976931348623157E308 1.7976931348623157E308 true
+4.9E-324 4.9E-324 true
+NaN NaN true
+Infinity Infinity true
+-Infinity -Infinity true
+2.0E-323 2.0E-323 true
+1.7976931348623157E308 1.7976931348623157E308 true
+3.141592653589793 3.141592653589793 true
+2.718281828459045 2.718281828459045 true
+4.35 4.35 true
+0.3 0.3 true
+0.002 0.002 true
+1.0E-5 1.0E-5 true
+3.0E10 3.0E10 true
+1.23456789E-7 1.23456789E-7 true
+9.223372036854776E18 9.223372036854776E18 true
+-2.147483648E9 -2.147483648E9 true
+== Float.toString
+0.0 0.0 0.0
+-0.0 -0.0 -0.0
+1.0 1.0 1.0
+0.1 0.1 0.10000000149011612
+0.3 0.3 0.30000001192092896
+0.33333334 0.33333334 0.3333333432674408
+100.0 100.0 100.0
+1.0E7 1.0E7 1.0E7
+9999999.0 9999999.0 9999999.0
+0.001 0.001 0.0010000000474974513
+1.0E-4 1.0E-4 9.999999747378752E-5
+3.4028235E38 3.4028235E38 3.4028234663852886E38
+1.4E-45 1.4E-45 1.401298464324817E-45
+1.1754944E-38 1.1754944E-38 1.1754943508222875E-38
+1.6777216E7 1.6777216E7 1.6777216E7
+1.6777216E7 1.6777216E7 1.6777216E7
+NaN NaN NaN
+Infinity Infinity Infinity
+-Infinity -Infinity -Infinity
+3.1415927 3.1415927 3.1415927410125732
+1.1754944E-38 1.1754944E-38 1.1754943508222875E-38
+1.0E10 1.0E10 1.0E10
+123.456 123.456 123.45600128173828
+0.3 0.3 0.30000001192092896
+2.5E-5 2.5E-5 2.499999936844688E-5
+== parseDouble
+parseDouble("1"): 1.0
+parseDouble("-1.5"): -1.5
+parseDouble("+2.5"): 2.5
+parseDouble("1e10"): 1.0E10
+parseDouble("1E-10"): 1.0E-10
+parseDouble("1."): 1.0
+parseDouble(".5"): 0.5
+parseDouble("-.5e1"): -5.0
+parseDouble("  3.25  "): 3.25
+parseDouble("	7
+"): 7.0
+parseDouble("1d"): 1.0
+parseDouble("1D"): 1.0
+parseDouble("2f"): 2.0
+parseDouble("3.0d"): 3.0
+parseDouble("NaN"): NaN
+parseDouble("Infinity"): Infinity
+parseDouble("-Infinity"): -Infinity
+parseDouble("+Infinity"): Infinity
+parseDouble("1e400"): Infinity
+parseDouble("-1e400"): -Infinity
+parseDouble("1e-400"): 0.0
+parseDouble("4.9e-324"): 4.9E-324
+parseDouble("2.4703282292062328e-324"): 4.9E-324
+parseDouble("0x1p3"): 8.0
+parseDouble("0x1.8p1"): 3.0
+parseDouble("-0x.8p0"): -0.5
+parseDouble("0X10P-2"): 4.0
+parseDouble("0x1p-1074"): 4.9E-324
+parseDouble("abc"): java.lang.NumberFormatException: For input string: "abc"
+parseDouble("1e"): java.lang.NumberFormatException: For input string: "1e"
+parseDouble("e5"): java.lang.NumberFormatException: For input string: "e5"
+parseDouble("0x10"): java.lang.NumberFormatException: For input string: "0x10"
+parseDouble("١"): java.lang.NumberFormatException: For input string: "١"
+parseDouble("1,5"): java.lang.NumberFormatException: For input string: "1,5"
+parseDouble("--1"): java.lang.NumberFormatException: For input string: "--1"
+parseDouble("0.1e+2"): 10.0
+parseDouble("123456789012345678901234567890"): 1.2345678901234568E29
+parseDouble(""): java.lang.NumberFormatException
+parseDouble(" "): java.lang.NumberFormatException
+parseDouble("1.2.3"): java.lang.NumberFormatException
+parseDouble(null): java.lang.NullPointerException
+== parseFloat
+parseFloat("1.1"): 1.1
+parseFloat("3.4028235e38"): 3.4028235E38
+parseFloat("3.5e38"): Infinity
+parseFloat("1e-46"): 0.0
+parseFloat("1.4e-45"): 1.4E-45
+parseFloat("0.1"): 0.1
+parseFloat("16777217"): 1.6777216E7
+parseFloat("-0"): -0.0
+parseFloat("NaN"): NaN
+parseFloat("0x1.fffffep127"): 3.4028235E38
+parseFloat("x"): java.lang.NumberFormatException: For input string: "x"
+Double.valueOf("2.5"): 2.5
+"1.5".toDouble: 1.5
+"1.5x".toDouble: java.lang.NumberFormatException: For input string: "1.5x"
+"2.5".toFloat: 2.5
+== bits
+0.0: 0 raw=0 back=0.0
+-0.0: 8000000000000000 raw=8000000000000000 back=-0.0
+1.0: 3ff0000000000000 raw=3ff0000000000000 back=1.0
+-2.0: c000000000000000 raw=c000000000000000 back=-2.0
+0.1: 3fb999999999999a raw=3fb999999999999a back=0.1
+NaN: 7ff8000000000000 raw=(NaN: known-bugs-jdk) back=NaN
+Infinity: 7ff0000000000000 raw=7ff0000000000000 back=Infinity
+4.9E-324: 1 raw=1 back=4.9E-324
+1.7976931348623157E308: 7fefffffffffffff raw=7fefffffffffffff back=1.7976931348623157E308
+2.2250738585072014E-308: 10000000000000 raw=10000000000000 back=2.2250738585072014E-308
+other NaN: true 7ff8000000000000 7ff0000000000001
+0.0: 0 raw=0 back=0.0
+-0.0: 80000000 raw=80000000 back=-0.0
+1.0: 3f800000 raw=3f800000 back=1.0
+-2.0: c0000000 raw=c0000000 back=-2.0
+0.1: 3dcccccd raw=3dcccccd back=0.1
+NaN: 7fc00000 raw=7fc00000 back=NaN
+-Infinity: ff800000 raw=ff800000 back=-Infinity
+1.4E-45: 1 raw=1 back=1.4E-45
+3.4028235E38: 7f7fffff raw=7f7fffff back=3.4028235E38
+intBitsToFloat 1.0 1.4E-45 -Infinity true
+longBitsToDouble 2.0 4.9E-324 -0.0
+== comparing
+=<<<<<<< >=<<<<<< >>=<<<<< >>>=<<<< >>>>=<<< >>>>>=<< >>>>>>=< >>>>>>>=
+[-Infinity, -1.0, -0.0, 0.0, 1.0, NaN]
+equals true false false true false
+hashCode 0 -2147483648 1073217536 2146959360 1069547520 -2147483648 1073741824
+isNaN true false isInfinite true false isFinite true false false
+instance true true
+max 0.0 NaN -0.0 NaN 0.0 1.0
+Math max 0.0 -0.0 NaN -0.0
+sum 0.30000000000000004 0.3 compare 1 1
+3 3 3.75 3 3 1 3.75 -2147483648 2
+1023 -1022 64 127 -126 4
+== Boolean
+true true true false false false false false
+true false true false
+1 -1 0 1
+1231 1237 1231 true
+false

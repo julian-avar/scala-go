@@ -1,0 +1,69 @@
+== Charset
+UTF-8 UTF-8 true true contains UTF-8 true contains ASCII true
+  encode 61 c3 a9 e2 82 ac f0 9f 98 80 decode 61,fffd,e9
+  encoder UTF-8 1.1 3.0 63 REPORT REPORT
+  decoder UTF-8 1.0 1.0 fffd REPORT
+  canEncode true true true false true false
+ISO-8859-1 ISO-8859-1 true true contains UTF-8 false contains ASCII true
+  encode 61 e9 3f 3f decode 61,e9,c3,a9
+  encoder ISO-8859-1 1.0 1.0 63 REPORT REPORT
+  decoder ISO-8859-1 1.0 1.0 fffd REPORT
+  canEncode true true false false false false
+US-ASCII US-ASCII true true contains UTF-8 false contains ASCII true
+  encode 61 3f 3f 3f decode 61,fffd,fffd,fffd
+  encoder US-ASCII 1.0 1.0 63 REPORT REPORT
+  decoder US-ASCII 1.0 1.0 fffd REPORT
+  canEncode true false false false false false
+forName true ISO-8859-1 US-ASCII true
+forName illegal name: java.nio.charset.IllegalCharsetNameException: bad name!
+forName(null): java.lang.IllegalArgumentException: Null charset name
+== CharsetEncoder
+UTF-8 REPORT: java.nio.charset.MalformedInputException: Input length = 1
+UTF-8 REPLACE: 61 c3 a9 e2 82 ac f0 9f 98 80 3f 7a
+UTF-8 IGNORE: 61 c3 a9 e2 82 ac f0 9f 98 80 7a
+ISO-8859-1 REPORT: java.nio.charset.UnmappableCharacterException: Input length = 1
+ISO-8859-1 REPLACE: 61 e9 3f 3f 3f 7a
+ISO-8859-1 IGNORE: 61 e9 7a
+US-ASCII REPORT: java.nio.charset.UnmappableCharacterException: Input length = 1
+US-ASCII REPLACE: 61 3f 3f 3f 3f 7a
+US-ASCII IGNORE: 61 7a
+replaceWith 68 23 6c 6c 6f legal true
+illegal replacement: java.lang.IllegalArgumentException: Illegal replacement
+caught java.nio.charset.UnmappableCharacterException: Input length = 1
+== CharsetDecoder
+UTF-8 REPORT: java.nio.charset.MalformedInputException: Input length = 1
+UTF-8 REPLACE: 61,e9,fffd,fffd,62,fffd,d83d,de00
+UTF-8 IGNORE: 61,e9,62,d83d,de00
+ISO-8859-1 REPORT: 61,c3,a9,ff,e2,82,62,80,f0,9f,98,80
+ISO-8859-1 REPLACE: 61,c3,a9,ff,e2,82,62,80,f0,9f,98,80
+ISO-8859-1 IGNORE: 61,c3,a9,ff,e2,82,62,80,f0,9f,98,80
+US-ASCII REPORT: java.nio.charset.MalformedInputException: Input length = 1
+US-ASCII REPLACE: 61,fffd,fffd,fffd,fffd,fffd,62,fffd,fffd,fffd,fffd,fffd
+US-ASCII IGNORE: 61,62
+replaceWith A?B
+c0 80 -> fffd,fffd
+e0 80 80 -> fffd,fffd,fffd
+f4 90 80 80 -> fffd,fffd,fffd,fffd
+f8 88 80 80 80 -> fffd,fffd,fffd,fffd,fffd
+== streaming
+61 c3 b1 (OVERFLOW) | e2 82 ac (OVERFLOW) | f0 9f 98 80 (OVERFLOW) | 21 (UNDERFLOW)
+true/1 true/1 true/1 true/2 true/2 true/2 true/2 true/4 end true -> 78,20ac,d83d,de00
+truncated: true 2 MALFORMED[2]
+CoderResult UNDERFLOW OVERFLOW MALFORMED[2] true false
+UNDERFLOW.length: java.lang.UnsupportedOperationException: null
+malformed throwException: java.nio.charset.MalformedInputException: Input length = 1
+unmappable throwException: java.nio.charset.UnmappableCharacterException: Input length = 2
+== HexFormat
+00017f80abff 00017F80ABFF 7f80 []
+0x00h, 0x01h, 0x7Fh, 0x80h, 0xABh, 0xFFh | , |0x|h|true false
+10,-1 0,-1,127 0 1,2 11
+> 0001 ab 0041 ffff 000000ff fffffffffffffffe 234
+b a CD
+true false 11 2147483647 -1 18 -1 291
+uppercase: false, delimiter: "", prefix: "", suffix: "" | uppercase: true, delimiter: ", ", prefix: "0x", suffix: "h"
+parseHex odd length: java.lang.IllegalArgumentException: string length not even: 3
+parseHex bad digit: java.lang.NumberFormatException: not a hexadecimal digit: "z" = 122
+parseHex missing delimiter: java.lang.IllegalArgumentException: extra or missing delimiters or values consisting of prefix, two hexadecimal digits, and suffix
+fromHexDigit('g'): java.lang.NumberFormatException: not a hexadecimal digit: "g" = 103
+fromHexDigits too long: java.lang.IllegalArgumentException: string length greater than 8: 9
+toHexDigits(1L, 17): java.lang.IllegalArgumentException: number of digits: 17

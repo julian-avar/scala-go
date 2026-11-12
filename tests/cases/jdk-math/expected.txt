@@ -1,0 +1,126 @@
+== exact
+addExact(MaxValue, 1): java.lang.ArithmeticException: integer overflow
+addExact(MinValue, -1): java.lang.ArithmeticException: integer overflow
+addExact(1, 2): 3
+addExact(Long.MaxValue, 1L): java.lang.ArithmeticException: long overflow
+subtractExact(MinValue, 1): java.lang.ArithmeticException: integer overflow
+subtractExact(0, MinValue): java.lang.ArithmeticException: integer overflow
+subtractExact(Long.MinValue, 1L): java.lang.ArithmeticException: long overflow
+subtractExact(5L, 7L): -2
+multiplyExact(65536, 65536): java.lang.ArithmeticException: integer overflow
+multiplyExact(-46341, 46341): java.lang.ArithmeticException: integer overflow
+multiplyExact(46340, 46340): 2147395600
+multiplyExact(MinValue, -1): java.lang.ArithmeticException: integer overflow
+multiplyExact(1L << 32, 1L << 31): java.lang.ArithmeticException: long overflow
+multiplyExact(Long.MinValue, -1L): java.lang.ArithmeticException: long overflow
+multiplyExact(3037000499L, 3037000499L): 9223372030926249001
+multiplyExact(Long.MaxValue, 2): java.lang.ArithmeticException: long overflow
+multiplyExact(1L << 40, -3): -3298534883328
+negateExact(MinValue): java.lang.ArithmeticException: integer overflow
+negateExact(Long.MinValue): java.lang.ArithmeticException: long overflow
+negateExact(5): -5
+incrementExact(MaxValue): java.lang.ArithmeticException: integer overflow
+incrementExact(Long.MaxValue): java.lang.ArithmeticException: long overflow
+decrementExact(MinValue): java.lang.ArithmeticException: integer overflow
+decrementExact(Long.MinValue): java.lang.ArithmeticException: long overflow
+decrementExact(0L): -1
+toIntExact(1L << 31): java.lang.ArithmeticException: integer overflow
+toIntExact(-(1L << 31)): -2147483648
+toIntExact(-(1L << 31) - 1): java.lang.ArithmeticException: integer overflow
+clamp(5L, 1, 3): 3
+clamp(Long.MinValue, -2, 3): -2
+clamp(7L, 2L, 9L): 7
+clamp(1L, 3, 2): java.lang.IllegalArgumentException: 3 > 2
+== floorDiv and floorMod
+7,2: 3 1 | 3 1
+-7,2: -4 1 | -3 -1
+7,-2: -4 -1 | -3 1
+-7,-2: 3 -1 | 3 -1
+6,3: 2 0 | 2 0
+-6,3: -2 0 | -2 0
+0,-5: 0 0 | 0 0
+-2147483648,-1: -2147483648 0 | -2147483648 0
+-2147483648,7: -306783379 5 | -306783378 -2
+1,-2147483648: -1 -2147483647 | 0 1
+7,2: 3 1
+-7,2: -4 1
+7,-2: -4 -1
+-9223372036854775808,-1: -9223372036854775808 0
+-9223372036854775808,3: -3074457345618258603 1
+-1,9223372036854775807: -1 9223372036854775806
+floorDiv(1, 0): java.lang.ArithmeticException: / by zero
+floorMod(1L, 0L): java.lang.ArithmeticException: / by zero
+== rounding
+0.0: floor=0.0 ceil=0.0 rint=0.0 round=0 roundF=0
+-0.0: floor=-0.0 ceil=-0.0 rint=-0.0 round=0 roundF=0
+0.4: floor=0.0 ceil=1.0 rint=0.0 round=0 roundF=0
+0.5: floor=0.0 ceil=1.0 rint=0.0 round=1 roundF=1
+0.6: floor=0.0 ceil=1.0 rint=1.0 round=1 roundF=1
+1.5: floor=1.0 ceil=2.0 rint=2.0 round=2 roundF=2
+2.5: floor=2.0 ceil=3.0 rint=2.0 round=3 roundF=3
+-0.4: floor=-1.0 ceil=-0.0 rint=-0.0 round=0 roundF=0
+-0.5: floor=-1.0 ceil=-0.0 rint=-0.0 round=0 roundF=0
+-0.6: floor=-1.0 ceil=-0.0 rint=-1.0 round=-1 roundF=-1
+-1.5: floor=-2.0 ceil=-1.0 rint=-2.0 round=-1 roundF=-1
+-2.5: floor=-3.0 ceil=-2.0 rint=-2.0 round=-2 roundF=-2
+1.0000000000000005E15: floor=1.0E15 ceil=1.000000000000001E15 rint=1.0E15 round=1000000000000001 roundF=2147483647
+1.0E300: floor=1.0E300 ceil=1.0E300 rint=1.0E300 round=9223372036854775807 roundF=2147483647
+-1.0E300: floor=-1.0E300 ceil=-1.0E300 rint=-1.0E300 round=-9223372036854775808 roundF=-2147483648
+NaN: floor=NaN ceil=NaN rint=NaN round=0 roundF=0
+Infinity: floor=Infinity ceil=Infinity rint=Infinity round=9223372036854775807 roundF=2147483647
+-Infinity: floor=-Infinity ceil=-Infinity rint=-Infinity round=-9223372036854775808 roundF=-2147483648
+4.9E-324: floor=0.0 ceil=1.0 rint=0.0 round=0 roundF=0
+-4.9E-324: floor=-1.0 ceil=-0.0 rint=-0.0 round=0 roundF=0
+round(Float) 3 -2 2147483647 -2147483648 0
+RichDouble 3 -2 2.0 3.0
+== special values
+0.0: abs=0.0 signum=0.0 sqrt=0.0 cbrt=0 nextUp=4.9E-324 nextDown=-4.9E-324
+-0.0: abs=0.0 signum=-0.0 sqrt=-0.0 cbrt=0 nextUp=4.9E-324 nextDown=-4.9E-324
+1.0: abs=1.0 signum=1.0 sqrt=1.0 cbrt=1 nextUp=1.0000000000000002 nextDown=0.9999999999999999
+-1.0: abs=1.0 signum=-1.0 sqrt=NaN cbrt=-1 nextUp=-0.9999999999999999 nextDown=-1.0000000000000002
+2.5: abs=2.5 signum=1.0 sqrt=1.5811388300841898 cbrt=1.357208808297 nextUp=2.5000000000000004 nextDown=2.4999999999999996
+-2.5: abs=2.5 signum=-1.0 sqrt=NaN cbrt=-1.357208808297 nextUp=-2.4999999999999996 nextDown=-2.5000000000000004
+0.5: abs=0.5 signum=1.0 sqrt=0.7071067811865476 cbrt=0.793700525984 nextUp=0.5000000000000001 nextDown=0.49999999999999994
+-0.5: abs=0.5 signum=-1.0 sqrt=NaN cbrt=-0.793700525984 nextUp=-0.49999999999999994 nextDown=-0.5000000000000001
+1.5: abs=1.5 signum=1.0 sqrt=1.224744871391589 cbrt=1.144714242553 nextUp=1.5000000000000002 nextDown=1.4999999999999998
+1.0E300: abs=1.0E300 signum=1.0 sqrt=1.0E150 cbrt=10000000000000000159028911097599180468360808563945281389781327557747838772170381060813469985856815104 nextUp=1.0000000000000002E300 nextDown=9.999999999999999E299
+4.9E-324: abs=4.9E-324 signum=1.0 sqrt=2.2227587494850775E-162 cbrt=0 nextUp=9.9E-324 nextDown=0.0
+Infinity: abs=Infinity signum=1.0 sqrt=Infinity cbrt=Infinity nextUp=Infinity nextDown=1.7976931348623157E308
+-Infinity: abs=Infinity signum=-1.0 sqrt=NaN cbrt=-Infinity nextUp=-1.7976931348623157E308 nextDown=-Infinity
+NaN: abs=NaN signum=NaN sqrt=NaN cbrt=NaN nextUp=NaN nextDown=NaN
+abs -2147483648 -9223372036854775808 0.0 7 7 Infinity
+signum(F) -1.0 -0.0 NaN 1.0
+max/min -1 0 NaN NaN 2.0 -0.0
+exact 1.5 1.0E-150 -3.0 1.0E-100 5.0 Infinity 1.3E201
+pow 1024.0 -8.0 0.25 1.0 1.0 NaN -Infinity Infinity 1.0E22 8.98846567431158E307 Infinity
+log -Infinity NaN 0.0 3.0 -3.0 -Infinity -Infinity 0.0 1.0 0.0 0.0 Infinity
+trig 0.0 -0.0 1.0 -0.0 NaN 0.0 true NaN
+atan2 true true 0.0 -0.0 true NaN
+hyperbolic 0.0 -0.0 1.0 1.0 -1.0 -Infinity Infinity
+degrees 180.0 3.141592653589793 0.0 -0.0
+constants 3.141592653589793 2.718281828459045 3.141592653589793
+random in [0, 1) true
+== transcendental (12 places)
+0.1: sin=0.099833416647 cos=0.995004165278 tan=0.100334672085 atan=0.099668652491 exp=1.105170918076 sinh=0.10016675002 cosh=1.005004168056 tanh=0.099667994625 expm1=0.105170918076
+0.5: sin=0.479425538604 cos=0.87758256189 tan=0.546302489844 atan=0.463647609001 exp=1.6487212707 sinh=0.521095305494 cosh=1.127625965206 tanh=0.46211715726 expm1=0.6487212707
+1.0: sin=0.841470984808 cos=0.540302305868 tan=1.557407724655 atan=0.785398163397 exp=2.718281828459 sinh=1.175201193644 cosh=1.543080634815 tanh=0.761594155956 expm1=1.718281828459
+2.0: sin=0.909297426826 cos=-0.416146836547 tan=-2.185039863262 atan=1.107148717794 exp=7.389056098931 sinh=3.626860407847 cosh=3.762195691084 tanh=0.964027580076 expm1=6.389056098931
+3.0: sin=0.14112000806 cos=-0.9899924966 tan=-0.142546543074 atan=1.249045772398 exp=20.085536923188 sinh=10.01787492741 cosh=10.067661995778 tanh=0.995054753687 expm1=19.085536923188
+10.0: sin=-0.544021110889 cos=-0.839071529076 tan=0.648360827459 atan=1.471127674304 exp=22026.465794806718 sinh=11013.232874703393 cosh=11013.232920103324 tanh=0.999999995878 expm1=22025.465794806718
+-0.75: sin=-0.681638760023 cos=0.731688868874 tan=-0.931596459944 atan=-0.643501108793 exp=0.472366552741 sinh=-0.822316731936 cosh=1.294683284677 tanh=-0.635148952387 expm1=-0.527633447259
+0.001: log=-6.907755278982 log10=-3 log1p=0.000999500333 sqrt=0.031622776602 cbrt=0.1
+0.5: log=-0.69314718056 log10=-0.301029995664 log1p=0.405465108108 sqrt=0.707106781187 cbrt=0.793700525984
+2.0: log=0.69314718056 log10=0.301029995664 log1p=1.098612288668 sqrt=1.414213562373 cbrt=1.259921049895
+10.0: log=2.302585092994 log10=1 log1p=2.397895272798 sqrt=3.162277660168 cbrt=2.154434690032
+12345.678: log=9.421061321292 log10=4.091514945509 log1p=9.421142318018 sqrt=111.111106555555 cbrt=23.112041846625
+-1.0: asin=-1.570796326795 acos=3.14159265359
+-0.5: asin=-0.523598775598 acos=2.094395102393
+0.0: asin=0 acos=1.570796326795
+0.3: asin=0.304692654015 acos=1.266103672779
+1.0: asin=1.570796326795 acos=0
+atan2 0.463647609001 -2.498091544797 pow 1.414213562373 hypot 1.414213562373
+== StrictMath
+4.0 3 9 -2.0 -1.0 3 2 -3
+0.841470984808 2.718281828459 2.302585092994 81.0 13.0 4.0 -1.0 4.0
+StrictMath.addExact: java.lang.ArithmeticException: integer overflow
+StrictMath.toIntExact: java.lang.ArithmeticException: integer overflow
