@@ -123,6 +123,12 @@ and runs the binary. Both outputs must equal `expected.txt`. Optional files chan
 | `library.txt`       | links the case as a library, used by the Go program in `consumer/`      |
 | `<dir>/go.mod`      | a subdirectory with a `go.mod` is a local Go module                     |
 
+Cases are grouped by prefix after the documentation they check: `lang-*` and `expr-*`/`data-*`
+([Language](docs/_docs/spec/language.md), [Data](docs/_docs/spec/data.md)), `scala-*` (the
+Scala library), `jdk-*` (javalib), `runtime-*` ([Runtime](docs/_docs/spec/runtime.md)) and
+`interop-*` ([Go interop](docs/_docs/spec/interop.md)); the older cases are named after a
+feature.
+
 Cases named `limits-*` and `known-bugs*` pin what does not work: each limitation in
 [Limitations](docs/_docs/user/limitations.md) and the not-planned list in
 [design.md](docs/design.md#status), and each known bug in the [roadmap](docs/roadmap.md#known-bugs).

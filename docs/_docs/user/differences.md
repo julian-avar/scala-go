@@ -29,6 +29,9 @@ wraps, `==` and `hashCode` match the JVM, and uncaught exceptions print JVM-styl
   referents strongly.
 - **Floating point:** on arm64, `a * b + c` may be fused into one multiply-add. `Math.round` is
   off by one in rare cases (a [known bug](../contributing/roadmap.md)).
+- **Memory and identity:** `Runtime.maxMemory` is `Long.MaxValue` unless `GOMEMLIMIT` is set;
+  `java.vm.name` and `java.vendor` are `scala-go`, `java.class.path` is empty, and program
+  classes have no class loader (`null`).
 - **Fatal errors:** Go's fatal errors print Go's message (`fatal error: stack overflow`) and exit
   with status 2.
 
@@ -45,17 +48,22 @@ wraps, `==` and `hashCode` match the JVM, and uncaught exceptions print JVM-styl
   the `(` flag and `BigInteger` arguments give different output. Unsupported conversions throw: see
   [Limitations](limitations.md#jdk-and-scala-libraries).
 - **Locales:** no locale data. Every locale formats as `Locale.ROOT` (English).
-- **Unicode:** character properties and case mappings come from Go's tables (Unicode 15, as in
-  JDK 21). Characters added in Unicode 16 have no case mapping.
+- **Unicode:** character properties and case mappings come from the Go release's tables (Unicode
+  16 with Go 1.27, as in JDK 25).
 - **Time zones** come from the system's zoneinfo, or from Go's copy embedded in the binary. Zone
   names are tz abbreviations (`CEST`); there are no long names (`Central European Summer Time`).
 
 ## I/O and networking
 
-- **HTTP** is HTTP/1.1 on Go's `net/http`, also when HTTP/2 is requested. Response header names
-  arrive in Go's canonical case (`Content-Type`).
+- **HTTP** is HTTP/1.1 on Go's `net/http`, also when HTTP/2 is requested, without the JDK's
+  `Upgrade`/`HTTP2-Settings` headers. `HttpURLConnection` gives response header names in Go's
+  canonical case (`X-Lower-Case`) and drops `Connection`; `HttpClient` lowercases them, as the
+  JDK does.
+- **Interrupts** do not wake a thread blocked in socket I/O (JVM: a virtual thread in
+  `ServerSocket.accept` gets `SocketException: Closed by interrupt`).
 - **TLS** trusts the system's certificates, not the JDK's `cacerts`.
-- **`java.util.zip`** produces different, equally valid, compressed bytes than the JDK's zlib.
+- **`java.util.zip`** produces different, equally valid, compressed bytes than the JDK's zlib;
+  short inputs may come out as a stored (uncompressed) block.
 
 ## Performance
 

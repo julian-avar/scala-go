@@ -170,11 +170,13 @@ do not fuse.
 
 `java.lang.Math` and `StrictMath`:
 
-- `abs`, `min`, `max`, `floorDiv`, `floorMod`, `signum`, `rint`, `sqrt`, `clamp` and `*Exact`
-  (throwing `ArithmeticException("integer overflow")`/`("long overflow")`) have the JDK's results.
+- `abs`, `min`, `max`, `floorDiv`, `floorMod`, `signum`, `rint`, `sqrt`, `clamp` (the `int` and
+  `long` overloads; the floating-point ones are missing) and `*Exact` (throwing
+  `ArithmeticException("integer overflow")`/`("long overflow")`) have the JDK's results.
 - The transcendental functions (`sin`, `exp`, `log`, `pow`, ...) are Go's `math` package.
   **Deviation:** results may differ from the JDK's in the last bit. `StrictMath` is `Math`, not
-  bit-exact fdlibm.
+  bit-exact fdlibm. **Deviation (bug):** `pow` misses Java's special cases (`pow(1, NaN)` and
+  `pow(-1, Infinity)` are 1.0, not NaN) and can be off by more than one bit (`pow(10, 308)`).
 - **Deviation (bug):** `Math.round(Double)` computes `floor(x + 0.5)` in floating point, which
   rounds twice.
 
@@ -428,7 +430,7 @@ Library code that needs a JDK API javalib lacks fails to link if reached.
 | Opaque types | Erased to the underlying type: no wrapper, no cost |
 | Extension methods | Ordinary methods |
 | `given`/`using`, context functions | Ordinary values, methods and lambdas |
-| `inline`, macros | Expanded by the compiler. Stack trace lines of inlined code are those of the inlined source |
+| `inline`, macros | Expanded by the compiler. **Deviation (bug):** stack trace lines of inlined code are those of the inlined source (JVM: the call site's) |
 | Union and intersection types | Erased; type tests test the erased classes |
 | Match types, type lambdas, kind polymorphism | Compile-time only |
 | `Selectable` | User-defined `Selectable`s work; `reflectiveSelectable` does not link (see [Types](#3-types)) |

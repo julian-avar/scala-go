@@ -58,10 +58,10 @@ Go; the runtime associates the `Thread` object with it.
 
 | API | Behavior |
 |-----|----------|
-| `start`, `run`, `join` (with timeouts), `isAlive`, `getState` | As on the JVM. `getState` reports `WAITING`/`TIMED_WAITING` for parked threads |
+| `start`, `run`, `join` (with timeouts), `isAlive`, `getState` | As on the JVM. **Deviation (bug):** `getState` is `RUNNABLE` in `sleep`, `wait`, `join` and while blocked on a monitor; only `LockSupport` parking reports `WAITING`/`TIMED_WAITING`. The main thread stays alive after `main` returns |
 | `currentThread` | The current goroutine's `Thread`. A goroutine not started as a `Thread` (the main goroutine, or one Go code started) gets one on first request, kept while it runs |
 | names, ids, `setDaemon`, `isDaemon` | As on the JVM; default names `Thread-0`, `Thread-1`, ... |
-| priorities | Stored and reported; no effect on scheduling |
+| priorities | Stored and reported; no effect on scheduling. **Deviation (bug):** a new thread starts at 5, not at its creator's priority capped by its group's maximum |
 | `sleep`, `yield`, `onSpinWait` | `time` timers and `runtime.Gosched`; `sleep` is interruptible |
 | `interrupt`, `isInterrupted`, `interrupted` | As on the JVM. Wakes `sleep`, `join`, `Object.wait`, `LockSupport.park` (and everything built on it: locks, conditions, queues, futures), `Process.waitFor` and blocked `GoChan` operations. **Deviation:** does not interrupt blocking socket or file I/O |
 | `Thread.ofPlatform()`, `ofVirtual()`, `startVirtualThread` | Both build goroutine-backed threads; virtual threads are daemons, unnamed by default, `isVirtual` |
@@ -125,7 +125,7 @@ A `GoMap` written concurrently with other uses is a fatal error (see
 | `WeakReference`, `SoftReference` | **Deviation:** hold their referent strongly; `get` returns it until `clear()`. `ReferenceQueue` exists but has no methods (`poll`, `remove`). `PhantomReference` is not implemented. `WeakHashMap` holds its keys strongly |
 | Heap exhaustion | **Deviation:** a Go fatal error (`fatal error: runtime: out of memory`), not a catchable `OutOfMemoryError` |
 | `Runtime.totalMemory`, `freeMemory` | The heap Go obtained from the system, and its unused part |
-| `Runtime.maxMemory` | `Long.MaxValue` (no limit unless `GOMEMLIMIT` is set) |
+| `Runtime.maxMemory` | **Deviation:** `Long.MaxValue` (no limit unless `GOMEMLIMIT` is set); the JVM reports its `-Xmx` |
 | `Runtime.gc()` | `runtime.GC()`. **Deviation (bug):** `System.gc()` is missing from javalib (a link error) |
 
 ## Stack
@@ -164,7 +164,7 @@ There is no class loading: the program is linked whole, and only reachable code 
 | `Class.isInstance`, `cast` | Not implemented (link error if reached) |
 | `Class.isAssignableFrom` | Works for the program's classes (the linker then embeds the class hierarchy), primitives, arrays and the JDK value classes |
 | `Class.forName(name)` | **Deviation:** returns a `Class` with that name for any name; never throws `ClassNotFoundException`; does not initialize the class |
-| `getClassLoader` | `null` |
+| `getClassLoader` | **Deviation:** `null`, also for program classes (JVM: the application class loader) |
 | `getResource`, `getResourceAsStream` | `null`: a binary has no class-path resources |
 | `desiredAssertionStatus` | `false` |
 | `java.lang.reflect.Array` | `newInstance`, `getLength`, `get`, `set` work. **Deviation:** `newInstance` of a reference component type gives an `Object[]` (see [Arrays](data.md#arrays)) |
@@ -204,8 +204,8 @@ use, with the chain of calls that reaches it.
 | `os.name` | `Linux`, `Mac OS X`, `Windows`, `FreeBSD`, else `GOOS` |
 | `os.arch` | `GOARCH`, with `aarch64` for arm64 and `x86` for 386 |
 | `user.dir`, `user.home`, `user.name` | the working directory, Go's `os.UserHomeDir`, `$USER`/`$LOGNAME`/`$USERNAME` |
-| `java.vm.name`, `java.vendor` | `scala-go` |
-| `java.class.path`, `java.library.path` | empty |
+| `java.vm.name`, `java.vendor` | **Deviation:** `scala-go` |
+| `java.class.path`, `java.library.path` | **Deviation:** empty |
 
 - **Deviation:** `java.version`, `java.home`, `java.specification.version` and the other JVM
   properties are `null`.
@@ -249,9 +249,8 @@ use, with the chain of calls that reaches it.
   No other charsets: `Charset.isSupported` is `false` for them. **Deviation (bug):** using one
   throws `UnsupportedOperationException` (JVM: `UnsupportedEncodingException` or
   `UnsupportedCharsetException`).
-- **Deviation:** `Character` classification and case mapping use Go's Unicode tables (Unicode
-  15.0 with Go 1.26); JDK 25 uses Unicode 16.0. Code points added in Unicode 16 classify
-  differently.
+- `Character` classification and case mapping use Go's Unicode tables: Unicode 16.0 with Go 1.27,
+  as in JDK 25. **Deviation:** they follow the Go release, not the JDK the program targets.
 - Regular expressions run on Go's RE2 engine: no lookaround, backreferences or possessive
   quantifiers.
 

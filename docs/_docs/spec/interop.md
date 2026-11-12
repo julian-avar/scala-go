@@ -221,6 +221,7 @@ value as the argument.
 | Go code panics during a facade call | the panic unwinds through the Scala frames as an exception: a `runtime.Error` becomes the Java exception given in [Exceptions](language.md#exceptions); any other value a `RuntimeException` with the value's text. A Scala `try` catches it (with `recover`, Go: [Handling panics][go-panics]) |
 | Scala code called by Go (a callback, a Go method implemented in Scala, an export) throws, and the Go result list ends with an `error` that the Scala result type leaves out (for exports: the method has `@throws`) | the exception becomes the error (`rt.RecoverAsError`): a `GoException` gives back the error it wraps; any other exception is an `*rt.ScalaError` whose `Error()` is the exception's `toString` |
 | the same without an `error` result | the exception unwinds through the Go frames as a Go panic whose value (`*rt.Exception`) is an `error` describing it. Go code may `recover` it. If the Go code was called by Scala code on the same goroutine, the exception reaches that Scala code as itself. If nothing recovers it (on a goroutine Go code started), the program ends with Go's panic report and exit status 2, without Scala's uncaught-exception handlers |
+| Go code panics in a call from a Scala callback, and Go code below the callback recovers | the panic passes through the Scala frames (running `finally` blocks); `recover` returns the original panic value, not an error |
 
 As a panic passes through Go frames, deferred Go functions run; through Scala frames, `finally`
 blocks run; both in stack order.

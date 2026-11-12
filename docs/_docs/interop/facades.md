@@ -142,6 +142,7 @@ types are facade classes, not Scala numbers: no arithmetic. Convert in with the 
 ## On the JVM
 
 Facade members throw `UnsupportedOperationException` on the JVM, so a program that calls Go runs
-only as Go. To test the rest on the JVM, keep Go calls behind a trait of your own.
+only as Go. Constructing a facade class instance (`new F`) does not throw; using its members does.
+`GoError`, `GoException`, [Go data](go-data.md) and `GoString` work on both. To test the rest on the JVM, keep Go calls behind a trait of your own.
 
 [Limitations](../user/limitations.md#go-interop) lists all limitations of Go interop.

@@ -20,8 +20,10 @@ by an end-to-end test (`tests/cases/limits-*`) that expects it to fail.
   [Runtime: reflection](../spec/runtime.md#reflection-and-class-loading).
 - **Type tests with a `ClassTag`** (`case x: T` given a `ClassTag[T]`) do not link:
   `Class.isInstance` and `Class.cast` are missing (with `--missing-apis throw`, they throw
-  `NoSuchMethodError`). Match on concrete types. Also missing: `getSuperclass`, `getInterfaces`,
-  `isInterface`, `isEnum`, `getEnumConstants`, `getCanonicalName`.
+  `NoSuchMethodError`). User-defined `TypeTest` givens used in patterns fail the same way. Match
+  on concrete types. Also missing: `getSuperclass`, `getInterfaces`, `isInterface`, `isEnum`,
+  `getEnumConstants`, `getCanonicalName`, `Enum.valueOf(Class, String)` and `getDeclaringClass`
+  of Java-style enums.
 - **Structural types** (`reflectiveSelectable`) do not link. Use a trait.
 - **Classpath resources** are not embedded: `getResourceAsStream` returns `null`, and
   `Source.fromResource` does not link. Read files, or embed data in code.
@@ -35,10 +37,28 @@ by an end-to-end test (`tests/cases/limits-*`) that expects it to fail.
   `java.text`, `java.util.jar`, TLS configuration and ciphers, UDP and NIO socket channels,
   `PhantomReference` and `Cleaner`. Use another API, or call Go through a
   [facade](../interop/facades.md). [The JDK](../libraries/jdk.md).
-- **Missing methods** of present classes include `String.formatted`, `strip{Leading,Trailing}`,
-  `indent`, `Character.getType`, `Math.fma`, `copySign`, `Integer.parseUnsignedInt`,
-  `System.gc` (`Runtime.gc()` works), `System.runFinalization`, `Thread.getStackTrace` and
-  `ReferenceQueue.poll`. The [roadmap](../contributing/roadmap.md#m3-common-programs) lists them.
+- **Missing methods** of present classes include:
+  - `String`: `formatted`, `strip{Leading,Trailing}`, `indent`, `codePointBefore`,
+    `offsetByCodePoints`, `splitWithDelimiters`, `transform`, constructors from `int[]`,
+    `StringBuilder` and `StringBuffer`. `StringBuilder`: the `codePoint*` methods, `repeat`.
+    `StringBuffer` has few methods beyond `append` and `toString`.
+  - `Character`: `getType`, `isTitleCase`, `isDefined`, `toString(int)`, `highSurrogate`,
+    `lowSurrogate`, `isBmpCodePoint`, `isSupplementaryCodePoint`, `codePointAt`/`Count`.
+  - Boxes: `Integer.valueOf(s, radix)`, `decode`, `getInteger`, `parseUnsignedInt`,
+    `toUnsignedString(i, radix)`; `Long.compareUnsigned`; `Short.parseShort`, `Byte.parseByte`;
+    `Double.toHexString`; `Boolean.valueOf(String)`, `logicalAnd`/`Or`/`Xor`.
+  - `Math`: `fma`, `copySign`, `ulp`, `clamp` of `float`/`double`, `absExact`, `ceilMod`,
+    `multiplyFull`, `nextUp(float)`, `floorMod(long, int)`. `BigInteger`: `sqrt`, `*ValueExact`,
+    `probablePrime`, `nextProbablePrime`, the random constructor.
+  - `System.gc` (`Runtime.gc()` works), `System.runFinalization`, `Thread.getStackTrace`,
+    `ReferenceQueue.poll`, `reflect.Array.getInt`/`setInt` (and the other typed accessors),
+    `ServerSocketChannel.open`.
+
+  The full list is in the `limits-jdk-gaps`, `limits-jdk-missing` and `limits-jdk-missing-expr`
+  test cases; the [roadmap](../contributing/roadmap.md#m3-common-programs) orders them.
+- **Scala library methods on a missing JDK API** do not link: `Future.mapTo`,
+  `PartialFunction.elementWise` (`Class.cast`/`isInstance`), `Random.between(Double, Double)`
+  (`Math.nextAfter`), `math.ulp`, `BigInt.probablePrime`, `StdIn.readf*` (`java.text`).
 - **`String.format` and `f"..."`** throw on argument indices (`%1$s`, `%<s`), the `,` flag,
   `%h`, `%t`, `%a`, and `BigDecimal` with `%f`. The exception is an
   `IllegalArgumentException` naming the JDK's (`UnknownFormatConversionException: ...`), not
@@ -68,6 +88,8 @@ by an end-to-end test (`tests/cases/limits-*`) that expects it to fail.
   not link.
 - **Missing:** `SubmissionPublisher`, `Thread.getAllStackTraces`, `ThreadGroup.activeCount` and
   `ThreadGroup.enumerate`.
+- **`StringBuffer` is not synchronized** (a [known bug](../contributing/roadmap.md#known-bugs)):
+  guard a shared one with a lock, or give each thread its own `StringBuilder`.
 
 ## Go interop
 

@@ -89,6 +89,9 @@ Members that cannot be represented are left out, with a comment in the generated
   types, and returned funcs with more than 3 parameters
 - constants that do not fit in a `Long`
 
-To use such a member, declare it in a [hand-written facade](facades.md) next to the generated
-ones, where the [conversions](facades.md#conversions) can express it. The
+Package variables are generated as getters only, without a comment; struct fields get setters
+too.
+
+To use such a member, or to assign a package variable, declare it in a
+[hand-written facade](facades.md) next to the generated ones, where the [conversions](facades.md#conversions) can express it. The
 [examples](../examples/index.md) list what their generated facades leave out.

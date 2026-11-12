@@ -126,7 +126,8 @@ superclass's fields and Go methods are promoted (Go: [Struct types][go-struct]).
   the per-class marker methods make the structure name the class. So tests are exact:
   subclasses pass, unrelated classes with the same methods do not.
 - Classes that are never instantiated have no struct. References to them are `any`, and only
-  `null` passes a cast to them.
+  `null` should pass a cast to them. **Deviation (bug):** from an operand typed `Any`, every value
+  passes, also for a trait no instantiated class implements.
 
 **Null.** An interface value is nil only if it has neither dynamic type nor value; an interface
 holding a nil pointer is not nil (Go: [Comparison operators][go-compare]). Null references of

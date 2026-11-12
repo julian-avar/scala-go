@@ -87,3 +87,6 @@ Main.scala:106:32: method java.math.BigInteger.nextProbablePrime()Ljava.math.Big
 Main.scala:107:31: method java.math.BigInteger.sqrtAndRemainder()[Ljava.math.BigInteger; is not available (no native implementation)
 Main.scala:108:37: static method java.math.BigInteger.probablePrime(ILjava.util.Random;)Ljava.math.BigInteger; is not available
 Main.scala:109:13: class java.math.BigInteger is not available (no IR)
+Main.scala:111:43: static method java.lang.reflect.Array.getInt(Ljava.lang.Object;I)I is not available
+Main.scala:112:35: static method java.lang.reflect.Array.setInt(Ljava.lang.Object;II)V is not available
+Main.scala:113:55: static method java.nio.channels.ServerSocketChannel.open()Ljava.nio.channels.ServerSocketChannel; is not available

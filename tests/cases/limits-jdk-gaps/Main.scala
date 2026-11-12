@@ -1,7 +1,7 @@
 import java.lang.{Byte as JByte, Double as JDouble, Float as JFloat, Integer as JInteger, Long as JLong, Short as JShort}
 import java.math.BigInteger
 
-// Missing methods of present java.lang and java.math classes, found by the jdk-* cases (the
+// Missing methods of present JDK classes, found by the jdk-* and runtime-* cases (the
 // limitations list only some of them; limits-jdk-missing has the others). Each use is a link error
 // naming the method. When one is implemented, its error disappears and this case fails: move the
 // use to the jdk-* case that covers its class, and update the docs.
@@ -107,3 +107,7 @@ object Main:
     println(b.sqrtAndRemainder().length)
     println(BigInteger.probablePrime(16, new java.util.Random(1)).bitLength)
     println(new BigInteger(16, new java.util.Random(1)).signum)
+    // Others, found by the runtime-* cases
+    println(java.lang.reflect.Array.getInt(Array(1), 0))
+    java.lang.reflect.Array.setInt(Array(1), 0, 2)
+    println(java.nio.channels.ServerSocketChannel.open())

@@ -45,39 +45,98 @@ Design questions, decided by default unless changed:
 
 ## M0: Correct
 
-Every item is a silent or surprising deviation from the JVM. The spec marks each as
+Every item is a silent or surprising deviation from the JVM. The spec marks those it describes as
 **Deviation (bug)**. The `known-bugs*` end-to-end cases pin each bug's current behavior, so a fix
 makes its case fail: move the check to a case run on both the JVM and Go.
 
 ### Known bugs
 
-All **S**.
+All **S**. The `known-bugs*` case that pins each bug is named after its area: `known-bugs-lang`,
+`-expr`, `-runtime`, `-jdk`, `-scala-lib`, `-interop`, and the original `known-bugs`. Cases whose
+name ends in `-go-errors`, `-links` or the like expect `go vet`/`go build` or the linker to fail.
+
+#### Code the Go compiler rejects
+
+| Bug | Fix in |
+|-----|--------|
+| `try throw e finally return x`, `try throw a finally throw b`, and a `try` around an inlined `throw` passed as a by-name argument emit code `go vet` rejects (unreachable code) | `FunctionEmitter` |
+| A `throw` typed as a primitive and boxed (`def h(): Any = (throw e): Int`, also `boundary[Int] { throw e }` used as `Any`) emits `any()` with no argument | `FunctionEmitter` |
+| A `throw` as an argument followed by other arguments (`pair(throw e, 1)`) emits a Go syntax error | `FunctionEmitter` |
+| Constant arguments to natives make Go reject constant expressions: `Integer.sum(Int.MaxValue, 1)`, `Long.sum` (overflow), `Integer.divideUnsigned(1, 0)`, `Long.remainderUnsigned(1L, 0L)` (division by zero), `Character.isISOControl(-1)`, `Float.intBitsToFloat(0xff800000)`, `Double.longBitsToDouble(0x8000000000000000L)` (constant overflows `uint32`/`uint64`) | Natives emitted as Go expressions: convert through variables, not constants |
+| A string literal containing `math.` (`println("math.abs")`) adds an unused `import "math"` to `support.go` | `Linker.goFile`: scan code, not literals |
+| A class named `Entry` in the empty package collides with the linker's `entry.go` (Go rejects file names that differ only in case); `support.go` is reserved the same way | `Linker`: reserve the names |
+| A facade of a pointer-receiver method on a non-struct Go type links, then fails `go build` | `GoInterop`: reject at link time, or copy to an addressable variable |
+| A generic facade whose Scala types disagree with Go's inference (`f: Long => GoString` for `func(T) U` with `T = int`) links, then fails `go vet` | `GoInterop`: a link error |
+| A Scala subclass of `BigInteger` or `BigDecimal` links, then fails `go build` (`cannot use this (variable of type *S_…) as *rt.BigInteger`) | Linker: a link error naming the class |
+| Two methods exported under one Go name (`@GoExport("Twice")` on overloads) link, then fail `go build` (`Export_Twice redeclared`) | `Exports`: a link error |
+
+#### Language
 
 | Bug | Fix in |
 |-----|--------|
 | `a * b + c` on `Double` fuses into one FMA on arm64 (and amd64 `GOAMD64=v3`): one rounding instead of two | `FunctionEmitter`: wrap products in explicit `float64(…)`/`float32(…)` |
-| `Math.round(0.49999999999999994)` is 1 (JVM: 0); large odd doubles round off by one | `rt.MathRound`: not `floor(d + 0.5)` |
+| `i + inc()`, where `inc` changes a captured `var i`, reads `i` after the call | Go leaves operand evaluation order unspecified: spill operands that read mutable fields |
 | A boxed `Int` or `Long` `==` a boxed `Float` (`val l: Any = 16777217L; val f: Any = 16777216f; l == f`) is `false` (JVM: `true`, compared as `Float`). Literal operands are folded correctly | `rt.Equals` |
 | `(1: Any) == BigInt(1)` is `false` (JVM: `true` via `ScalaNumber`) | `rt.Equals`: `ScalaNumber` on the right |
 | `==` with a null `String` throws `NullPointerException` (JVM: `false`); string matches on a null selector throw | `genArithmetic`: `UnivEq` operands reach `rt.Equals` as a nil `*rt.String` in an `any`. Check `BigInteger`/`BigDecimal` too |
+| `().##` and `().hashCode` are identity hashes (JVM: 0) | `rt`: hash of the unit value |
 | `eq` on Go slices, maps or funcs panics | `refEq` emits `any(a) == any(b)` on uncomparable types |
 | A Go struct with a slice, map or func field is not `==` to itself; an interface field holding an uncomparable value makes `==` throw | `rt.foreignEquals` |
 | `asInstanceOf[Integer]` of a `String` (any pointer-typed operand to a box class) does not throw | `LinkContext.castTo`: pointer source, `any` target |
-| `i + inc()`, where `inc` changes a captured `var i`, reads `i` after the call | Go leaves operand evaluation order unspecified: spill operands that read mutable fields |
+| A cast to a class never instantiated, or to a trait no instantiated class implements, lets any value through when the operand is typed `Any` (JVM: `ClassCastException`) | `LinkContext.castTo`: such casts pass only `null` |
+| A user-defined `given TypeTest` used by `case x: T` does not link (it reaches `ClassTag.unapply`, which needs `Class.isInstance`) | Follows `Class.isInstance` ([Silent wrong output](#silent-wrong-output)) |
+| On a Java-style Scala enum, `getDeclaringClass` and `java.lang.Enum.valueOf(classOf[E], name)` do not link | javalib `Enum` |
+| The stack trace line of a `throw` inside an `inline` method is the inlined source's line (JVM: the call site's) | Plugin: positions of inlined trees |
+| `getSimpleName` of a local class is `""`; of an operator-named class keeps only the text after the last `$` (`List(1).getClass.getSimpleName` is `colon`, JVM `$colon$colon`) | `rt.ClassGetSimpleName` |
+| `Array(Array(1, 2), Array(3, 4)).transpose` throws `NullPointerException` (reference arrays do not know their element type) | `ClassTag` arrays of arrays |
 | A negative array index throws `RuntimeException`, not `ArrayIndexOutOfBoundsException` | `rt.Caught`: gc's message for negative indices has no length |
-| `lastIndexOf` of a supplementary code point is -1; `indexOf(0x110000)` finds U+FFFD | `rt` string search natives |
-| Uncaught exceptions in `main` skip `Thread.setDefaultUncaughtExceptionHandler` | `rt.RunMain` |
-| `NonFatal(StackOverflowError())` is `true`: no `VirtualMachineError` | javalib |
-| A throwing object initializer gives no `ExceptionInInitializerError`; the later `NoClassDefFoundError` has no cause | javalib, module initialization |
-| `System.gc()` is a link error (`Runtime.gc()` works) | javalib |
-| `getSimpleName` of a local class is `""` | `rt.ClassGetSimpleName` |
-| `try throw e finally return x` emits code `go vet` rejects (unreachable code) | `FunctionEmitter` |
-| A facade of a pointer-receiver method on a non-struct Go type links, then fails `go build` | `GoInterop`: reject at link time, or copy to an addressable variable |
-| A Scala subclass of `BigInteger` or `BigDecimal` links, then fails `go build` (`cannot use this (variable of type *S_…) as *rt.BigInteger`) | Linker: a link error naming the class |
-| Two methods exported under one Go name (`@GoExport("Twice")` on overloads) link, then fail `go build` (`Export_Twice redeclared`) | `Exports`: a link error |
 | `@GoExport` on a `val` or a constructor field is ignored, without an error | Plugin: reject, as for traits |
 | A tuple result of an export is rejected with a misleading message (`cannot instantiate a generic Go function with Scala type scala.Tuple2[…]`) | `Exports`: say that tuple results are not supported |
+
+#### Runtime and threads
+
+| Bug | Fix in |
+|-----|--------|
+| Uncaught exceptions in `main` skip `Thread.setDefaultUncaughtExceptionHandler` | `rt.RunMain` |
+| An overridden `ThreadGroup.uncaughtException` is never called; with a default handler set, `getUncaughtExceptionHandler` returns it (JVM: the group); a default handler that throws ends the program with a Go panic, exit 2 (JVM: prints the exception, continues) | javalib `Thread.uncaught` |
+| `getState` is `RUNNABLE` in `sleep`, `wait`, `join` and while blocked on a monitor (JVM: `TIMED_WAITING`, `WAITING`, `BLOCKED`); only `LockSupport` parking is reported | javalib `Thread` |
+| The main `Thread` stays alive after `main` returns or throws: `isAlive` is `true`, and `join()` on it never returns | `rt.RunMain` |
+| A new thread's priority is 5, not its creator's; a `ThreadGroup`'s maximum priority does not cap it | javalib `Thread` |
+| `NonFatal(StackOverflowError())` and `NonFatal(OutOfMemoryError())` are `true`: no `VirtualMachineError` | javalib |
+| A throwing object initializer gives no `ExceptionInInitializerError`; the later `NoClassDefFoundError` has no cause | javalib, module initialization |
+| `initCause` on an exception that already has a cause overwrites it (JVM: `IllegalStateException`) | javalib `Throwable` |
+| `System.gc()` is a link error (`Runtime.gc()` works) | javalib |
+| `classOf[Array[Int]].getTypeName` is `[I` (JVM: `int[]`); `toString` of an interface's `Class` says `class` (JVM: `interface`) | `rt` class natives |
+
+#### JDK and Scala library
+
+| Bug | Fix in |
+|-----|--------|
+| `Math.round(0.49999999999999994)` is 1 (JVM: 0); large odd doubles round off by one | `rt.MathRound`: not `floor(d + 0.5)` |
+| `Math.pow(1, NaN)` and `Math.pow(-1, Infinity)` are 1.0 (JVM: NaN). `Math.pow(10, 308)` is `1.0000000000000006E308`, beyond the last-bit allowance. `StrictMath.cbrt(0.5)` is not fdlibm's result | `rt` math natives: Java's special cases; fdlibm for `StrictMath` |
+| `scala.math.BigDecimal(1.5)` and `BigDecimal("1.5") == 1.5` throw `ClassCastException` (`*S_java_dmath_dMathContext is not interface { M_goBits_p_rJ() int64 }`) | javalib `BigDecimal` and its `MathContext` |
+| `BigInteger.toByteArray` of negative powers of two has an extra byte (-128 gives `ff 80`); radix 1 throws `RuntimeException` and radix 37 parses (JVM: `NumberFormatException`); `new BigInteger(signum, magnitude)` accepts a signum inconsistent with the magnitude | javalib `BigInteger` |
+| `Double.doubleToRawLongBits(Double.NaN)` is `0x7ff8000000000001` (Go's `math.NaN()`; JVM: `0x7ff8000000000000`) | `rt`: the canonical NaN |
+| `parseDouble` rejects `"2.5F"` and `"-NaN"`, and accepts `"1_000"`, `"infinity"`, `"nan"` and a leading U+00A0; `parseFloat` rounds through `double` (`"1.00000017881393432617187499"` gives `1.0000002`) | javalib `Double`/`Float` parsing |
+| `Integer.toString(i, radix)` and `Long.toString` with a radix out of range throw (JVM: radix 10); `parseInt` of non-ASCII digits (`"١٢٣"`) throws | javalib `Integer`/`Long` |
+| `Character.digit` of non-ASCII digits is -1, and accepts radixes out of range; `isUpperCase`/`isLowerCase` ignore Other_Uppercase/Other_Lowercase (U+2160, `ª`); `isAlphabetic` is `isLetter` | javalib `Character` |
+| `" ".isBlank` is `true` (JVM: `false`); `"abc".indexOf("", 20)` is -1 (JVM: 3); `intern()` of a computed string is not `eq` to the equal literal | javalib `String` |
+| `lastIndexOf` of a supplementary code point is -1; `indexOf(0x110000)` finds U+FFFD | `rt` string search natives |
+| `replaceAll("a*", "X")` on `"aaa"` gives `X` (JVM: `XX`); a replacement naming a missing group (`$2`) is ignored (JVM: `IndexOutOfBoundsException`); an invalid pattern (`"("`) throws `UnsupportedOperationException` (JVM: `PatternSyntaxException`) | javalib `regex` on Go's `regexp` |
+| UTF-8 bytes of a surrogate (`ED A0 80`) decode to three U+FFFD (JVM: one), in `new String` and in `CharsetDecoder` | `rt` UTF-8 decoder |
+| `StringBuilder.append(cs, 2, 1)` does nothing (JVM: `IndexOutOfBoundsException`); `appendCodePoint(-1)` appends U+FFFF (JVM: `IllegalArgumentException`); `append(chars, 1, 5)` throws `ArrayIndexOutOfBoundsException`, not `IndexOutOfBoundsException` | javalib `StringBuilder` |
+| `StringBuffer` is not synchronized: concurrent appends lose characters or throw. Not pinned (the result is random) | javalib `StringBuffer` |
+| Exception messages are JDK 8's or Go's: index errors (`index 5, length 3`, JVM `Index 5 out of bounds for length 3`), `parseInt` (no `under radix N`, radix and null messages), `parseDouble` (`empty String`, `multiple points`), `BigInteger` parsing, `Thread.sleep(-1)`, `Thread.Builder.priority` | javalib: JDK 17+'s messages |
 | String charsets other than the supported three throw `UnsupportedOperationException`, not `UnsupportedEncodingException`/`UnsupportedCharsetException` | javalib charsets |
+
+#### Go interop
+
+| Bug | Fix in |
+|-----|--------|
+| A `GoSlice`/`GoMap` passed for a defined Go slice or map type (`type Names []string`) is a link error (`cannot pass Scala type … as Go type …`), though the spec converts it | `GoInterop.toGoNormalized`: the Go-data case before `GoType.Named` |
+| A Scala number passed for a `time.Duration` parameter is a link error (`unknown Go type gp_time.Duration`) unless some facade imports `time` | `GoInterop`: import the named type's package |
+| A Scala `String` is an instance of a Go interface it does not implement (`("s": Any).isInstanceOf[fmt.Stringer]` is `true`; JVM and Go code: `false`) | `rt` type tests on `*rt.String` |
+| `GoType.of[Any].name` is `interface {}` on Go, `any` on the JVM (also inside composite types) | `GoType` natives: Go's `any` spelling |
 
 ### Silent wrong output
 
@@ -113,7 +172,7 @@ Start with a report that diffs javalib and natives against the JDK's API (`javap
 | Item | Missing | Size | Needs |
 |------|---------|------|-------|
 | API diff report | Tool comparing javalib's public API with JDK 21's, per class | S | — |
-| `java.lang` | `String`: `formatted`, `strip{Leading,Trailing,Indent}`, `indent`, `translateEscapes`, `codePointCount`, `contentEquals`. `Character`: `getType`, `toTitleCase`, `toChars`, `getNumericValue`, `isValidCodePoint`, `UnicodeBlock`, `UnicodeScript`. `Math`: `copySign`, `fma`, `multiplyHigh`, `nextAfter`, `IEEEremainder`, `scalb`, `getExponent`, `ceilDiv`. `parseUnsigned*`, `System.console`, `System.gc`, `System.runFinalization`, `Thread.getStackTrace`, `getContextClassLoader` (breaks `Source.fromResource`), `IntStream.parallel` | S each | — |
+| `java.lang` | `String`: `formatted`, `strip{Leading,Trailing,Indent}`, `indent`, `translateEscapes`, `codePointCount`, `contentEquals`. `Character`: `getType`, `toTitleCase`, `toChars`, `getNumericValue`, `isValidCodePoint`, `UnicodeBlock`, `UnicodeScript`. `Math`: `copySign`, `fma`, `multiplyHigh`, `nextAfter`, `IEEEremainder`, `scalb`, `getExponent`, `ceilDiv`. `parseUnsigned*`, `System.console`, `System.gc`, `System.runFinalization`, `Thread.getStackTrace`, `getContextClassLoader` (breaks `Source.fromResource`), `IntStream.parallel`, `Math.ulp`/`nextAfter` (break `scala.math.ulp`, `Random.between`), `Class.cast`/`isInstance` (break `Future.mapTo`, `TypeTest`s). The rest is pinned by `limits-jdk-gaps` and `limits-jdk-missing-expr` | S each | — |
 | `java.util` | `Scanner`, `EnumSet`/`EnumMap`, `Calendar`, `Timer`, `Currency`, `ServiceLoader` (resolve `META-INF/services` at link time), `ResourceBundle`, `Stream.gather`, concurrent collectors, reversed sequenced-map views, `Arrays.compare`/`mismatch`, multi-line `Properties` values | M | `getEnumConstants`, reflective instantiation |
 | Classpath resources | `getResourceAsStream` returns null. The linker embeds resources selected by build patterns | S–M | — |
 | `java.util.logging` | `Logger`, `Handler`, `Level`, `LogRecord`, `LogManager` (scribe, cask, ZIO use it) | S–M | — |
