@@ -5,177 +5,127 @@ title: Go interoperability
 # Go interoperability
 
 This page specifies what facade declarations denote, how values cross between Scala and Go, and
-what exported Scala code is in Go. It uses the terms of the [Go specification][go-spec] (types,
-assignability, conversions, method sets) and the [Go memory model][go-mem]. Usage is in the user
-guide: [Calling Go](../interop/facades.md), [Generated facades](../interop/generated-facades.md),
-[Go data](../interop/go-data.md), [Calling Scala from Go](../interop/exports.md).
+what exported Scala code is in Go, in the terms of the [Go specification][go-spec]. How-to:
+[Calling Go](../interop/facades.md), [Generated facades](../interop/generated-facades.md),
+[Go data](../interop/go-data.md), [Calling Scala from Go](../interop/exports.md). Mechanisms:
+[Design](../contributing/design.md#go-interop).
 
-Interop is Go-only: facade members throw `UnsupportedOperationException` on the JVM. The Go data
-types (`GoSlice`, `GoMap`, `GoChan`, `GoPtr`, `GoString`) and `GoData` also have a JVM
-implementation with Go's semantics.
+Facade members throw `UnsupportedOperationException` on the JVM. The Go data types (`GoSlice`,
+`GoMap`, `GoChan`, `GoPtr`, `GoString`) and `GoData` also run on the JVM, with Go's semantics.
 
-## Terms
-
-| Term | Meaning |
-|------|---------|
-| facade | a Scala declaration annotated `@GoImport` (object, class or trait) and its members, standing for a Go package or type |
-| Go value | a value of a Go type held by Scala code in an `any`: a facade reference, a `GoSlice`, a Go `string`, ... |
-| Scala type of a member | the type the facade declares, before erasure (recorded in the IR by the plugin), with type aliases followed |
-| Go type of a member | the type of the real Go declaration, read by the linker from the package's export data (`goapi`) |
-| canonical view | the one Scala type that stands for a Go type inside Go data (see [Go data](#go-data)) |
-
-The linker checks every facade member a program uses against the Go declaration and chooses
-conversions from both types. A mismatch is a link error at the Scala call site. Unused members
-are not checked.
+A **facade** is a Scala object, class or trait annotated `@GoImport`, standing for a Go package
+or type. The linker checks every facade member a program uses against the real Go declaration
+(from the package's export data) and converts values by both the member's Go type and its Scala
+type (before erasure, with type aliases followed). A mismatch is a link error at the Scala call
+site; unused members are not checked. A **Go value** is a value of a Go type that Scala code
+holds in an `any`: a facade reference, a `GoSlice`, a Go `string`, ...
 
 ## Facade declarations
 
 ### Packages
 
-`@GoImport(path) object P` stands for the Go package with import path `path`. The generated code
-imports it under an alias (`gp_<last path element>`, numbered on clashes), so its name never
-clashes with generated identifiers (Go: [Import declarations][go-import]). The package resolves
-in the generated module, whose `go.mod` requires the configured modules.
+`@GoImport(path) object P` stands for the Go package `path`, resolved in the generated module
+(whose `go.mod` requires the configured modules) and imported under an alias
+(`gp_<last path element>`) that cannot clash with generated names.
 
-| Member of `P` | Go entity | Use |
-|---------------|-----------|-----|
-| `def F(params): R = native` | package-level function `F` (Go: [Function declarations][go-funcs]) | the call `gp.F(args)` |
-| `def V: R = native` (no parameter list) | package-level variable or constant `V` (Go: [Variable declarations][go-vars], [Constant declarations][go-consts]) | a read of `gp.V`. A constant is converted by a Go conversion of the constant, which must be representable in the target type (Go: [Representability][go-repr]) |
-| `def V_=(x: T): Unit = native` | assignment to the variable `V` | `gp.V = x` (Go: [Assignment statements][go-assign-stmt]) |
-| `def T(x: U): T = native`, `T` a defined type that is not a struct or interface | the conversion `T(x)` (Go: [Conversions][go-conversions]) | `x` is first converted to `T`'s underlying type |
-| `def T(entries: (K, V)*): T`, `def T(elems: E*): T`, `T` a named map or slice type | a composite literal of `T` (Go: [Composite literals][go-composite]) | a new map or slice. Unlike in a Go map literal, a key may repeat; the later entry wins |
-| class or trait nested in `P` | the defined type of `P` with the class's name | see [Types](#types) |
+| Member of `P` | Go entity |
+|---------------|-----------|
+| `def F(params): R = native` | the function `F`, called as `F(args)` |
+| `def V: R = native` (no parameter list) | a read of the variable or constant `V`. A constant is converted by a Go conversion of the constant, which must be representable in the target type (Go: [Representability][go-repr]) |
+| `def V_=(x: T): Unit = native` | the assignment `V = x` |
+| `def T(x: U): T = native`, `T` a defined type that is not a struct or interface | the conversion `T(x)`, `x` first converted to `T`'s underlying type (Go: [Conversions][go-conversions]) |
+| `def T(entries: (K, V)*): T`, `def T(elems: E*): T`, `T` a named map or slice type | a composite literal of `T`: a new map or slice. A key may repeat; the later entry wins |
+| class or trait nested in `P` | the defined type of `P` with the class's name ([Types](#types)) |
 
 `@GoName(name)` gives the Go name of a member whose Scala name differs. Several members may stand
-for one Go function: one per Scala signature, or per instantiation of a generic function (see
-[Generic functions](#generic-functions)).
+for one Go function: one per Scala signature, or per instantiation of a generic function.
 
 ### Types
 
 | Declaration | Go type | Facade references hold |
 |-------------|---------|------------------------|
-| `class T` in `P`, or `@GoImport(path, "T") class C`, for a struct type | the defined struct type `T` (Go: [Type definitions][go-typedefs]) | a `*T` in an `any`; `null` is a nil `*T` |
-| the same, for any other non-interface type (`type Values map[string][]string`, `type Level int`) | `T` | a `T` in an `any` |
-| `trait T` | the interface type `T` (Go: [Interface types][go-interfaces]) | the interface's dynamic value, in an `any` |
-| `trait GoError` (in `scalago.go`) | the predeclared `error` | as above |
-| `class T[A, B]` (or `trait`) for a generic type | the instance `T[A', B']` of each use, `A'` the Go type of the use's type argument `A` | as above |
+| `class T` in `P`, or `@GoImport(path, "T") class C`, for a struct type | the struct type `T` | a `*T` in an `any`; `null` is a nil `*T` |
+| the same, for any other non-interface type (`type Level int`) | `T` | a `T` in an `any` |
+| `trait T` | the interface type `T` | the interface's dynamic value, in an `any` |
+| `trait GoError` (`scalago.go`) | `error` | as above |
+| `class T[A, B]` (or `trait`) for a generic type | the instance `T[A', B']` of each use, `A'` the Go type of `A` ([Generic functions](#generic-functions)) | as above |
 
-- Facade classes have no constructor parameters (the plugin checks). `new T` is Go's zero value
-  of `T` (Go: [The zero value][go-zero]): a pointer to a new zero struct, or the zero `T`;
-  `new T[A]` of the instance. Interface types have no `new`.
-- A generic facade class's type parameters stand for the Go type's, in order. Each use (a member
-  call, `new`) instantiates it with the type arguments of the receiver's (or the created) Scala
-  type; their Go types are as for [generic functions](#generic-functions). Type tests against a
-  generic facade are link errors (type arguments are erased); casts to one are unchecked.
-- A facade class member without a parameter list is a field (Go: [Selectors][go-selectors]),
-  including fields promoted from embedded structs; `x_=` assigns it. A member with a parameter
-  list is a method.
-- Methods are called on the held value. For struct types that is the pointer, whose method set
-  holds the methods with receiver `*T` and `T`, promoted ones included (Go:
-  [Method sets][go-methodsets]). For other types the held value is not addressable, so only
-  methods with receiver `T` can be called (Go: [Calls][go-calls]); a facade of a method with
-  receiver `*T` is a link error (it would change a copy).
-- A Go package may have facade objects in several Scala modules. Facades are matched by the Go
+- Facade classes have no constructor parameters. `new T` is the zero value of `T` (Go:
+  [The zero value][go-zero]): for a struct, a pointer to a new zero struct; `new T[A]` of the
+  instance. Interface types have no `new`.
+- A generic facade's type parameters stand for the Go type's, in order; each use instantiates it
+  with the type arguments of its Scala type. Type tests against a generic facade are link errors
+  (type arguments are erased); casts to one are unchecked.
+- A member without a parameter list is a field, including fields promoted from embedded structs;
+  `x_=` assigns it. A member with a parameter list is a method.
+- For struct types the held pointer's method set has the methods with receivers `*T` and `T`,
+  promoted ones included (Go: [Method sets][go-methodsets]). Other held values are not
+  addressable, so a facade of a method with receiver `*T` on them is a link error.
+- A Go package may have facade objects in several Scala modules: facades are matched by the Go
   type they stand for, not by Scala class.
 
 ## Values across the boundary
 
-A value crossing the boundary is converted according to its Scala type `S` and Go type `G`.
-Scala-to-Go conversions apply to facade call arguments, to results of Scala code called by Go
-(callbacks, Go methods implemented in Scala, exports) and to assignments of Go variables and
-fields. Go-to-Scala conversions apply in the other direction.
+A value crossing the boundary is converted by its Scala type `S` and Go type `G`. "To Go"
+applies to facade call arguments, assignments of Go variables and fields, and results of Scala
+code called by Go (callbacks, Go methods implemented in Scala, exports); "to Scala" to the other
+direction. "—" marks a direction that does not occur.
 
-### Scala to Go
-
-| Scala type `S` | Go type `G` | Go value |
-|----------------|-------------|----------|
-| `Boolean` | `bool` | the value |
-| a numeric primitive (`Int`, `Long`, `Double`, ...), or `GoInt`, `GoByte`, ... | any numeric type | `G(x)`, Go's numeric conversion: integers are sign- or zero-extended then truncated; floats are truncated toward zero; out-of-range floats give an implementation-dependent result (Go: [Conversions][go-conversions]) |
-| a numeric primitive | a defined numeric type (`time.Duration`) | `G(x)` |
-| `String` | `string`, or a defined string type | a new Go string transcoded from UTF-16 to UTF-8; unpaired surrogates become U+FFFD; `null` throws `NullPointerException` (Go's `string` has no null) |
-| `GoString` | `string` | the value |
-| `GoComplex` | `complex128`, `complex64` | the value; for `complex64`, Go's conversion (each part rounded to `float32`) |
-| a facade of struct type `T` | `T` | a copy of the struct (`*p`); `null` throws `NullPointerException` |
-| a facade of struct type `T` | `*T` | the pointer |
-| a facade of another type `T` | `T` | the value |
-| a facade, or `Any` | an interface type `I` (or `any`) | see [Interfaces](#interfaces) |
-| a Scala class | an interface type it implements | the object (see [Go interfaces implemented in Scala](#go-interfaces-implemented-in-scala)) |
-| `String` | `any` | a Go `string` |
-| a primitive | `any` | the primitive's Go type in the interface (`Int` is `int32`, `Long` is `int64`), not `int` |
-| `Array[P]` | `[]G` | shares the array's memory when `P`'s Go type is `G` (`Array[Long]` and `[]int64`, `Array[Byte]` and `[]byte`); otherwise a new slice of converted elements. `null` is a nil slice |
-| `Seq[E]` | `[]G` | a new slice of converted elements |
-| `Array[(K, V)]`, `Seq[(K, V)]` | `map[K]V` | a new map |
-| `GoSlice[E]`, `GoMap[K, V]`, `GoChan[E]`, `GoPtr[E]` | a slice, map, channel or pointer type | the value, shared, if `E` (`K`, `V`) is the canonical view of `G`'s element type. Converted when `G` is a defined type with the same underlying type, or a directional channel type (Go: [Assignability][go-assignability], [Conversions][go-conversions]) |
-| `GoSlice[E]` | an array type `[n]G` | a new array of the slice's first `n` elements (Go's conversion of a slice to an array); a shorter slice panics (Go: [Conversions from slice to array][go-conversions]) |
-| `(A, B) => C` | `func(A', B') C'`, or a defined func type | see [Functions](#functions) |
-| `T*` (last parameter) | `...G` | literal arguments are passed one by one; an `Array` or `Seq` passed as `xs*` becomes a slice passed with `...` (Go: [Passing arguments to `...` parameters][go-variadic]) |
-
-### Go to Scala
-
-| Go type `G` | Scala type `S` | Scala value |
-|-------------|----------------|-------------|
-| `bool` | `Boolean` | the value |
-| a numeric type | a numeric primitive | Go's numeric conversion to `S`'s Go type, as above |
-| a defined numeric type | a numeric primitive, or its facade | the number, or the Go value |
-| `string`, or a defined string type | `String` | a new string transcoded from UTF-8; invalid bytes become U+FFFD |
-| `string` | `GoString` or `Any` | the Go string |
-| `complex128`, `complex64` | `GoComplex` | the value, as a `complex128` |
-| struct type `T` | a facade of `T` | a pointer to a copy of the value |
-| `*T`, `T` a struct type | a facade of `T` | the pointer; nil is `null` |
-| another defined type `T` | a facade of `T` | the value |
-| an interface type | `Any` or a facade | the interface's dynamic value; a nil interface is `null` |
-| `[]E` | `Array[S]` | shares the memory when `E` is `S`'s Go type, else a new array of converted elements |
-| a slice, map, channel or pointer type | `GoSlice`, `GoMap`, `GoChan`, `GoPtr` of its canonical views | the value, shared |
-| an array type `[n]E` | `GoSlice` of `E`'s canonical view | a slice of a copy of the array |
-| a func type | a Scala function type | a `GoFunction0`–`GoFunction3` (see [Functions](#functions)) |
-| several results | a tuple | the results, converted |
-| results ending with `error` | the other results' type | the error is checked (see [Errors and panics](#errors-and-panics)) |
+| Scala type `S` | Go type `G` | To Go | To Scala |
+|----------------|-------------|-------|----------|
+| `Boolean` | `bool` | the value | the value |
+| a numeric primitive, or `GoInt`, `GoByte`, ... | any numeric type, also a defined one (`time.Duration`) | `G(x)`: integers sign- or zero-extended then truncated; floats truncated toward zero; out-of-range floats give an implementation-dependent result (Go: [Conversions][go-conversions]) | Go's conversion to `S`'s Go type |
+| `String` | `string`, or a defined string type | a new string transcoded from UTF-16; unpaired surrogates become U+FFFD; `null` throws `NullPointerException` | a new string transcoded from UTF-8; invalid bytes become U+FFFD |
+| `GoString` (to Scala also `Any`) | `string` | the value | the value |
+| `GoComplex` | `complex128`, `complex64` | the value; for `complex64`, each part rounded to `float32` | the value, as a `complex128` |
+| a facade of struct type `T` | `T` | a copy of the struct; `null` throws `NullPointerException` | a pointer to a copy |
+| a facade of struct type `T` | `*T` | the pointer | the pointer; nil is `null` |
+| a facade of another type `T` (also a defined numeric type) | `T` | the value | the value |
+| a facade, `Any`, a Scala class | an interface type | see [Interfaces](#interfaces) | the dynamic value; a nil interface is `null` |
+| `Array[P]` | `[]G` | shares the array's memory when `P`'s Go type is `G` (`Array[Long]` and `[]int64`), else a new slice of converted elements; `null` is a nil slice | likewise shared, else a new array of converted elements |
+| `Seq[E]` | `[]G` | a new slice of converted elements | — |
+| `Array[(K, V)]`, `Seq[(K, V)]` | `map[K]V` | a new map | — |
+| `GoSlice[E]`, `GoMap[K, V]`, `GoChan[E]`, `GoPtr[E]`, `E` (`K`, `V`) the canonical views of `G`'s element types | a slice, map, channel or pointer type | the value, shared; converted to a defined type with the same underlying type or to a directional channel type (Go: [Assignability][go-assignability]). **Deviation (bug):** a `GoSlice` or `GoMap` for a defined slice or map type is a link error ([Known bugs](../contributing/roadmap.md#known-bugs)) | the value, shared |
+| `GoSlice[E]` | an array type `[n]G` | a new array of the slice's first `n` elements; a shorter slice panics | a slice of a copy of the array |
+| a function type | a func type, or a defined one | see [Functions](#functions) | a `GoFunction0`–`GoFunction3` |
+| `T*` (last parameter) | `...G` | literal arguments one by one; an `Array` or `Seq` passed as `xs*` is a slice passed with `...` | — |
+| a tuple | several results | the elements | the results, converted |
+| the other results' type | results ending with `error` | see [Errors and panics](#errors-and-panics) | the error is checked |
 
 ### Interfaces
 
-A Go interface value holds a dynamic type and value (Go: [Interface types][go-interfaces]).
-Values go to an interface type `I` (or `any`) as follows:
+A value goes to an interface type `I` (or `any`) as:
 
 | Value | Go interface value |
 |-------|--------------------|
-| a Scala object | its struct pointer, which implements `I` if the class extends `I`'s facade (always, for `any`). Identity is kept: the same object reaches Go as the same interface value and comes back as itself |
-| a Scala `String`, a boxed primitive (to `any`) | a Go `string`; the Go primitive |
-| a facade of struct type `T` (held as `*T`) | **by value** if `T`'s method set implements `I`, else the pointer (`rt.ToGoInterface`, `rt.ToGoAny`). For `any`: by value if `T` has no pointer-receiver methods, so that `*T`'s method set is `T`'s (Go: [Method sets][go-methodsets], [Implementing an interface][go-implements]) |
-| other Go values | as they are; a value whose type does not implement `I` throws `ClassCastException` (a failed type assertion) |
+| a Scala object | its struct pointer, which implements `I` if the class extends `I`'s facade (always, for `any`). The same object reaches Go as the same interface value and comes back as itself |
+| a `String`; a boxed primitive | a Go `string`; the primitive's Go type (`Int` is `int32`, `Long` `int64`, never `int`) |
+| a facade of struct type `T` | a copy of the struct (**by value**) if `T`'s method set implements `I` (for `any`: if `T` has no pointer-receiver methods), else the pointer (Go: [Method sets][go-methodsets]). So Go code receives what Go code would pass: a `tea.KeyMsg` in a `tea.Msg`, a `*bytes.Buffer` as an `io.Writer` |
+| other Go values | as they are; a value whose type does not implement `I` throws `ClassCastException` |
 
-For struct facades, Go code receives what Go code would have passed: a `tea.KeyMsg` in a
-`tea.Msg`, a `*bytes.Buffer` as an `io.Writer`. Passing by value copies the struct (Go:
-[Assignability][go-assignability]). The choice depends on the type alone and is cached per type.
-
-In the other direction the dynamic value is taken as it is. A Go interface holding a nil pointer
-is not nil (Go: [Comparison operators][go-compare]), so it is not `null` in Scala either: an
-`error` result holding a nil `*MyError` is a non-null `GoError`, as `err != nil` is true in Go.
+From Go to Scala the dynamic value is taken as it is. A Go interface holding a nil pointer is not
+nil (Go: [Comparison operators][go-compare]), so it is not `null`: an `error` holding a nil
+`*MyError` is a non-null `GoError`.
 
 ### Functions
 
-- A Scala function passed for a Go func type, or a defined func type (`type Cmd func() Msg`,
-  assignable from the unnamed func type of the same signature, Go:
-  [Assignability][go-assignability]), becomes a Go closure: it converts its arguments, calls
-  `apply`, converts the result, and flushes buffered Scala output. `null` is a nil func. If the
-  Go result list ends with `error` and the Scala result type does not, the closure returns the
-  thrown exception as that error. Several Go results come from a tuple.
-- A Go func returned to Scala is a `scalago.go.GoFunctionN` (N ≤ 3). It converts arguments and
-  results with the facade's types and throws a trailing non-nil `error`. A nil func is `null`.
+- A Scala function passed for a Go func type, or a defined func type (`type Cmd func() Msg`),
+  becomes a Go closure that converts its arguments, calls `apply`, converts the result and
+  flushes buffered Scala output. `null` is a nil func. Several Go results come from a tuple. If
+  the Go results end with `error` and the Scala result type does not, a thrown exception is
+  returned as that error.
+- A Go func returned to Scala is a `scalago.go.GoFunctionN` (N ≤ 3) that converts with the
+  facade's types and throws a trailing non-nil `error`. A nil func is `null`.
 - Variadic func types are not supported.
 
 ### Named types
 
-- A defined type whose underlying type is a func type is a Scala function type; FacadeGen
-  declares it as a type alias (`type Cmd = () => Any`). Go accepts the converted closure: the
-  underlying types are identical and one of the types is not named.
-- A defined interface type without methods (`type Msg interface{}`) is `Any`: every value
-  implements it.
-- A generic func type (`iter.Seq[V]`, `func(yield func(V) bool)`) is a generic Scala function
-  type alias (`type Seq[V] = (V => Boolean) => Unit`): Go iterators are Scala functions taking a
-  yield function, and Scala functions are Go iterators.
-- Conversions to a defined type and composite literals of a named slice or map type are package
-  members (see [Packages](#packages)); `GoSlice`, `GoMap` and `GoChan` values for defined types
-  are converted (see [Scala to Go](#scala-to-go)).
+- A defined func type is a Scala function type alias (`type Cmd = () => Any`); the converted
+  closure is assignable to it (Go: [Assignability][go-assignability]).
+- A defined interface type without methods (`type Msg interface{}`) is `Any`.
+- A generic func type is a generic function type alias: `iter.Seq[V]` is
+  `type Seq[V] = (V => Boolean) => Unit`, so Go iterators are Scala functions taking a yield
+  function, and Scala functions are Go iterators.
 
 ### Go values in Scala code
 
@@ -183,20 +133,19 @@ A Go value held by Scala code (in an `Any` or a facade type) behaves as follows:
 
 | Operation | Behavior |
 |-----------|----------|
-| `isInstanceOf[F]`, type patterns | a Go type assertion to `F`'s Go type (Go: [Type assertions][go-assert]); for a struct facade, both `T` and `*T` pass |
+| `isInstanceOf[F]`, type patterns | a Go type assertion to `F`'s Go type (Go: [Type assertions][go-assert]); for a struct facade, both `T` and `*T` pass. **Deviation (bug):** a Scala `String` is an instance of every Go interface ([Known bugs](../contributing/roadmap.md#known-bugs)) |
 | `asInstanceOf[F]` | as above; `null` passes; a `T` struct value is copied to a new `*T` |
-| boxes | a Go value is a Scala box exactly when its dynamic type is `bool`, `uint16`, `int8`, `int16`, `int32`, `int64`, `float32` or `float64` (the Go types of Scala's primitives). Go `int`, `uint8`, `uint32`, ... are Go values, not numbers; `GoData.toScala` converts them |
+| boxes | a Go value is a Scala box exactly when its dynamic type is `bool`, `uint16`, `int8`, `int16`, `int32`, `int64`, `float32` or `float64`. Go `int`, `uint8`, `uint32`, ... are Go values, not numbers; `GoData.toScala` converts them |
 | `==`, `equals` | Go's `==` when the dynamic types are identical and comparable; identity for maps, slices (same array and length), funcs, channels and pointers; `false` for different types |
-| `eq` | Go's `==` on the interface values. **Deviation (bug):** panics for types Go cannot compare (see [Equality and hashing](language.md#equality-and-hashing)) |
+| `eq` | Go's `==` on the interface values; see [Equality and hashing](language.md#equality-and-hashing) for uncomparable types |
 | `hashCode` | consistent with `==`: the address for maps, slices, funcs, channels and pointers; the value for integers; a hash of the bytes for strings |
-| `toString` | `Error()` if the value is an `error`, else `String()` if it has one (`fmt.Stringer`), else `<Go type>@<hash in hex>` |
+| `toString` | `Error()` for an `error`, else `String()` for a `fmt.Stringer`, else `<Go type>@<hash in hex>` |
 | `getClass.getName` | the Go type (`*strings.Builder`, `int`) |
-| `synchronized` | a monitor from the global table, keyed by the value, or by the address for uncomparable types |
+| `synchronized` | a monitor keyed by the value, or by its address for uncomparable types |
 
-**Deviation (bug):** a Go struct value whose type Go cannot compare (a struct with a slice, map
-or func field) is not `==` to itself. A comparable struct type with an interface field holding an
-uncomparable value makes `==` throw `RuntimeException` (Go's run-time panic). From the
-implementation, `rt.foreignEquals`.
+**Deviation (bug):** a Go struct value of an uncomparable type (with a slice, map or func field)
+is not `==` to itself; an interface field holding an uncomparable value makes `==` throw
+`RuntimeException` ([Known bugs](../contributing/roadmap.md#known-bugs)).
 
 ## Generic functions
 
@@ -205,161 +154,138 @@ Go: [Instantiations][go-instantiations]), each the Go type of a Scala type:
 
 | Scala type argument | Go type argument |
 |---------------------|------------------|
-| a primitive, `GoInt`, `GoUint`, ..., `String`, `GoString`, `GoComplex`, `Unit` | its Go type: `Long` is `int64`, `GoInt` is `int`, `String` and `GoString` are `string`, `Unit` is `struct{}` |
+| a primitive, `GoInt`, `GoUint`, ..., `String`, `GoString`, `GoComplex`, `Unit` | its Go type: `Long` is `int64`, `GoInt` is `int`, `String` is `string`, `Unit` is `struct{}` |
 | `GoSlice[E]`, `GoMap[K, V]`, `GoChan[E]`, `GoPtr[E]` | `[]E'`, `map[K']V'`, `chan E'`, `*E'` |
 | a facade | the Go type it stands for; `*T` for a struct type `T` |
 | `Any`, `GoError` | `any`, `error` |
 | a function type | the func type of its Go parameter and result types |
 
 A facade member is generic (`def Max[E](x: GoSlice[E]): E`) or monomorphic
-(`def Max(x: GoSlice[GoInt]): GoInt`). The type arguments of a Go type parameter come from:
+(`def Max(x: GoSlice[GoInt]): GoInt`). A Go type parameter is bound, in order of preference, by:
 
-1. the Scala type argument of the facade member's type parameter of the same name (`E` in
-   `slices.Max[GoInt]`, given or inferred by Scala);
-2. its constraint's core type, if it has one (`S ~[]E` is `[]int`, Go: [Core types][go-core]);
-3. otherwise the facade's Scala types, unified with the Go declaration's: first the parameters
-   that are not funcs (Go data must have the exact type, being shared), then funcs, then
-   results (`Map(xs []T, f func(T) U)` with `GoSlice[GoInt]` and `Long => GoString` is
-   `Map[int, string]`: the function's argument converts).
+1. the Scala type argument of the member's type parameter of the same name (given or inferred);
+2. its constraint's core type, if any (`S ~[]E` is `[]int`, Go: [Core types][go-core]);
+3. unifying the facade's Scala types with the Go declaration's: parameters that are not funcs
+   (Go data must match exactly, being shared), then funcs, then results.
+   `Map(xs []T, f func(T) U)` with `GoSlice[GoInt]` and `Long => GoString` is
+   `Map[int, string]`; the function's argument converts.
 
-A type parameter none of these binds is a link error. The arguments and results are then
-converted to and from the instantiated Go types. Values of a member's type parameter types are
-erased in Scala: they are unboxed and boxed at the call. Go checks the type arguments against the
-constraints when it compiles the generated code (Go: [Satisfying a type constraint][go-satisfy]):
-`slices.Max[Any]` compiles in Scala but not in Go.
+A type parameter none of these binds is a link error. Values of a member's type parameter types
+are unboxed and boxed at the call. A type parameter constrained by an interface may be declared
+as that interface (`k: fmt.Stringer` for `K fmt.Stringer`), which satisfies the constraint.
+Generic facade members need a parameter list. A type argument `Nothing` or `Null`, or one Scala
+inferred for a type parameter no value parameter uses, is a compile error.
 
-- A type parameter constrained by an interface, in a monomorphic facade
-  (`func Matches[K fmt.Stringer](k K, ...)` declared with `k: fmt.Stringer`), is the interface
-  type, which satisfies the constraint because an interface type implements itself.
-- Generic facade members need a parameter list; the plugin records their type parameters and
-  each call's type arguments (before erasure drops them). A type argument that Scala inferred
-  for a type parameter no value parameter uses, and a type argument `Nothing` or `Null`, are
-  compile errors.
-- **Deviation (bug):** the linker does not check the type arguments against the constraints, so
-  one outside them is a Go compile error of the generated code, not a link error.
+Go checks type arguments against constraints when it compiles the generated code (Go:
+[Satisfying a type constraint][go-satisfy]). **Deviation (bug):** the linker does not, so
+`slices.Max[Any]` is a Go compile error, not a link error
+([Known bugs](../contributing/roadmap.md#known-bugs)).
 
 ## Types Scala code cannot name
 
-A Go API may use types that code outside their package cannot name: unexported ones
-(`binary.BigEndian` is of type `bigEndian`), and those of `internal` packages (`json/v2`'s
-`Options`) (Go: [Exported identifiers][go-exported]). Their values are Go values that Scala holds
-as they are, typed `Any` or as an interface they implement (FacadeGen picks the interface of
-their package, or of a package it imports, with the most methods: `binary.ByteOrder`,
-`io.ReadCloser` for `http.NoBody`). A call whose parameters or results have such types goes
-through Go's reflection (`rt.CallReflect`), which converts each argument to its parameter's
-type; an argument of another type throws `ClassCastException`. Fields of such types are read
-only.
+Values of types code outside their package cannot name (unexported, such as `binary.BigEndian`'s
+`bigEndian`, or in `internal` packages; Go: [Exported identifiers][go-exported]) are held as they
+are, typed `Any` or as an interface they implement. Calls whose parameters or results have such
+types go through Go's reflection, which converts each argument to its parameter's type; an
+argument of another type throws `ClassCastException`. Fields of such types are read-only.
 
 ## Calls
 
-A facade call evaluates the receiver and arguments left to right into Go variables, flushes
-buffered Scala output (to keep it ordered with what Go code writes), then makes the Go call with
-the converted values. An assignment to a Go field or variable is the same, with the assigned
-value as the argument.
+A facade call evaluates the receiver and arguments left to right, flushes buffered Scala output
+(keeping it ordered with what Go writes), then makes the Go call with the converted values. An
+assignment to a Go field or variable is the same, with the assigned value as the argument.
 
 ## Errors and panics
 
 | Situation | Behavior |
 |-----------|----------|
-| a Go function's results end with `error`, and the facade's result type leaves it out | a non-nil error is thrown as `scalago.go.GoException`, wrapping the Go error |
-| the facade's result type keeps it (`(Boolean, GoError)`, or `GoError` alone) | the error is returned; `nil` is `null` |
-| Go code panics during a facade call | the panic unwinds through the Scala frames as an exception: a `runtime.Error` becomes the Java exception given in [Exceptions](language.md#exceptions); any other value a `RuntimeException` with the value's text. A Scala `try` catches it (with `recover`, Go: [Handling panics][go-panics]) |
-| Scala code called by Go (a callback, a Go method implemented in Scala, an export) throws, and the Go result list ends with an `error` that the Scala result type leaves out (for exports: the method has `@throws`) | the exception becomes the error (`rt.RecoverAsError`): a `GoException` gives back the error it wraps; any other exception is an `*rt.ScalaError` whose `Error()` is the exception's `toString` |
-| the same without an `error` result | the exception unwinds through the Go frames as a Go panic whose value (`*rt.Exception`) is an `error` describing it. Go code may `recover` it. If the Go code was called by Scala code on the same goroutine, the exception reaches that Scala code as itself. If nothing recovers it (on a goroutine Go code started), the program ends with Go's panic report and exit status 2, without Scala's uncaught-exception handlers |
-| Go code panics in a call from a Scala callback, and Go code below the callback recovers | the panic passes through the Scala frames (running `finally` blocks); `recover` returns the original panic value, not an error |
+| a Go function's results end with `error`, and the facade's result type leaves it out | a non-nil error is thrown as a `scalago.go.GoException` wrapping it |
+| the facade's result type keeps it (`(Boolean, GoError)`, or `GoError`) | the error is returned; `nil` is `null` |
+| Go code panics during a facade call | the panic unwinds through Scala frames as an exception: a `runtime.Error` as in [Exceptions](language.md#exceptions), any other value a `RuntimeException` with its text. A Scala `try` catches it |
+| Scala code called by Go throws, and the Go results end with an `error` the Scala result type leaves out (exports: the method has `@throws`) | the exception becomes the error: a `GoException` gives back its error, any other exception is an `*rt.ScalaError` whose `Error()` is its `toString` |
+| the same without an `error` result | the exception unwinds through Go frames as a panic whose value is an `error` describing it, which Go code may `recover`. Back in Scala code on the same goroutine it is the exception itself. Unrecovered on a goroutine Go code started, it ends the program (Go's report, exit status 2, no uncaught-exception handlers) |
+| Go code panics below a Scala callback and Go code above the callback recovers | the panic passes through the Scala frames; `recover` returns the original value |
 
-As a panic passes through Go frames, deferred Go functions run; through Scala frames, `finally`
-blocks run; both in stack order.
+Panics run deferred Go functions and Scala `finally` blocks in stack order (Go:
+[Handling panics][go-panics]).
 
 ## Go interfaces implemented in Scala
 
-A Scala class extending a facade trait implements the Go interface. Each instantiated struct of
-the class gets, for each interface method, a Go method with the Go name and signature. It
-converts the arguments to Scala, calls the Scala method virtually and converts the result
-(several Go results from a Scala tuple, a trailing `error` from an exception, see above). The
-struct pointer's method set then contains the interface's methods, so it implements the
-interface (Go: [Implementing an interface][go-implements]). The linker checks each method
-against the Go interface's declaration.
-
-- Interfaces with unexported methods cannot be implemented outside their package (Go:
-  [Uniqueness of identifiers][go-unique]), so not in Scala.
-- Variadic and generic interface methods cannot be implemented in Scala.
+A Scala class extending a facade trait implements the Go interface (Go:
+[Implementing an interface][go-implements]): each instantiated struct of the class gets a Go
+method per interface method, with its Go name and signature, that converts the arguments, calls
+the Scala method virtually and converts the result (a tuple for several results, a thrown
+exception for a trailing `error`). The linker checks each method against the Go declaration.
+Interfaces with unexported methods (Go: [Uniqueness of identifiers][go-unique]), and variadic or
+generic methods, cannot be implemented in Scala.
 
 ## Go data
 
 `GoSlice[T]`, `GoMap[K, V]`, `GoChan[T]` and `GoPtr[T]` are opaque types whose values are Go
-slices, maps, channels and pointers, shared with Go code without copying. `GoString` is Go's
-`string`. Elements are read and written in their **canonical views**, which depend on the Go
-element type alone:
+slices, maps, channels and pointers, shared with Go without copying; `GoString` is Go's
+`string`. Elements are read and written in **canonical views**, which depend on the Go element
+type alone:
 
-| Go element type | Canonical Scala view |
-|-----------------|----------------------|
-| `int`, `int64`, `uint`, `uint64`, `uintptr` | `Long` (`GoInt`, `GoUint`, `GoUint64`, `GoUintptr` when creating) |
+| Go element type | Canonical Scala view (type when creating) |
+|-----------------|-------------------------------------------|
+| `int`, `int64`, `uint`, `uint64`, `uintptr` | `Long` (`GoInt`, `GoUint`, `GoUint64`, `GoUintptr`) |
 | `int32`, `uint32` | `Int` (`GoUint32`) |
 | `int16`, `uint16`, `int8`, `uint8` | `Short`, `Char`, `Byte` (`GoByte`) |
 | `float32`, `float64`, `bool` | `Float`, `Double`, `Boolean` |
-| `string` | `GoString` |
-| `complex128` | `GoComplex` |
-| `struct{}` | `Unit` |
+| `string`, `complex128`, `struct{}` | `GoString`, `GoComplex`, `Unit` |
 | a struct type | its facade (reading copies the struct to a new pointer; writing copies it back) |
 | an interface type | `Any`, or its facade |
 | anything else | the Go value: facades, `GoSlice`, `GoMap`, ... |
 
 Unsigned values are kept bit for bit: a `uint64` above `Long.MaxValue` reads as a negative
-`Long`. A facade whose Go data type does not use canonical views (`GoSlice[String]` for a
-`[]string`) is a link error that names the right view (`GoSlice[GoString]`).
-
-Creating Go data needs the Go element type, given by a `GoType[T]` instance: `Int` is `int32`,
-`Long` is `int64`, `GoInt` is `int`, `GoString` is `string`, `Any` is `any`, and so on.
+`Long`. A non-canonical view (`GoSlice[String]` for a `[]string`) is a link error naming the
+right one (`GoSlice[GoString]`). Creating Go data takes the Go element type from a `GoType[T]`
+instance: `Int` is `int32`, `Long` `int64`, `GoInt` `int`, `GoString` `string`, `Any` `any`, ...
 
 | Operation | Go semantics |
 |-----------|--------------|
-| `GoSlice.make[T](n)`, `make(n, cap)` | `make([]T, n, cap)`: `n` zero values (Go: [Making slices, maps and channels][go-make]) |
-| `s(i)`, `s(i) = x` | index expressions (Go: [Index expressions][go-index]); an index out of range throws `ArrayIndexOutOfBoundsException` |
-| `slice(from, until)` | `s[from:until]`, sharing the array (Go: [Slice expressions][go-slices]) |
-| `appended`, `appendedAll`, `copyFrom` | `append` (reuses the array while the capacity allows) and `copy` (Go: [Appending and copying slices][go-append]) |
+| `GoSlice.make[T](n)`, `make(n, cap)` | `make([]T, n, cap)`: `n` zero values |
+| `s(i)`, `s(i) = x` | indexing; out of range throws `ArrayIndexOutOfBoundsException` |
+| `slice(from, until)` | `s[from:until]`, sharing the array |
+| `appended`, `appendedAll`, `copyFrom` | `append` (reuses the array while the capacity allows), `copy` (Go: [Appending and copying slices][go-append]) |
 | `GoMap.make` | `make(map[K]V)` |
-| `m.get(k)`, `m(k) = v`, `remove(k)` | index expressions, assignment and `delete` (Go: [Deletion of map elements][go-delete]). Keys compare with Go's `==`: a `NaN` key is never found, `-0.0` equals `0.0`. A key whose dynamic type is not comparable panics |
-| iteration | Go's order, unspecified and different between iterations (Go: [For statements with range clause][go-range]) |
-| store into a nil map | `UnsupportedOperationException` (Go: a run-time panic); reading a nil map finds nothing |
+| `m.get(k)`, `m(k) = v`, `remove(k)` | indexing, assignment, `delete`. Keys compare with Go's `==`: a `NaN` key is never found, `-0.0` equals `0.0`; a key of uncomparable dynamic type panics |
+| iteration | Go's order, unspecified and different each time |
+| store into a nil map | `UnsupportedOperationException`; reading a nil map finds nothing |
 | `GoChan.make[T](cap)` | `make(chan T, cap)`; a negative capacity throws `IllegalArgumentException` |
-| `send`, `receive()` | send and receive (Go: [Send statements][go-send], [Receive operator][go-recv]). They block the thread, flush buffered output first, and are interrupted by `Thread.interrupt` (`InterruptedException`). `receive()` is `None` once the channel is closed and drained |
+| `send`, `receive()` | block the thread, flush buffered output first, and are interrupted by `Thread.interrupt` (`InterruptedException`). `receive()` is `None` once the channel is closed and drained. On a nil channel they block forever (interruptibly) |
 | `trySend`, `tryReceive` | non-blocking (a `select` with `default`) |
-| `close()` | `close`. Closing a closed or nil channel, or sending on a closed one, throws `RuntimeException` (Go's run-time panic; Go: [Close][go-close]) |
-| send and receive on a nil channel | block forever (interruptibly), as in Go |
-| any operation on `null` | `NullPointerException` (a nil Go value is not `null`: `isNil` tells) |
-| `GoPtr.alloc[T]`, `GoPtr.to(x)` | `new(T)` (Go: [Allocation][go-new]); a pointer to a copy of `x` |
+| `close()` | closing a closed or nil channel, or sending on a closed one, throws `RuntimeException` (Go: [Close][go-close]) |
+| `GoPtr.alloc[T]`, `GoPtr.to(x)` | `new(T)`; a pointer to a copy of `x` |
 | `get`, `set` | `*p`, `*p = x`; nil throws `NullPointerException` |
-| `isNil` | `== nil` |
+| `isNil` | `== nil` (a nil Go value is not `null`) |
+| any operation on `null` | `NullPointerException` |
 
-On the JVM the same operations have the same results, except that `GoMap` iterates in insertion
-order.
+On the JVM every operation has the same result, except that maps iterate in insertion order.
 
-**Synchronization.** A channel send is synchronized before the corresponding receive completes
-([Go memory model: channel communication][go-mem-chan]), so values sent from one thread are
-safely published to the receiver. Other Go data has no synchronization of its own: concurrent use
-needs `synchronized`, a lock or a channel. A `GoMap` written concurrently with other uses ends the
-process with Go's fatal error `concurrent map writes`, which no `catch` intercepts.
-**Deviation:** this is not a `ConcurrentModificationException`.
+A channel send is synchronized before the corresponding receive completes (Go:
+[Channel communication][go-mem-chan]), so sent values are safely published. Other Go data has no
+synchronization of its own. **Deviation:** a `GoMap` written concurrently with other uses ends
+the process with Go's fatal error `concurrent map writes`, which no `catch` intercepts, not a
+`ConcurrentModificationException`.
 
 ### GoData
 
-`GoData(x)` copies Scala data to plain Go data, the values that Go code inspecting values by
+`GoData(x)` copies Scala data to plain Go data, the values Go code inspecting values by
 reflection expects. Both directions copy; identity is not kept.
 
 | Scala | `GoData(x)` |
 |-------|-------------|
 | strings | Go `string` |
-| Scala integers | Go `int` (the default type of Go's integer constants, Go: [Constants][go-constants]) |
-| other numbers, `Boolean` | unchanged |
+| integers | Go `int` (the default type of Go's integer constants) |
+| other numbers, `Boolean`, Go values | unchanged |
 | `Option` | its value, or `nil` |
 | maps, case classes | `map[string]any` (case classes by `productElementNames`) |
 | other collections, arrays | `[]any` |
-| Go values | unchanged |
 
 `GoData.toScala` copies back: Go strings to `String`, integers to `Long`, floats to `Double`,
-slices and arrays to `Vector`, maps to `Map[String, Any]` sorted by key. Only Go's predeclared
-types are data: a `time.Duration` stays a Go value.
+slices and arrays to `Vector`, maps to `Map[String, Any]` sorted by key. Only values of Go's
+predeclared types are data: a `time.Duration` stays a Go value.
 
 ## Exports
 
@@ -368,81 +294,53 @@ module's root package:
 
 | Scala | Go declaration |
 |-------|----------------|
-| `@GoExport def f(params): R` in a top-level `object` | `func F(params) R` (Go: [Function declarations][go-funcs]). Unless a name is given, the name is capitalized, so exported (Go: [Exported identifiers][go-exported]) |
+| `@GoExport def f(params): R` in a top-level `object` | `func F(params) R`; the name is capitalized unless given |
 | the same, with `@throws[E]` | `func F(params) (R, error)` |
-| `@GoExport class C(params)` | `type C = scala.X_C`, an alias (Go: [Alias declarations][go-alias]) of an interface type whose methods are the class's `@GoExport` methods (and those of exported superclasses); `func NewC(params) C` for the primary constructor |
-| `@GoExport def m(...)` in an exported class | a method of the interface, declared on every instantiated struct of the class and its subclasses, calling the Scala method virtually |
+| `@GoExport class C(params)` | `type C = scala.X_C`, an alias of an interface type with the class's `@GoExport` methods and those of exported superclasses; `func NewC(params) C` for the primary constructor |
+| `@GoExport def m(...)` in an exported class | an interface method, calling the Scala method virtually |
 
-- Go types follow the Scala types: `Int` is `int32`, `Long` `int64`, `GoInt` `int`, `String` and
-  `GoString` `string`, `Array[T]` and `GoSlice[T]` `[]T`; `GoMap`, `GoChan`, `GoPtr` and facades
-  their Go types; exported classes their interfaces; `GoError` `error`; Scala functions Go
+- Go types follow the Scala types: `Int` is `int32`, `Long` `int64`, `GoInt` `int`, `String`
+  and `GoString` `string`, `Array[T]` and `GoSlice[T]` `[]T`, `GoError` `error`; `GoMap`,
+  `GoChan`, `GoPtr` and facades their Go types; exported classes their interfaces; functions Go
   funcs. Conversions are those above.
-- An exported object crosses the boundary as itself (the interface holds its struct pointer), so
-  `==` on it in Go is identity.
-- Errors and panics: see [Errors and panics](#errors-and-panics). Buffered Scala output is
-  flushed when each call returns.
-- The library's modules and static initializers run on first use, as in programs. Go package
-  initialization only creates literals.
-- A Go package that the library imports through a facade cannot import the library: Go forbids
-  import cycles (Go: [Import declarations][go-import]).
-- Not supported: exported traits, fields and `val`s, secondary constructors, tuple results,
-  generic methods, overloads with the same Go name. Traits, secondary constructors and generic
-  methods are compile errors; tuple results are link errors. **Deviation (bug):** `@GoExport` on
-  a field or `val` is ignored, and overloads exported under one Go name give Go code that does
-  not compile.
+- An exported object crosses as itself, so `==` on it in Go is identity.
+- Buffered Scala output is flushed when each call returns.
+- Modules and static initializers run on first use; Go package initialization only creates
+  literals.
+- A Go package that the library imports through a facade cannot import the library (Go:
+  [Import declarations][go-import]).
+- Exported traits, secondary constructors and generic methods are compile errors; tuple results
+  are link errors. **Deviation (bug):** `@GoExport` on a field or `val` is ignored, and overloads
+  exported under one Go name give Go code that does not compile
+  ([Known bugs](../contributing/roadmap.md#known-bugs)).
 
 ## Goroutines and threads
 
-Go code may call Scala code (exports, callbacks, Go methods implemented in Scala) from any
-goroutine, concurrently. Such a goroutine is a thread for Scala code: it gets a `Thread` object
-the first time it needs one (`Thread.currentThread`, a monitor, a `ThreadLocal`), kept while the
-goroutine runs. Scala code started by Go code with a `go` statement is not a non-daemon thread:
-the program does not wait for it.
-
-Scala and Go code synchronize through the edges of the [Go memory model][go-mem]. A value passed
-in a call is visible to the callee. Values shared across goroutines need channels, `sync`
-primitives or atomics on the Go side and the corresponding constructs on the Scala side (see
-[Runtime: memory model](runtime.md#memory-model)).
+Go code may call Scala code from any goroutine, concurrently. Such a goroutine gets a `Thread`
+the first time it needs one (`Thread.currentThread`, a monitor, a `ThreadLocal`), kept while it
+runs; it is not a non-daemon thread, so the program does not wait for it. Scala and Go code
+synchronize through the edges of the [Go memory model][go-mem]: a value passed in a call is
+visible to the callee; values shared across goroutines need channels, `sync` or atomics on the
+Go side and the corresponding constructs on the Scala side
+([Runtime: memory model](runtime.md#memory-model)).
 
 [go-spec]: https://go.dev/ref/spec
 [go-mem]: https://go.dev/ref/mem
 [go-mem-chan]: https://go.dev/ref/mem#chan
-[go-alias]: https://go.dev/ref/spec#Alias_declarations
 [go-append]: https://go.dev/ref/spec#Appending_and_copying_slices
 [go-assert]: https://go.dev/ref/spec#Type_assertions
-[go-assign-stmt]: https://go.dev/ref/spec#Assignment_statements
 [go-assignability]: https://go.dev/ref/spec#Assignability
-[go-calls]: https://go.dev/ref/spec#Calls
 [go-close]: https://go.dev/ref/spec#Close
 [go-compare]: https://go.dev/ref/spec#Comparison_operators
-[go-composite]: https://go.dev/ref/spec#Composite_literals
-[go-constants]: https://go.dev/ref/spec#Constants
-[go-consts]: https://go.dev/ref/spec#Constant_declarations
 [go-conversions]: https://go.dev/ref/spec#Conversions
-[go-delete]: https://go.dev/ref/spec#Deletion_of_map_elements
-[go-exported]: https://go.dev/ref/spec#Exported_identifiers
-[go-funcs]: https://go.dev/ref/spec#Function_declarations
-[go-implements]: https://go.dev/ref/spec#Implementing_an_interface
-[go-import]: https://go.dev/ref/spec#Import_declarations
-[go-index]: https://go.dev/ref/spec#Index_expressions
-[go-inference]: https://go.dev/ref/spec#Type_inference
-[go-interfaces]: https://go.dev/ref/spec#Interface_types
-[go-make]: https://go.dev/ref/spec#Making_slices_maps_and_channels
-[go-methodsets]: https://go.dev/ref/spec#Method_sets
-[go-new]: https://go.dev/ref/spec#Allocation
-[go-panics]: https://go.dev/ref/spec#Handling_panics
-[go-range]: https://go.dev/ref/spec#For_range
-[go-recv]: https://go.dev/ref/spec#Receive_operator
-[go-repr]: https://go.dev/ref/spec#Representability
-[go-satisfy]: https://go.dev/ref/spec#Satisfying_a_type_constraint
-[go-selectors]: https://go.dev/ref/spec#Selectors
-[go-send]: https://go.dev/ref/spec#Send_statements
-[go-slices]: https://go.dev/ref/spec#Slice_expressions
-[go-typedefs]: https://go.dev/ref/spec#Type_definitions
-[go-unique]: https://go.dev/ref/spec#Uniqueness_of_identifiers
-[go-variadic]: https://go.dev/ref/spec#Passing_arguments_to_..._parameters
-[go-vars]: https://go.dev/ref/spec#Variable_declarations
-[go-zero]: https://go.dev/ref/spec#The_zero_value
-[go-instantiations]: https://go.dev/ref/spec#Instantiations
 [go-core]: https://go.dev/ref/spec#Core_types
 [go-exported]: https://go.dev/ref/spec#Exported_identifiers
+[go-implements]: https://go.dev/ref/spec#Implementing_an_interface
+[go-import]: https://go.dev/ref/spec#Import_declarations
+[go-instantiations]: https://go.dev/ref/spec#Instantiations
+[go-methodsets]: https://go.dev/ref/spec#Method_sets
+[go-panics]: https://go.dev/ref/spec#Handling_panics
+[go-repr]: https://go.dev/ref/spec#Representability
+[go-satisfy]: https://go.dev/ref/spec#Satisfying_a_type_constraint
+[go-unique]: https://go.dev/ref/spec#Uniqueness_of_identifiers
+[go-zero]: https://go.dev/ref/spec#The_zero_value

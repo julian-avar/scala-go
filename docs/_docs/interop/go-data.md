@@ -4,26 +4,20 @@ title: Go data
 
 # Go data
 
-The types of `scalago.go` are Go data, shared with Go code without copying. Scala's own types
-are converted at the boundary instead: a `String` is transcoded, an `Array[String]` copied.
-
-| Scala         | Go        |
-|---------------|-----------|
-| `GoString`    | `string`  |
-| `GoSlice[T]`  | `[]T`     |
-| `GoMap[K, V]` | `map[K]V` |
-| `GoChan[T]`   | `chan T`  |
-| `GoPtr[T]`    | `*T`      |
-| `GoComplex`   | `complex128` |
-| `GoError`     | `error`   |
-
-They also run on the JVM with the same semantics, so code using them can be tested there.
+The types of `scalago.go` are Go data, shared with Go code without copying: `GoString` is
+`string`, `GoSlice[T]` `[]T`, `GoMap[K, V]` `map[K]V`, `GoChan[T]` `chan T`, `GoPtr[T]` `*T`,
+`GoComplex` `complex128` and `GoError` `error`. Scala's own types are converted at the boundary
+instead (a `String` is transcoded, an `Array[String]` copied). Go data also runs on the JVM with
+the same semantics, except that `GoMap` iterates in insertion order there (in Go's randomized
+order on Go).
 
 ## GoString
 
-`GoString` is Go's string: immutable UTF-8 bytes, passed to Go without conversion (like Scala
-Native's `CString`). Scala's `String` stays `java.lang.String` (UTF-16), so programs behave as on
-the JVM. The `go` interpolator works like `s"..."`: same escapes, checked at compile time.
+`GoString` is immutable UTF-8 bytes, passed to Go without conversion, while `String` stays
+`java.lang.String` (UTF-16). The `go` interpolator works like `s"..."`, checked at compile time;
+it inserts `GoString`s as they are and other values as `String.valueOf` renders them, in one Go
+concatenation with no UTF-16 conversion. `Ordering[GoString]` orders by
+bytes, as Go's `<`. There is no `f`-style formatting: `go"${"%.2f".format(x)}"`.
 
 ```scala
 import scalago.go.*
@@ -35,16 +29,12 @@ g.toJavaString                   // "Hi Grüße, 2!"
 g == go"Hi Grüße, 2!"            // true: contents are compared, on Go and on the JVM
 ```
 
-- `GoString` arguments are inserted as they are; others are rendered as `String.valueOf` would.
-- On Go, literal parts are string constants and an interpolation is one Go concatenation, with no
-  UTF-16 conversion.
-- `Ordering[GoString]` orders by bytes, as Go's `<`.
-- No `f`-style formatting. Format into a `String` first: `go"${"%.2f".format(x)}"`.
-
 ## Scala data for Go code
 
-Go code that inspects values by reflection (`encoding/json`, templates, configuration libraries)
-cannot see inside Scala objects. Convert with `GoData`:
+Scala cannot declare Go struct types: Go sees a Scala class only through Go interfaces. Go code
+that inspects values by reflection (`encoding/json`, templates) cannot see inside Scala objects,
+and code that binds or scans into structs (gin's `ShouldBindJSON`, argus's `Bind[T]`, database
+scanners) cannot fill one. Convert with `GoData`:
 
 ```scala
 import scalago.go.*
@@ -56,12 +46,15 @@ val config = GoData.map("server.port" -> 8080, "log.level" -> "info")  // GoMap[
 GoData.toScala(data)                                    // Map("id" -> 1, "tags" -> Vector("docs"), "title" -> "write docs")
 ```
 
-- `GoData(x)`: case classes and maps become `map[string]any`, other collections `[]any`,
-  strings Go `string`s, integers Go `int`s, `Option`s their value or `nil`.
-- `GoData.toScala`: Go maps become `Map[String, Any]` sorted by key, slices `Vector`s, and values
+- `GoData(x)`: case classes and maps become `map[string]any` (so `encoding/json` writes fields
+  sorted by name, under their Scala names), other collections `[]any`, strings Go `string`s,
+  integers Go `int`s, `Option`s their value or `nil`.
+- `GoData.toScala`: maps become `Map[String, Any]` sorted by key, slices `Vector`s, values
   `String`, `Long`, `Double` or `Boolean`.
-- Both copy. A Scala value passed to Go as `Any` without them stays the same object, and comes
-  back as itself.
+- Both copy. A Scala value passed to Go as `Any` without them stays the same object.
+- To bind JSON, bind into `any` (`GoPtr.alloc[Any]`) and convert with `GoData.toScala`
+  (`encoding/json` decodes numbers as `float64`, so they come back as `Double`s), or parse the raw
+  body with a Scala JSON library ([gin example](../examples/gin.md)).
 
 ## Slices, maps and pointers
 
@@ -83,8 +76,8 @@ val p = GoPtr.to(42L)    // *int64
 p.set(p.get + 1)
 ```
 
-- `GoMap` iteration order is Go's, which is randomized. On the JVM it is insertion order.
-- Facade types are already pointers. Use `GoPtr` for other types, such as `*int` or `*[]string`.
+Facade types are already pointers; use `GoPtr` for others, such as `*int` or `*[]string`.
+`GoComplex(1, 2)` has `+`, `-`, `*`, `/`, `real`, `imag` and `==`; `math/cmplx` has the rest.
 
 ## Channels
 
@@ -99,25 +92,12 @@ for v <- ch do println(v)                  // Go's for v := range ch
 ```
 
 `send` and `receive` block the calling thread (a goroutine); `trySend` and `tryReceive` do not.
-In gears code, use the cancellable `awaitSend` and `awaitReceive` of `scalago.gears` (see
-[Concurrency](../user/concurrency.md)).
-
-## Complex numbers
-
-```scala
-import scalago.go.*
-
-val z = GoComplex(1, 2)        // complex(1, 2)
-z * z                          // (-3+4i), as Go's fmt formats it
-(z / GoComplex(0, 1)).real     // 2.0
-```
-
-`+`, `-`, `*`, `/`, `real`, `imag`, and `==` on values. `math/cmplx` (in
-[scalago-gostd](../libraries/gostd.md)) has the rest.
+In gears code, use the cancellable `awaitSend` and `awaitReceive` of `scalago.gears`
+([Concurrency](../user/concurrency.md)).
 
 ## Element types
 
-Elements are read and written in a **canonical** Scala view, decided by the Go element type:
+Elements are read and written in a **canonical** Scala view of the Go element type:
 
 | Go element type                             | Scala view                                    |
 |---------------------------------------------|-----------------------------------------------|
@@ -125,30 +105,24 @@ Elements are read and written in a **canonical** Scala view, decided by the Go e
 | `int32`, `uint32`                           | `Int` (or `GoUint32`)                         |
 | `int16`, `uint16`, `int8`, `uint8`          | `Short`, `Char`, `Byte` (or `GoByte`)         |
 | `float32`, `float64`, `bool`                | `Float`, `Double`, `Boolean`                  |
-| `string`                                    | `GoString`                                    |
-| `complex128`                                | `GoComplex`                                   |
-| `struct{}`                                  | `Unit`                                        |
-| a struct                                    | its facade                                    |
+| `string`, `complex128`, `struct{}`          | `GoString`, `GoComplex`, `Unit`               |
 | anything else                               | the Go value: a facade, `GoSlice`, ..., `Any` |
 
-Creating Go data needs the Go element type: `GoSlice.make[GoInt](n)` makes an `[]int`,
-`GoSlice.make[Long](n)` an `[]int64`, and reading either gives `Long`s. `GoInt`, `GoByte` and
-the other Go numeric types are Scala numbers at run time; they matter only as type arguments and
-in facades. A facade with the wrong view (`GoSlice[String]` for a Go `[]string`) is a link error
-that names the right one.
+The `Go*` numeric types are Scala numbers at run time; they give the Go type when creating data:
+`GoSlice.make[GoInt](n)` is an `[]int`, `GoSlice.make[Long](n)` an `[]int64`, and both read as
+`Long`s. A facade with the wrong view (`GoSlice[String]` for a Go `[]string`) is a link error that
+names the right one.
 
 ## Limitations
 
-- No `select` over several channels.
+- No `select` over several channels. Receive on each from its own thread, or write the `select`
+  in a small Go function of a [local module](go-libraries.md).
 - Unsynchronized concurrent writes to a `GoMap` end the process with Go's fatal error
   `concurrent map writes`, which no `catch` intercepts.
-- Arrays inside Go data (`[][32]byte`), `complex64` and funcs inside Go data have no Scala view
-  but `Any`: pass them on to Go, but not use them from Scala. Facades see an array parameter or
-  result as a `GoSlice` (of a copy).
+- Arrays, `complex64` and funcs inside Go data have no Scala view but `Any`: pass them on to Go,
+  but do not use them from Scala.
 - Named slice and map types (`type H map[string]any`) are facade classes, not `GoSlice`s or
-  `GoMap`s. Their elements cannot be read from Scala.
-- `GoData` makes maps, not structs: Go code sees a case class's fields under their Scala names,
-  and `encoding/json` writes them sorted by name. `encoding/json` decodes numbers into `any` as
-  `float64`, so `GoData.toScala` gives them back as `Double`s.
-
-[Limitations](../user/limitations.md#go-interop) lists all limitations of Go interop.
+  `GoMap`s. Build them from elements or entries (`gin.H("k" -> v)`) or from a `GoMap`; their
+  elements cannot be read from Scala.
+- No `GoType` instances for facade types, so no `GoSlice.make` or `GoMap.make` with facade
+  elements; slices of them come from Go.

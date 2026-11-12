@@ -13,7 +13,7 @@ object app extends ScalaGoModule {
 ```
 
 `ScalaGoModule` compiles each dependency to Go from the TASTy in its jar, once per version (Mill
-caches it). The linker keeps only what the program uses. Jars that already contain scala-go IR,
+caches it); the linker keeps only what the program uses. Jars that already contain scala-go IR,
 such as `scalago-gears`, are used as they are.
 
 Checked against the JVM, with identical output: cats, upickle (derived `ReadWriter`s), fastparse,
@@ -26,8 +26,8 @@ pprint, mainargs, os-lib ([ecosystem example](../examples/ecosystem.md)) and gea
   missing at link time; a few (ujson's float formatting) have native implementations. This rules
   out `scala.collection.concurrent.TrieMap`, whose nodes are Java classes: use
   `java.util.concurrent.ConcurrentHashMap`.
-- **Runtime reflection and code generation:** `Class.forName`, `getMethods`, Java serialization,
-  dynamic proxies. Macros, givens and `Mirror`s (most Scala 3 libraries) work.
+- **Runtime reflection and code generation** (`Class.forName`, `getMethods`, Java serialization,
+  dynamic proxies) do not exist. Macros, givens and `Mirror`s (most Scala 3 libraries) work.
 - **Scala 2 libraries** have no TASTy.
 - **Blocked:** cats-effect and ZIO (Java classes, atomic field updaters), fs2-io (NIO channels,
   TLS), circe and zio-json (`java.util.Currency`), scribe (`java.util.logging`), scopt

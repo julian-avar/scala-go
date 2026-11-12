@@ -5,11 +5,11 @@ title: argus
 # argus
 
 Configuration that reloads itself when its file changes, on [argus](https://github.com/agilira/argus)
-([source](https://github.com/julian-avar/scala-go/tree/main/examples/argus)). Facades of argus
-are [generated](../interop/generated-facades.md); `time` comes from
-[`scalago-gostd`](../libraries/gostd.md).
-
-`LiveConfig` uses argus's `Setup` builder, with defaults, a JSON file and Scala callbacks:
+([source](https://github.com/julian-avar/scala-go/tree/main/examples/argus)), through
+[generated facades](../interop/generated-facades.md) and `scalago-gostd`'s `time`. Each revision
+becomes an immutable case class in an `AtomicReference`; a file that does not parse calls
+`OnError` and the last good configuration stays. argus calls the Scala callbacks on its own
+goroutines.
 
 ```scala sc:nocompile
 private val settings = argus.Setup("demo")
@@ -25,19 +25,14 @@ private val settings = argus.Setup("demo")
   .Start()
 ```
 
-- **Immutable revisions.** Each revision becomes an immutable `ServiceConfig` case class,
-  swapped atomically in an `AtomicReference`. A file that does not parse calls `OnError`; the last
-  good configuration stays.
-- **Reading keys.** `ServiceConfig.from` reads key by key (`GetString`, `GetInt`, `GetDuration`,
-  `GetStringSlice`), because `argus.Bind[T]` binds onto a Go struct Scala cannot declare. A Go
-  `time.Duration` becomes a `java.time.Duration` through `Nanoseconds()`.
-- **Plain data.** `FlagsWatcher` uses argus's universal watcher: it parses a YAML file into a Go
-  map, which [`GoData.toScala`](../interop/go-data.md) turns into a Scala `Map`.
-- **Callbacks on Go goroutines.** argus calls `OnReload`, `OnError` and the watcher's callback on
-  its own goroutines. They hand events to Scala code through an `AtomicReference` and a
-  `LinkedBlockingQueue`.
-
 Run it with `./mill examples.argus.goRun service.json` (watches the file) or
-`./mill examples.argus.check` (edits files in a temporary directory, checks each reload). The
-[README](https://github.com/julian-avar/scala-go/blob/main/examples/argus/README.md) has the
-file format, the cgo note and the limitations, with workarounds.
+`./mill examples.argus.check` (edits files in a temporary directory, checks each reload). argus
+imports `mattn/go-sqlite3`, which needs [cgo](../interop/go-libraries.md#cgo).
+
+Limitations:
+
+- No `argus.Bind[T]` onto a Scala class (it needs a Go struct with tags): `ServiceConfig.from`
+  reads key by key (`GetString`, `GetInt`, `GetDuration`, `GetStringSlice`).
+- The universal watcher's audit trail is off (`config.DisableAudit = true`): by default argus
+  writes it to a SQLite database at a system path.
+- Left out of the generated facade: `Source.UnmarshalJSON` (a pointer method of a non-struct type).

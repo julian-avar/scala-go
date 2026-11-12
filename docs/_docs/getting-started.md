@@ -4,13 +4,8 @@ title: Getting started
 
 # Getting started
 
-## Requirements
-
-- JDK 25.
-- Go 1.27 on the `PATH`.
-- [Mill](https://mill-build.org) 1.x.
-
-scala-go is not on Maven Central. Publish it to your local Ivy repository from a checkout:
+Requirements: JDK 25, Go 1.27 on the `PATH`, [Mill](https://mill-build.org) 1.x. scala-go is not
+on Maven Central; publish it to your local Ivy repository from a checkout:
 
 ```sh
 ./mill __.publishLocal
@@ -21,9 +16,7 @@ scala-go is not on Maven Central. Publish it to your local Ivy repository from a
 ```
 hello/
 ├── build.mill
-└── app/
-    └── src/
-        └── Main.scala
+└── app/src/Main.scala
 ```
 
 `build.mill`:
@@ -47,10 +40,8 @@ object app extends ScalaGoModule
   println(s"Hello, $who!")
 ```
 
-`ScalaGoModule` sets `scalaVersion` to 3.9.0 (the version the compiler plugin is built for) and
-adds the plugin and the scala-go library.
-
-## Running it
+`ScalaGoModule` sets `scalaVersion` to 3.9.0 (the version the plugin is built for) and adds the
+plugin and the scala-go library.
 
 | Command              | Result                                                     |
 |----------------------|------------------------------------------------------------|
@@ -59,14 +50,9 @@ adds the plugin and the scala-go library.
 | `mill app.goLink`    | the generated Go module, `out/app/goLink.dest/go`          |
 | `mill app.run a b`   | runs the same program on the JVM                           |
 
-The plugin only adds `.goir` files next to the `.class` files, so the module still compiles,
-runs and tests on the JVM. Test frameworks do not run as Go: test on the JVM, and build and run
-the Go binary in CI.
+The module still compiles, runs and tests on the JVM. Test frameworks do not run as Go: test on
+the JVM, and build and run the Go binary in CI.
 
-## Next steps
-
-- [Scala libraries](libraries/scala.md): add them to `mvnDeps` as usual.
-- [Calling Go](interop/facades.md): use Go packages.
-- [Shipping binaries](user/shipping.md): release builds and cross-compiling.
-- [Examples](examples/index.md): complete programs.
-- [Limitations](user/limitations.md): what does not work yet.
+Next: [Scala libraries](libraries/scala.md) (add them to `mvnDeps`), [Calling Go](interop/facades.md),
+[Shipping binaries](user/shipping.md), [Examples](examples/index.md),
+[Limitations](user/limitations.md).

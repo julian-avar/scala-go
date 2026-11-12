@@ -4,10 +4,10 @@ title: ecosystem
 
 # ecosystem
 
-Popular Scala 3 libraries, from their ordinary Maven artifacts, compiled to Go from the TASTy in
-their jars ([source](https://github.com/julian-avar/scala-go/tree/main/examples/ecosystem)). None
-has a scala-go artifact. The program does not call Go, so it also runs on the JVM, and its check
-compares both outputs.
+Scala 3 libraries from their ordinary Maven artifacts (listed in `mvnDeps`, nothing else),
+compiled to Go from the TASTy in their jars
+([source](https://github.com/julian-avar/scala-go/tree/main/examples/ecosystem)). The program
+does not call Go, so its check runs it on the JVM and as Go and compares the outputs.
 
 | Library    | Version | What the program uses                                                    |
 |------------|---------|--------------------------------------------------------------------------|
@@ -27,10 +27,7 @@ println(parseExpr("2*(3+4)-5"))                                  // fastparse
 println(os.proc("sh", "-c", "cat; echo $FOO").call(stdin = "piped in ", env = Map("FOO" -> "bar")).out.text())  // os-lib
 ```
 
-`build.mill` lists the six artifacts in `mvnDeps`, nothing else. `ScalaGoModule` compiles each
-jar's TASTy to IR once per version, and the linker keeps only the code the program reaches. os-lib's
-subprocesses run on javalib's `ProcessBuilder`, which uses Go's `os/exec`.
+Run it with `./mill examples.ecosystem.check`: `JVM and Go outputs agree (27 lines)`.
 
-Run it with `./mill examples.ecosystem.check`, which prints `JVM and Go outputs agree (27 lines)`.
-The [README](https://github.com/julian-avar/scala-go/blob/main/examples/ecosystem/README.md) lists
-the other commands and the limitations; [Scala libraries](../libraries/scala.md) has the coverage.
+Limitations: only what the program calls is checked (other parts of these libraries may reach a
+missing JDK API, a link error); the os-lib part runs `sh` and `cat`, so Unix only.

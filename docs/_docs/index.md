@@ -1,15 +1,13 @@
 # scala-go
 
-scala-go compiles Scala 3 programs to native executables through Go.
+scala-go compiles Scala 3 programs to native executables through Go. A compiler plugin writes IR
+(`.goir`) next to the `.class` files; a whole-program linker turns the program, its Scala
+libraries, the Scala standard library and javalib (a Java standard library written in Scala) into
+a Go module; `go build` makes one executable that needs no JVM.
 
-- A Scala compiler plugin writes IR (`.goir`) next to the `.class` files.
-- A whole-program linker turns the program, its Scala libraries, the Scala standard library and
-  javalib (a Java standard library written in Scala) into a Go module.
-- `go build` compiles that module into one executable that needs no JVM.
-
-Programs keep the JVM's semantics: `String` is `java.lang.String`, exceptions have stack traces,
-`java.util`, `java.time` and `scala.concurrent` behave as on the JVM. They also get Go's
-strengths: millisecond startup, cross-compilation, goroutines and direct calls to Go libraries.
+Programs keep the JVM's semantics (`String` is `java.lang.String`, exceptions have stack traces,
+`java.util`, `java.time` and `scala.concurrent` behave as on the JVM) and get Go's strengths:
+millisecond startup, cross-compilation, goroutines and direct calls to Go libraries.
 
 ```scala sc:nocompile
 import gofacades.{lipgloss, tea}
@@ -33,16 +31,13 @@ final case class Counter(n: Int) extends tea.Model:   // a Go interface, impleme
 | Go interop      | Scala calls Go packages (bubbletea, gin, ...); Go calls Scala libraries                    |
 
 Not supported: runtime reflection beyond `getClass`, Java code in dependencies, Scala 2
-libraries. See [Limitations](user/limitations.md) and
-[Differences from the JVM](user/differences.md).
+libraries. See [Limitations](user/limitations.md) and [Differences from the JVM](user/differences.md).
 
 ## Where to go next
 
-- [Getting started](getting-started.md): a first program, run as Go and on the JVM.
-- [Build setup](user/build.md): the Mill module, its tasks and settings.
+- [Getting started](getting-started.md), then [Build setup](user/build.md).
 - [Calling Go](interop/facades.md) and [Calling Scala from Go](interop/exports.md).
 - [Examples](examples/index.md): complete programs with bubbletea, gin and argus.
-- API: [scalago.go](scalago.go) (facades, Go data types), [scalago.gears](scalago.gears),
-  [scalago.gostd](scalago.gostd).
-- [Specification](spec/index.md): what scala-go guarantees.
-- [Design](contributing/design.md): for contributors.
+- API: [scalago.go](scalago.go), [scalago.gears](scalago.gears), [scalago.gostd](scalago.gostd).
+- [Specification](spec/index.md): what scala-go guarantees. [Design](contributing/design.md): for
+  contributors.

@@ -4,17 +4,14 @@ title: Calling Go
 
 # Calling Go
 
-A **facade** is a Scala declaration of a Go API. Write it by hand, as on this page, or
-[generate](generated-facades.md) it. The linker checks every facade member a program uses
-against the real Go declaration, and converts values between the facade's Scala types and the Go
-types. A mismatch is a link error at the Scala call site; unused members are not checked.
-
-The standard library needs no setup. List other Go modules in `goRequires`, or local
-directories in `goLocalModules` ([Go libraries](go-libraries.md)).
+A **facade** declares a Go API in Scala, by hand as on this page or
+[generated](generated-facades.md). The linker checks each facade member a program uses against the
+Go declaration (a mismatch is a link error at the Scala call site; unused members are not
+checked) and converts values between their types. Modules other than the standard library go in
+`goRequires` or `goLocalModules` ([Go libraries](go-libraries.md)). The full rules are in
+[Go interoperability](../spec/interop.md).
 
 ## Declaring a package
-
-`@GoImport(path)` on an object declares the Go package `path`:
 
 ```scala
 import scalago.go.*
@@ -30,14 +27,14 @@ object strconv:
   println(strconv.Atoi("42") + 1)
 ```
 
-- Members are `def`s whose body is `native`. Use `def`, not `val`.
-- A member with a parameter list is a package function. One without is a variable or constant.
+- Members are `def`s (not `val`s) whose body is `native`: with a parameter list a function,
+  without one a variable or constant. `x_=` assigns a variable.
 - Names are Go's. `@GoName("Fields")` gives the Go name when the Scala name differs, for example
   to declare one function with two signatures.
+- A member named as a type, with one parameter, is Go's conversion to that type:
+  `def Duration(d: Long): Duration` in a facade of `time` is `time.Duration(d)`.
 
 ## Declaring types
-
-Classes and traits nested in the object are the package's types:
 
 ```scala
 import scalago.go.*
@@ -59,71 +56,53 @@ object io:
     def Write(p: Array[Byte]): Int
 ```
 
-| Scala                                    | Go                                   |
-|------------------------------------------|--------------------------------------|
-| `class T`                                | type `T`; a struct type is held by pointer |
-| `trait T`                                | interface `T`                        |
-| member without a parameter list          | a field; declare `x_=` next to `x` to assign it |
-| member with a parameter list             | a method                             |
-| `new T`                                  | the zero value of `T`                |
-| `null`                                   | `nil`                                |
-| `isInstanceOf[T]`, `case x: T`           | a type assertion                     |
-| `@GoImport(path, name)` on a top-level class or trait | type `name` of package `path`, outside a package object |
-
-A Scala class can implement a facade trait and be passed to Go as that interface:
-
-```scala sc:nocompile
-class Upper extends io.Writer:
-  def Write(p: Array[Byte]): Int =
-    print(new String(p, "UTF-8").toUpperCase)
-    p.length
-```
-
-Scala cannot define Go struct types: Go sees a Scala class only through the interfaces it
-implements. Go code that fills structs by reflection (JSON binding, database scanners) cannot fill
-one; use [`GoData`](go-data.md#scala-data-for-go-code).
+- A class nested in the object is a Go type (a struct type is held by pointer), a trait an
+  interface. `@GoImport(path, name)` on a top-level class or trait declares type `name` of
+  package `path`.
+- `new T` is Go's zero value of `T`, `null` is `nil`, `isInstanceOf[T]` and `case x: T` are type
+  assertions.
+- Assigning a field changes the struct you hold. Methods with value receivers return copies:
+  `val (input2, cmd) = input.Update(msg)`. A struct goes back to Go by value where its methods
+  allow (`tea.KeyMsg`, `lipgloss.Style`), so the library's type switches see it.
+- A Scala class extending a facade trait (`class Upper extends io.Writer`) is passed to Go as
+  that interface. Scala cannot define Go struct types:
+  see [Scala data for Go code](go-data.md#scala-data-for-go-code).
 
 ## Conversions
 
 | Scala                          | Go                                                         |
 |--------------------------------|------------------------------------------------------------|
 | `Int`, `Long`, `Double`, ...   | any numeric type, converted as Go converts (`int(x)`)      |
-| `Boolean`                      | `bool`                                                     |
-| `String`                       | `string`, transcoded from UTF-16 to UTF-8 and back         |
-| `GoString`                     | `string`, as is                                            |
-| `GoError`                      | `error`                                                    |
-| a facade class or trait        | its Go type                                                |
-| a Scala class                  | a Go interface it implements                               |
-| `Array[T]`                     | `[]T`; shared when the representations match (`Array[Byte]` and `[]byte`), else copied |
-| `GoSlice[T]`, `GoMap[K, V]`, `GoChan[T]`, `GoPtr[T]` | the Go value, shared (see [Go data](go-data.md)) |
+| `String`; `GoString`           | `string`: transcoded between UTF-16 and UTF-8 at each crossing; as is (use it in hot paths) |
+| `Array[T]`                     | `[]T`: shared when the representations match (`Array[Byte]` and `[]byte`), else copied |
+| `GoSlice[T]`, `GoMap[K, V]`, `GoChan[T]`, `GoPtr[T]` | the Go value, shared ([Go data](go-data.md)) |
+| a facade type; a Scala class   | its Go type; a Go interface it implements                  |
+| `Any`, `GoError`               | `any` and other interface types; `error`                   |
 | `T*` (last parameter)          | a variadic parameter `...T`                                |
 | `(A, B) => C`                  | `func(A, B) C`; a Go func returned to Scala is a Scala function of at most 3 parameters |
 | `(A, B)` as a result           | two results                                                |
-| `Any`, `AnyRef`                | `any` and other interface types                            |
+
+Named numeric types (`time.Duration`) are facade classes, not Scala numbers: no arithmetic.
+Convert in with the conversion (`time.Duration(nanos)`), out with the type's methods
+(`d.Nanoseconds()`).
 
 ## Errors
 
 - A Go `error` result that the facade's result type leaves out is checked: a non-nil error is
-  thrown as a `GoException`, whose `error` is the Go error.
-- To get the error as a value, keep it in the result type: `(Boolean, GoError)`. `nil` is `null`.
-- A Go panic becomes a `RuntimeException`. Go runtime errors become the matching Java exceptions.
+  thrown as a `GoException`, whose `error` is the Go error. Keep it in the result type
+  (`(Boolean, GoError)`) to get it as a value; `nil` is `null`. Generated facades always leave it
+  out.
+- A Go panic becomes a `RuntimeException`; Go runtime errors become the matching Java exceptions.
 - A Scala method implementing a Go method that returns an `error` returns a thrown exception as
-  that error. A `GoException` gives back the Go error it wraps (`throw GoException(io.EOF)`).
-
-```scala sc:nocompile
-try strconv.Atoi("forty-two")
-catch case e: GoException => println(s"not a number: ${e.error.Error()}")
-
-val (b, err) = strconv.ParseBool("maybe")
-if err != null then println(err.Error())
-```
+  that error; a `GoException` gives back the Go error it wraps (`throw GoException(io.EOF)`).
 
 ## Generics
 
-Declare a generic Go function as a generic member, with the Go type parameters' names; a type
-parameter whose constraint has a core type (`S ~[]E`) is that type. Each call instantiates it
-with its type arguments, as Scala gives or infers them: canonical views, such as `GoInt` for
-`int` and `GoString` for `string`. A generic Go type is a generic class or trait.
+A generic Go function is a generic member with the Go type parameters' names; a type parameter
+whose constraint has a core type (`S ~[]E`) is that type. A generic Go type is a generic class or
+trait. Each use is instantiated with the Go types of its Scala type arguments, given or inferred
+(`GoInt` is `int`, `Long` is `int64`). A monomorphic member per instantiation also works:
+`@GoName("Max") def maxFloat(x: GoSlice[Double]): Double`.
 
 ```scala
 import scalago.go.*
@@ -143,25 +122,19 @@ slices.Max(GoSlice.of[GoInt](GoInt(3), GoInt(7)))         // slices.Max[[]int, i
 val p = new atomic.Pointer[GoString]                      // new(atomic.Pointer[string])
 ```
 
-Go checks the constraints when it compiles the generated code: `slices.Max[Any]` compiles in
-Scala, not in Go. Give the type arguments that no parameter determines
-(`reflect.TypeFor[GoInt]()`): the plugin rejects those Scala would infer as `Any` or `Nothing`. A monomorphic member also works, one per instantiation
-(`@GoName("Max") def maxFloat(x: GoSlice[Double]): Double`); Go's type arguments then come from
-its Scala types. Write `GoSlice.of[GoInt](...)` in arguments of generic members: with the element
-type unknown, Scala cannot choose `GoSlice.of`'s Go type. Type tests against generic facades are
-not supported. [Specification](../spec/interop.md#generic-functions).
-
-## Conversions to named types
-
-A package member named as a type, with one parameter, is Go's conversion to that type:
-`def Duration(d: Long): Duration` in a facade of `time` is `time.Duration(d)`. Named numeric
-types are facade classes, not Scala numbers: no arithmetic. Convert in with the conversion
-(`time.Duration(nanos)`), out with the type's methods (`d.Nanoseconds()`).
+- Scala does not check Go's constraints: `slices.Max` of a `GoSlice[Any]` links, then fails
+  `go build` ([known bug](../contributing/roadmap.md#known-bugs)).
+- A type argument that no parameter determines must be given (`reflect.TypeFor[GoInt]()`): the
+  plugin rejects those Scala would infer as `Any` or `Nothing`.
+- `GoSlice.of(...)` in an argument of a generic member needs its element type
+  (`GoSlice.of[GoInt](...)`), otherwise its Go type is ambiguous.
+- Type tests against generic facade types are link errors, and casts to them are unchecked.
+- A struct facade as a type argument stands for the pointer type: `atomic.Pointer[bytes.Buffer]`
+  is Go's `atomic.Pointer[*bytes.Buffer]`.
 
 ## On the JVM
 
 Facade members throw `UnsupportedOperationException` on the JVM, so a program that calls Go runs
-only as Go. Constructing a facade class instance (`new F`) does not throw; using its members does.
-`GoError`, `GoException`, [Go data](go-data.md) and `GoString` work on both. To test the rest on the JVM, keep Go calls behind a trait of your own.
-
-[Limitations](../user/limitations.md#go-interop) lists all limitations of Go interop.
+only as Go. `new F` of a facade class does not throw; using its members does. `GoError`,
+`GoException`, [Go data](go-data.md) and `GoString` work on both. To test the rest on the JVM,
+keep Go calls behind a trait of your own.

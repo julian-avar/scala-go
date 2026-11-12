@@ -4,15 +4,11 @@ title: basics
 
 # basics
 
-A small program built with `ScalaGoModule`
-([source](https://github.com/julian-avar/scala-go/tree/main/examples/basics)). It shows:
-
-- case classes and pattern matching, collections, string interpolation;
-- a `GoString`, UTF-8 as Go stores strings (`"Grüße"` is 7 bytes);
-- Go called through [generated facades](../interop/generated-facades.md): the standard library's
-  `strconv` and a local Go module, `go/textstats`;
-- [gears](../user/concurrency.md#gears) futures on goroutines, gears being an ordinary Maven
-  dependency compiled from its TASTy.
+A small program ([source](https://github.com/julian-avar/scala-go/tree/main/examples/basics)):
+case classes, collections, a `GoString` (`"Grüße"` is 7 UTF-8 bytes), Go's `strconv` and a local
+Go module, `go/textstats`, through [generated facades](../interop/generated-facades.md), and
+[gears](../user/concurrency.md#gears) futures on goroutines (gears is an ordinary Maven
+dependency).
 
 ```scala sc:nocompile
 // build.mill
@@ -21,11 +17,6 @@ object basics extends ScalaGoModule {
   def goFacadePackages = Seq("strconv", "example.com/textstats")
 }
 ```
-
-`goLocalModules` adds the module to the generated `go.mod` (a `replace` directive), and
-`goFacadePackages` generates the `gofacades.textstats` and `gofacades.strconv` objects. A Go
-`[]string` arrives as a `GoSlice[GoString]`. `Longest` returns `(string, error)`: the facade
-returns the `String` and throws a non-nil `error` as a `GoException`.
 
 ```scala sc:nocompile
 import gofacades.*
@@ -36,6 +27,7 @@ try textstats.Longest(GoSlice.empty[GoString])
 catch case e: GoException => println(s"Go error: ${e.getMessage}")      // Go's error result
 ```
 
-Run it with `./mill examples.basics.goRun Ada Grace`. The
-[README](https://github.com/julian-avar/scala-go/blob/main/examples/basics/README.md) has the
-expected output and the limitations this example hits, with workarounds.
+Run it with `./mill examples.basics.goRun Ada Grace`.
+
+Limitation: the generated `go.mod` refers to `go/textstats` by absolute path (a `replace`); to
+build the generated module elsewhere, copy `go/textstats` along and adjust the path.

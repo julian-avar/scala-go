@@ -6,10 +6,11 @@ title: gin
 
 A JSON API for todos on [gin](https://github.com/gin-gonic/gin)
 ([source](https://github.com/julian-avar/scala-go/tree/main/examples/gin)): routes with path and
-query parameters, middleware, a route group with a token check, JSON responses from Scala data and
-request bodies bound from JSON. Facades of gin are
-[generated](../interop/generated-facades.md); `net` and `net/http` come from
-[`scalago-gostd`](../libraries/gostd.md).
+query parameters, middleware written as Scala lambdas, a route group with a token check, JSON
+responses from [`GoData`](../interop/go-data.md#scala-data-for-go-code) and request bodies bound
+into `any`. Handlers run concurrently on `net/http`'s goroutines; the store is an immutable
+`TreeMap` behind `synchronized`. gin's facades are [generated](../interop/generated-facades.md);
+`net` and `net/http` come from [`scalago-gostd`](../libraries/gostd.md).
 
 ```scala sc:nocompile
 val api = router.Group("/api", authorized(token))
@@ -25,22 +26,14 @@ api.POST("/todos", c =>
 )
 ```
 
-- **Handlers are Scala lambdas.** `gin.HandlerFunc` is a Go func type, so a Scala function is one.
-  The middleware `counting` calls `c.Next()`; `authorized` ends the chain with
-  `AbortWithStatusJSON`.
-- **Concurrency.** Go's `net/http` serves each connection on its own goroutine, so handlers run
-  concurrently. `TodoStore` keeps an immutable `TreeMap` behind `synchronized`;
-  `scala.collection.concurrent.TrieMap` does not link.
-- **Responses.** [`GoData`](../interop/go-data.md) converts Scala data to what `encoding/json`
-  writes: a case class becomes a `map[string]any`, so fields come out sorted by name, under their
-  Scala names. Error bodies are `gin.H("error" -> ...)`.
-- **Request bodies.** Scala cannot declare a Go struct with `json`/`binding` tags for gin to bind
-  into. The body is bound into an `any` (`GoPtr.alloc[Any]`), converted with `GoData.toScala` to a
-  `Map[String, Any]` and validated by hand. Bad JSON is a `GoException` from `ShouldBindJSON`.
-- **Self-test.** `--self-test` serves on a free port (`net.Listen("tcp", "127.0.0.1:0")` and an
-  `http.Server`), sends 14 requests with `java.net.http.HttpClient`, checks each response, and
-  shuts down with `server.Shutdown(context.Background())`.
+Run it with `./mill examples.gin.goRun` (serves on `:8080`) or `./mill examples.gin.check`
+(`--self-test`: serves on a free port and checks 14 requests sent with `java.net.http.HttpClient`).
 
-Run it with `./mill examples.gin.goRun` (serves on `:8080`) or `./mill examples.gin.check`. The
-[README](https://github.com/julian-avar/scala-go/blob/main/examples/gin/README.md) has `curl`
-commands and the limitations, with workarounds.
+Limitations:
+
+- No binding into a Scala class; bound JSON numbers are `Double`s. Parsing `c.GetRawData()` with
+  upickle also works.
+- Response fields come out sorted by name, under their Scala names; build a `gin.H` for others.
+- Left out of the generated facades: `gin.DebugPrintFunc` (a variadic func type),
+  `gin.DebugPrintRouteFunc` (more than 3 parameters), `HandlersChain`'s conversion (funcs inside
+  Go data), the setter of `Context.Errors` (an unexported type).

@@ -4,7 +4,7 @@ title: Go interop
 
 # Go interop
 
-Scala code and Go code call each other directly, in one process, without serialization.
+Scala and Go code call each other directly, in one process, without serialization.
 
 | To ...                                           | See                                       |
 |--------------------------------------------------|-------------------------------------------|
@@ -14,6 +14,5 @@ Scala code and Go code call each other directly, in one process, without seriali
 | use a third-party Go module                      | [Go libraries](go-libraries.md)           |
 | call Scala code from a Go program                | [Calling Scala from Go](exports.md)       |
 
-Programs that call Go run only as Go ([On the JVM](facades.md#on-the-jvm)). The `scalago.go`
-data types (`GoSlice`, `GoMap`, ...) also run on the JVM. [Go interoperability](../spec/interop.md)
-specifies the exact semantics.
+Programs that call Go run only as Go ([On the JVM](facades.md#on-the-jvm)); the Go data types run
+on both. [Go interoperability](../spec/interop.md) specifies the exact semantics.
