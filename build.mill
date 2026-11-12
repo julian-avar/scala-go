@@ -1,4 +1,5 @@
-//| mill-version: 1.1.8
+//| mill-jvm-version: system
+//| mill-version: 1.3.1
 package build
 
 import mill.*
@@ -14,8 +15,8 @@ object Versions {
    */
   val scala = UserScalaGoModule.ScalaVersion
   /** Mill's own Scala version: the Mill plugin is compiled with it. */
-  val millScala = "3.8.2"
-  val mill = "1.1.8"
+  val millScala = "3.9.0"
+  val mill = "1.3.1"
   val munit = "1.3.0"
   val gears = "0.3.1"
 }
@@ -219,11 +220,18 @@ object gostd extends WithPlugin with Published {
     "unicode", "unicode/utf8"
   )
 
+  /** The Go that the facades are generated from: a new release has new API, so it is an input. */
+  def goVersion = Task.Input {
+    os.proc("go", "version").call(env = Task.env).out.text().trim
+  }
+
   def generatedSources = Task {
+    goVersion()
+    // Task.env is the environment of the `mill` command (a Mill daemon outlives its shell).
     os.proc(
       "java", "-cp", linker.runClasspath().map(_.path).mkString(java.io.File.pathSeparator),
       "scalago.linker.FacadeGen", "--out", Task.dest, "--package", "scalago.gostd", goPackages
-    ).call(stdout = os.Pipe)
+    ).call(stdout = os.Pipe, env = Task.env)
     Seq(PathRef(Task.dest))
   }
 }

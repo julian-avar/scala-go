@@ -27,11 +27,11 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
       # The standard library facades (scalago-gostd) are generated from Go's API at build time.
       - uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version: '1.27'
           cache-dependency-path: runtime/go.mod
       - uses: actions/cache@v4
         with:

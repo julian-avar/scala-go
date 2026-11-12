@@ -175,7 +175,7 @@ object Linker:
     errors.warnings
 
   private def goMod(config: Config): String =
-    val sb = StringBuilder(s"module ${config.goModulePath}\n\ngo 1.22\n")
+    val sb = StringBuilder(s"module ${config.goModulePath}\n\ngo 1.27\n")
     if config.goRequires.nonEmpty then
       sb ++= config.goRequires.map((m, v) => s"\t$m $v\n").mkString("\nrequire (\n", "", ")\n")
     for (m, dir) <- config.goReplaces do sb ++= s"\nreplace $m => $dir\n"

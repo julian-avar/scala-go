@@ -108,9 +108,9 @@ Gr%C3%BC%C3%9Fe+%E4%B8%96%E7%95%8C+%F0%9F%8C%8D | Gr%FC%DFe+%3F%3F+%3F | Grüße
 a+b c=€
 decode %: java.lang.IllegalArgumentException: URLDecoder: Incomplete trailing escape (%) pattern
 decode %4: java.lang.IllegalArgumentException: URLDecoder: Incomplete trailing escape (%) pattern
-decode %zz: java.lang.IllegalArgumentException: URLDecoder: Illegal hex characters in escape (%) pattern - Error at index 0 in: "zz"
-decode %-1: java.lang.IllegalArgumentException: URLDecoder: Illegal hex characters in escape (%) pattern - negative value
-decode %+1: 
+decode %zz: java.lang.IllegalArgumentException: URLDecoder: Illegal hex characters in escape (%) pattern - not a hexadecimal digit: "z" = 122
+decode %-1: java.lang.IllegalArgumentException: URLDecoder: Illegal hex characters in escape (%) pattern - not a hexadecimal digit: "-" = 45
+decode %+1: java.lang.IllegalArgumentException: URLDecoder: Illegal hex characters in escape (%) pattern - not a hexadecimal digit: "+" = 43
 encoding: java.io.UnsupportedEncodingException: no-such-charset
 -- InetAddress
 <127.0.0.1>: Inet4Address /127.0.0.1 127.0.0.1 127,0,0,1 2130706433 true false false false false

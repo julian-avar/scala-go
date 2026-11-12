@@ -110,7 +110,7 @@ class EndToEndTests extends munit.FunSuite:
     // Programs calling Go code (`go-only.txt` says why) cannot run on the JVM.
     if !Files.exists(dir.resolve("go-only.txt")) && !isLibrary then
       val jvmClasspath = (classes.toString +: compileClasspath(dependencies)).mkString(File.pathSeparator)
-      assertNoDiff(run(Seq(javaBinary, "-cp", jvmClasspath, mainClass), work, io = io), expected, "JVM output")
+      assertNoDiff(run(Seq(javaBinary, "--sun-misc-unsafe-memory-access=allow", "-cp", jvmClasspath, mainClass), work, io = io), expected, "JVM output")
 
     val config = Linker.Config(
       mainObject = mainClass,

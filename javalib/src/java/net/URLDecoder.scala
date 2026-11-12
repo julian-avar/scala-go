@@ -30,9 +30,7 @@ object URLDecoder:
           if bytes == null then bytes = new Array[Byte]((n - i) / 3)
           var pos = 0
           while i + 2 < n && s.charAt(i) == '%' do
-            val v = hexPair(s, i + 1)
-            if v < 0 then
-              throw new IllegalArgumentException("URLDecoder: Illegal hex characters in escape (%) pattern - negative value")
+            val v = hexDigit(s.charAt(i + 1)) << 4 | hexDigit(s.charAt(i + 2))
             bytes(pos) = v.toByte
             pos += 1
             i += 3
@@ -45,16 +43,11 @@ object URLDecoder:
           i += 1
     if changed then sb.toString else s
 
-  /** The value of the two chars at `i` as Integer.parseInt(s, i, i + 2, 16) has it. */
-  private def hexPair(s: String, i: Int): Int =
-    val first = s.charAt(i)
-    val signed = first == '-' || first == '+'
-    var v = 0
-    for k <- (if signed then 1 else 0) until 2 do
-      val d = Character.digit(s.charAt(i + k), 16)
-      if d < 0 then
-        throw new IllegalArgumentException(
-          "URLDecoder: Illegal hex characters in escape (%) pattern - Error at index " + k + " in: \"" +
-            s.substring(i, i + 2) + "\"")
-      v = v * 16 + d
-    if first == '-' then -v else v
+  /** The value of an ASCII hex digit, as HexFormat.fromHexDigit has it. */
+  private def hexDigit(c: Char): Int =
+    if c >= '0' && c <= '9' then c - '0'
+    else if c >= 'a' && c <= 'f' then c - 'a' + 10
+    else if c >= 'A' && c <= 'F' then c - 'A' + 10
+    else
+      throw new IllegalArgumentException(
+        "URLDecoder: Illegal hex characters in escape (%) pattern - not a hexadecimal digit: \"" + c + "\" = " + c.toInt)

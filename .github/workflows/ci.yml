@@ -11,20 +11,18 @@ concurrency:
 
 jobs:
   # The Go runtime on each supported architecture: amd64 and arm64 use the fast goroutine-id path
-  # (assembly), which its unit tests check, also under the race detector. Go 1.22 is the oldest
-  # version generated modules support.
+  # (assembly), which its unit tests check, also under the race detector.
   runtime:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
-        go: ['1.22', stable]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go }}
+          go-version: '1.27'
           cache-dependency-path: runtime/go.mod
       - name: gofmt
         working-directory: runtime
@@ -55,10 +53,10 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
       - uses: actions/setup-go@v5
         with:
-          go-version: stable
+          go-version: '1.27'
           cache-dependency-path: runtime/go.mod
       - uses: actions/cache@v4
         with:

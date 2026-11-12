@@ -60,7 +60,7 @@ object FacadeGen:
     val provided = FacadeIndex.load(config.classpath)
     val moduleDir = Files.createTempDirectory("scalago-facadegen-")
     try
-      val goMod = StringBuilder("module scalago.facadegen\n\ngo 1.22\n")
+      val goMod = StringBuilder("module scalago.facadegen\n\ngo 1.27\n")
       if config.goRequires.nonEmpty then goMod ++= config.goRequires.map((m, v) => s"\t$m $v\n").mkString("\nrequire (\n", "", ")\n")
       for (m, dir) <- config.goReplaces do goMod ++= s"\nreplace $m => $dir\n"
       Files.writeString(moduleDir.resolve("go.mod"), goMod.toString, UTF_8)
@@ -188,12 +188,16 @@ object FacadeGen:
     private val packages: Seq[String] =
       (roots.filter(api.packages.contains) ++ included.toSeq.map(_._1).sorted).distinct
 
-    /** Scala object name of each generated package: its Go name, or its path when ambiguous. */
+    /** Scala object name of each generated package: its Go name, or its path when ambiguous. A
+     *  root package that is the only root of its name keeps its name: the packages that other
+     *  packages' types come from (`encoding/json/v2` for `encoding/json`) do not take it.
+     */
     private val objectNames: Map[String, String] =
       val byName = packages.groupBy(p => api.packages(p).name)
       packages.map { p =>
         val name = api.packages(p).name
-        p -> (if byName(name).size == 1 then name else p.replaceAll("[^A-Za-z0-9]", "_"))
+        val same = byName(name)
+        p -> (if same.size == 1 || same.filter(roots.contains) == Seq(p) then name else p.replaceAll("[^A-Za-z0-9]", "_"))
       }.toMap
 
     /** The Scala type standing for Go type `pkg.name`: a dependency's facade, or a generated one. */
