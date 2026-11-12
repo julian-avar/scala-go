@@ -1,0 +1,8 @@
+args: 0
+add again: java.lang.IllegalArgumentException: Hook previously registered
+add a running thread: java.lang.IllegalArgumentException: Hook already running
+add null: NullPointerException
+remove: true false
+exiting from another thread
+hooks ran concurrently; in the other hook: add java.lang.IllegalStateException: Shutdown in progress, remove java.lang.IllegalStateException: Shutdown in progress
+last output, without a newline

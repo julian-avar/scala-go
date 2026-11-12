@@ -1,0 +1,103 @@
+-- names
+int | int | int | int | array=false primitive=true component=-
+long | long | long | long | array=false primitive=true component=-
+double | double | double | double | array=false primitive=true component=-
+boolean | boolean | boolean | boolean | array=false primitive=true component=-
+char | char | char | char | array=false primitive=true component=-
+byte | byte | byte | byte | array=false primitive=true component=-
+short | short | short | short | array=false primitive=true component=-
+float | float | float | float | array=false primitive=true component=-
+void | void | void | void | array=false primitive=true component=-
+int | int | int | int | array=false primitive=true component=-
+java.lang.Integer | java.lang.Integer | Integer | class java.lang.Integer | array=false primitive=false component=-
+java.lang.String | java.lang.String | String | class java.lang.String | array=false primitive=false component=-
+java.lang.Object | java.lang.Object | Object | class java.lang.Object | array=false primitive=false component=-
+java.util.ArrayList | java.util.ArrayList | ArrayList | class java.util.ArrayList | array=false primitive=false component=-
+java.util.Map$Entry | java.util.Map$Entry | Entry | array=false primitive=false component=-
+java.lang.Thread$State | java.lang.Thread$State | State | class java.lang.Thread$State | array=false primitive=false component=-
+[I | int[] | class [I | array=true primitive=false component=int
+[[D | double[][] | class [[D | array=true primitive=false component=[D
+[B | byte[] | class [B | array=true primitive=false component=byte
+[C | char[] | class [C | array=true primitive=false component=char
+[Ljava.lang.String; | String[] | class [Ljava.lang.String; | array=true primitive=false component=java.lang.String
+[[Ljava.lang.String; | String[][] | class [[Ljava.lang.String; | array=true primitive=false component=[Ljava.lang.String;
+[Ljava.lang.Object; | Object[] | class [Ljava.lang.Object; | array=true primitive=false component=java.lang.Object
+rtclasses.Square | rtclasses.Square | Square | class rtclasses.Square | array=false primitive=false component=-
+rtclasses.Shape | rtclasses.Shape | Shape | array=false primitive=false component=-
+rtclasses.Point | rtclasses.Point | Point | class rtclasses.Point | array=false primitive=false component=-
+rtclasses.Registry$Entry | rtclasses.Registry$Entry | Entry | class rtclasses.Registry$Entry | array=false primitive=false component=-
+rtclasses.Registry$ | rtclasses.Registry$ | Registry$ | class rtclasses.Registry$ | array=false primitive=false component=-
+Outer | Outer | Outer | class Outer | array=false primitive=false component=-
+Outer$Inner | Outer$Inner | Inner | class Outer$Inner | array=false primitive=false component=-
+Outer$Nested | Outer$Nested | Nested | class Outer$Nested | array=false primitive=false component=-
+Outer$ | Outer$ | Outer$ | class Outer$ | array=false primitive=false component=-
+Main$ | Main$ | Main$ | class Main$ | array=false primitive=false component=-
+Main$ | Main$ | Main$ | class Main$ | array=false primitive=false component=-
+scala.Option | scala.Option | Option | class scala.Option | array=false primitive=false component=-
+scala.Some | scala.Some | Some | class scala.Some | array=false primitive=false component=-
+scala.None$ | scala.None$ | None$ | class scala.None$ | array=false primitive=false component=-
+scala.collection.immutable.List | scala.collection.immutable.List | List | class scala.collection.immutable.List | array=false primitive=false component=-
+scala.collection.immutable.Nil$ | scala.collection.immutable.Nil$ | Nil$ | class scala.collection.immutable.Nil$ | array=false primitive=false component=-
+java.lang.RuntimeException | java.lang.RuntimeException | RuntimeException | class java.lang.RuntimeException | array=false primitive=false component=-
+java.lang.Runnable | java.lang.Runnable | Runnable | array=false primitive=false component=-
+-- getClass
+java.lang.Integer
+java.lang.Long
+java.lang.Double
+java.lang.Character
+java.lang.Boolean
+java.lang.String
+rtclasses.Square
+rtclasses.Point
+Outer
+Outer$Nested
+[I
+[D
+scala.Some
+scala.collection.immutable.Nil$
+scala.collection.immutable.$colon$colon
+java.util.ArrayList
+scala.math.BigInt
+java.lang.IllegalStateException
+java.lang.Thread
+scala.runtime.BoxedUnit
+java.lang.Object
+-- identity
+true true true
+true true true
+true 2
+-- isAssignableFrom
+Shape <- Square: true
+Square <- Shape: false
+Object <- Square: true
+Square <- Square: true
+Product <- Point: true
+Serializable <- Point: true
+int <- int: true
+long <- int: false
+Object <- int: false
+Object <- Integer: true
+Number <- Integer: true
+Comparable <- String: true
+CharSequence <- String: true
+Object <- int[]: true
+int[] <- int[]: true
+long[] <- int[]: false
+Exception <- IllegalStateException: true
+RuntimeException <- Exception: false
+-- loaders, assertions
+null null null
+desiredAssertionStatus: false
+-- java.lang.reflect.Array
+[I 3 42 7 0,42,7
+[D 2.5 2 b
+2 3 [I
+get out of bounds: ArrayIndexOutOfBoundsException
+getLength of a non-array: IllegalArgumentException
+-- ClassTag
+int [I 2
+long [J 2
+char [C 2
+rtclasses.Square true true
+[I
+[F

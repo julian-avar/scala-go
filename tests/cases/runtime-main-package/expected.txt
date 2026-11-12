@@ -1,0 +1,7 @@
+Launcher initialized
+main: args=0 thread=main class=app.launch.Launcher$
+First initialized
+First: 1
+before Lazy
+Lazy initialized
+Lazy: 2 2

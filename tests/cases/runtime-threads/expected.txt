@@ -1,0 +1,34 @@
+main: main daemon=false priority=5 group=main alive=true RUNNABLE virtual=false same=true
+names: Thread-0 Thread-1 named
+setName: renamed, null name: java.lang.NullPointerException: 'name' is null
+ids: distinct=true positive=true getId=true seen=true
+priorities: 1 5 10 new=5 set=10
+out of range: java.lang.IllegalArgumentException java.lang.IllegalArgumentException
+group: capped parent=main max=4 thread=capped priority=4
+builder: built 3 java.lang.IllegalArgumentException
+default daemon: false
+child of a daemon thread is a daemon: true
+start twice: java.lang.IllegalThreadStateException
+run() runs in main
+virtual: name='' daemon=true java.lang.IllegalArgumentException: 'false' not legal for virtual threads
+NEW: NEW, latch await: WAITING
+parkNanos: TIMED_WAITING
+after join: TERMINATED alive=false
+setDaemon of a running thread: java.lang.IllegalThreadStateException
+join(20): alive=true join(Duration)=false
+join of an unstarted thread: java.lang.IllegalThreadStateException: Thread not started
+negative sleep: java.lang.IllegalArgumentException, negative join: java.lang.IllegalArgumentException: timeout value is negative
+interrupt sleep: InterruptedException, flag=false
+interrupt wait: InterruptedException, flag=false
+interrupt timed wait: InterruptedException, flag=false
+interrupt join: InterruptedException, flag=false
+interrupt park: returned, flag=true
+interrupt queue take: InterruptedException, flag=false
+interrupt latch await: InterruptedException, flag=false
+interrupt lockInterruptibly: InterruptedException, flag=false
+self: true true true false false
+published through start and join: 1,2,3,4
+published through isAlive: 99
+main returns
+first thread, after main returned
+second thread, started by the first

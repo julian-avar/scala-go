@@ -1,0 +1,5 @@
+main throws
+Exception in thread "main" java.lang.IllegalStateException: main failed
+	at Main$.main(Main.scala:22)
+	at Main.main(Main.scala)
+shutdown hook; the worker finished: true

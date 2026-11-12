@@ -1,0 +1,17 @@
+priority of a thread created by a thread of priority 8: 5
+initial priority in a group of maximum priority 4: 5
+Exception in thread "grouped" Quiet: in group
+getUncaughtExceptionHandler is the group while a default handler is set: false
+a throwing uncaught-exception handler: status 2, Go panic: true
+state in sleep: RUNNABLE
+state in wait: RUNNABLE
+state in timed wait: RUNNABLE
+state in join: RUNNABLE
+state entering a held monitor: RUNNABLE
+getTypeName of int[]: [I
+getTypeName of String[][]: [[Ljava.lang.String;
+toString of an interface: class java.lang.Runnable
+Thread.sleep(-1): throws java.lang.IllegalArgumentException: timeout value is negative or out of range
+Thread.ofPlatform().priority(42): throws java.lang.IllegalArgumentException: Thread priority out of range
+main returns
+main thread alive after main returned: true

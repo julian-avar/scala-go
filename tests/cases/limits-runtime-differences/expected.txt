@@ -1,0 +1,30 @@
+exit in a shutdown hook: status 5, output [main returns | the hook calls exit]
+SIGTERM: status 143, output []
+SIGQUIT: status 2, output [SIGQUIT: quit]
+writing to a closed standard output: status 141
+main threadId: 1
+printed while main holds System.out's monitor
+println while another thread holds System.out's monitor finished: true
+interrupt of a virtual thread blocked in ServerSocket.accept: still blocked
+Runtime.maxMemory is Long.MaxValue: true
+a million calls deep on the main thread: 500000500000
+java.vm.name: scala-go
+java.vendor: scala-go
+java.class.path: []
+Locale.getDefault: en_US
+class loader of a program class: null
+reflect.Array.newInstance(String): [Ljava.lang.Object;
+reflect.Array.newInstance(int, 2, 3): [Ljava.lang.Object;
+ClassTag[Array[Int]].newArray: [Ljava.lang.Object;
+Array.ofDim[Int](2, 2): [Ljava.lang.Object;
+Array(Array(1)): [Ljava.lang.Object;
+line of main's frame, from `here`: 2
+top frame of Integer.parseInt's exception: Main$.main
+frames below a thread's body: java.lang.Thread.run(Thread.scala) < java.lang.Thread.runOnGoroutine(Thread.scala) < java.lang.Thread.start(Thread.scala)
+frame of an object's initializer: Some(FailingInit$.<init>)
+Europe/Paris getTransitionRules size: 0
+Europe/Paris transitions listed after 1996: 82
+Europe/Paris last listed transition year: 2037
+Deflater output: 789c001700e8ff68656c6c6f2068656c6c6f2068656c6c6f2068656c6c6f0300680308b1
+HttpURLConnection response header names: Content-Length,X-Lower-Case
+headers of an HTTP/2 request to upgrade: []

@@ -1,0 +1,13 @@
+Exception in thread "plain" Quiet: from plain
+main continues
+captured: Exception in thread "redirected" Quiet: from redirected
+getUncaughtExceptionHandler is set: true
+own handler: own from own same thread: true
+builder's handler: built from built
+getDefaultUncaughtExceptionHandler is set: true
+default handler: defaulted from defaulted
+thread's handler before the default: preferred
+default handler: error an Error
+default handler:  from a virtual thread
+after an uncaught exception: TERMINATED alive=false
+main returns

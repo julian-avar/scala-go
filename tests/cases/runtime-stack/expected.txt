@@ -1,0 +1,6 @@
+main thread, 10000 deep: 50005000
+1000000 deep: 500000500000
+exception through 1000000 frames: caught bottom
+exception through 100000 finally blocks: caught bottom, 100001 finally blocks ran
+again, after the stack shrank: 500000500000
+builder's stackSize: 500000500000

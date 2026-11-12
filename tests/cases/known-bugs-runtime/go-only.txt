@@ -1,0 +1,1 @@
+Pins known bugs: the JVM prints the results given in the comments. One check runs the Go binary itself as a child process.

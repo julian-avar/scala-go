@@ -1,0 +1,36 @@
+-- properties
+line.separator=\n
+file.separator=/
+path.separator=:
+file.encoding=UTF-8
+native.encoding=UTF-8
+sun.jnu.encoding=UTF-8
+stdout.encoding=UTF-8
+stderr.encoding=UTF-8
+java.io.tmpdir=/tmp
+os.name=Linux
+os.arch known: true
+user.dir: absolute=true is the working directory=true exists=true
+user.home and user.name set: true true
+lineSeparator: \n true
+getProperties: Linux true
+setProperty: null 12 34 true
+set through getProperties: true
+clearProperty: 34 null fallback
+sys.props: Some(Linux) None
+sys.props update: from Scala
+null key: java.lang.NullPointerException, null value: java.lang.NullPointerException
+-- environment
+getenv: [hello, world = greeting] [] null
+getenv(): hello, world = greeting true false true unmodifiable: java.lang.UnsupportedOperationException
+inherited by a subprocess: [hello, world = greeting] [unset]
+ProcessBuilder.environment: [changed] [now set]; unchanged here: hello, world = greeting null
+-- clocks
+nanoTime never goes back: true
+sleep(30) took at least 30 ms: true
+currentTimeMillis: after 2024 true, close to Instant.now true
+-- zone, locale, charset
+Asia/Kolkata Asia/Kolkata 19800000
+2023-11-15T03:43:20+05:30[Asia/Kolkata]
+en_US en US en-US
+UTF-8 1234.50 title I
