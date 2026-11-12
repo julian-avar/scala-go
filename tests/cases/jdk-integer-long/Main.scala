@@ -21,7 +21,7 @@ object Main:
   def attemptRadix(label: String, radix: Int)(body: => Any): Unit =
     if radix == 10 then attempt(label)(body) else attemptType(label)(body)
 
-  // Not constants: natives given constant operands can fold into Go constant expressions (known-bugs-jdk-go-errors).
+  // Not constants, unlike in `constantOperands`.
   val zero: Int = Integer.parseInt("0")
   val one: Int = Integer.parseInt("1")
 
@@ -35,6 +35,14 @@ object Main:
     unsigned()
     comparing()
     smaller()
+    constantOperands()
+
+  // Natives given constant operands: Go must not evaluate them at compile time.
+  def constantOperands(): Unit =
+    println("== constant operands")
+    attempt("sum")(s"${JInteger.sum(Int.MaxValue, 1)} ${JLong.sum(Long.MaxValue, 1L)}")
+    attempt("divideUnsigned")(JInteger.divideUnsigned(1, 0))
+    attempt("remainderUnsigned")(JLong.remainderUnsigned(1L, 0L))
 
   def parsing(): Unit =
     println("== parseInt")

@@ -17,6 +17,8 @@ object named:
   @GoName("Tags") def tagsFrom(xs: GoSlice[GoString]): Tags = native
   def Attrs(entries: (String, Int)*): Attrs = native
   @GoName("Attrs") def attrsFrom(m: GoMap[GoString, GoInt]): Attrs = native
+  def CountTags(t: GoSlice[GoString]): Int = native
+  def SizeAttrs(a: GoMap[GoString, GoInt]): Int = native
   type Handler = String => String
   def Run(h: Handler, s: String): String = native
   def Upper(): Handler = native
@@ -74,6 +76,8 @@ object Main:
     println(s"slice conversion: ${named.tagsFrom(GoSlice.of(go"x", go"y")).Joined()}")
     println(s"map literal: ${named.Attrs("b" -> 2, "a" -> 1, "b" -> 3).Sorted()}")
     println(s"map conversion: ${named.attrsFrom(GoMap.of(go"k" -> GoInt(7))).Sorted()}")
+    // Go data passed for a defined slice or map type is converted.
+    println(s"data for defined types: ${named.CountTags(GoSlice.of(go"a", go"b"))} ${named.SizeAttrs(GoMap.of(go"k" -> GoInt(1)))}")
 
     // A defined func type is a Scala function type; an interface without methods is Any.
     println(s"func type: ${named.Run(s => s.reverse, "abc")} ${named.Run(named.Upper(), "abc")} ${named.Upper()("go")}")

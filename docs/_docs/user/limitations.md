@@ -70,8 +70,7 @@ scala-go does not implement is a link error naming it, never a silent difference
 - **No Go structs from Scala:** Go sees Scala classes only through interfaces, so `encoding/json`,
   gin's `ShouldBindJSON` and database scanners cannot fill one. Bind into `any` and convert with
   [`GoData.toScala`](../interop/go-data.md#scala-data-for-go-code), or parse in Scala.
-- **Generics:** Scala does not check Go constraints (a [known bug](../contributing/roadmap.md#known-bugs));
-  some type arguments must be explicit; no type tests against generic facades.
+- **Generics:** Scala does not check Go constraints (the linker does); some type arguments must be explicit; no type tests against generic facades.
   [Generics](../interop/facades.md#generics).
 - **Values of types Scala cannot name** (unexported, `internal`) are typed `Any` or as an
   interface; calls taking them use reflection, so a wrong argument is a `ClassCastException` at

@@ -57,6 +57,9 @@ object Main:
     for x <- Seq(pointer, value, vals.NewNamed("n"), vals.AnyLevel(1), vals.AnyError(), vals.AnyNil()) do
       println(s"kind: ${kind(x)}")
     println(s"isInstanceOf: ${pointer.isInstanceOf[vals.Pair]} ${value.isInstanceOf[vals.Pair]} ${pointer.isInstanceOf[vals.Named]}")
+    // A Scala String is a Go string to Go code: not a Stringer, though the runtime's type has a String method.
+    val text: Any = "scala"
+    println(s"String as Go types: ${text.isInstanceOf[fmt.Stringer]} ${text match { case _: fmt.Stringer => true; case _ => false }} ${scala.util.Try(text.asInstanceOf[fmt.Stringer]).isFailure}")
 
     // Casts: null passes; a struct value is copied to a new pointer.
     val nothing: vals.Pair = (null: Any).asInstanceOf[vals.Pair]

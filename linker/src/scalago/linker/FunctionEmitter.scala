@@ -20,6 +20,11 @@ import scalago.ir.Tree.*
  *  Each emitted line carries the position of the tree being emitted ([[GoLine]]), from which
  *  [[LineDirectives]] makes Go report Scala positions. Lines that cannot fail or call anything
  *  (braces, jumps, declarations) are emitted without one (`emitPlain`).
+ *
+ *  Go rejects code after a terminating statement (`go vet`: unreachable code), so once one is
+ *  emitted (a `panic`, `return` or `break`, or an `if` or `switch` all of whose branches end in
+ *  one), the rest of the Go block is left out: trees are not emitted, and lines are dropped. A
+ *  `throw` in an operand (`f(throw e, 1)`) thus ends the expression, as on the JVM.
  */
 final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef):
   import FunctionEmitter.*
@@ -29,6 +34,8 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   /** The position of the innermost tree being emitted that has one. */
   private var pos: Position = method.pos
   private var tempCounter = 0
+  /** Whether the current Go block has ended in a terminating statement (see the class comment). */
+  private var unreachable = false
   private val mutableLocals = mutable.HashSet.empty[LocalName]
 
   private final case class LabelInfo(dest: Dest, depth: Int, code: Int)
@@ -55,7 +62,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   def emitBody(body: Tree): List[GoLine] =
     genTree(body, if isVoidMethod then Dest.Discard else Dest.Return)
     // Go requires a terminating statement at the end of a function with results.
-    if !isVoidMethod && !alwaysReturns(body) then emitPlain("panic(\"unreachable\")")
+    if !isVoidMethod then emitPlain("panic(\"unreachable\")")
     val prelude = List.newBuilder[GoLine]
     for cls <- thisStructs do
       prelude += GoLine(s"${Mangling.thisStruct(cls)} := this.${Mangling.accessor(cls)}()", Position.NoPosition)
@@ -67,10 +74,10 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   // Output helpers
   // ---------------------------------------------------------------------------------------------
 
-  private def emit(line: String): Unit = out += GoLine(line, pos)
+  private def emit(line: String): Unit = if !unreachable then out += GoLine(line, pos)
 
   /** Emits a line that needs no source position: it cannot fail or call anything. */
-  private def emitPlain(line: String): Unit = out += GoLine(line, Position.NoPosition)
+  private def emitPlain(line: String): Unit = if !unreachable then out += GoLine(line, Position.NoPosition)
 
   /** Runs `body` with `p` as the current position (unless `p` is unknown). */
   private inline def atPos[A](p: Position)(inline body: A): A =
@@ -82,16 +89,27 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       pos = saved
       result
 
-  /** Runs `body` against a fresh buffer and returns the lines it emitted. */
-  private def nested[A](body: => A): (List[GoLine], A) =
+  /** Runs `body` against a fresh buffer, for a Go block; returns the lines it emitted, and whether
+   *  they end in a terminating statement.
+   */
+  private def nested[A](body: => A): (List[GoLine], A, Boolean) =
     val saved = out
+    val savedUnreachable = unreachable
     out = mutable.ArrayBuffer.empty
     try
       val result = body
-      (out.toList, result)
-    finally out = saved
+      (out.toList, result, unreachable)
+    finally
+      out = saved
+      unreachable = savedUnreachable
 
-  private def emitIndented(lines: List[GoLine]): Unit = lines.foreach(l => out += l.indented)
+  private def emitIndented(lines: List[GoLine]): Unit = if !unreachable then lines.foreach(l => out += l.indented)
+
+  /** Appends lines from `nested` to the current Go block. */
+  private def emitInline(lines: List[GoLine], terminates: Boolean): Unit =
+    if !unreachable then
+      out ++= lines
+      unreachable = terminates
 
   private def freshTemp(): String =
     tempCounter += 1
@@ -105,7 +123,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   // Statements: trees whose value goes to a destination
   // ---------------------------------------------------------------------------------------------
 
-  private def genTree(tree: Tree, dest: Dest): Unit = atPos(tree.pos) {
+  private def genTree(tree: Tree, dest: Dest): Unit = if !unreachable then atPos(tree.pos) {
     ctx.analyzer.missingUse(tree) match
       case Some(use) =>
         throwMissing(use)
@@ -129,62 +147,64 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       else
         val goType = ctx.goType(tpe)
         if isControlStructure(rhs) then
+          // Used first: an `rhs` that never completes leaves out the code after it.
           emitPlain(s"var $v $goType")
+          emitPlain(s"_ = $v")
           genTree(rhs, Dest.AssignTo(v, tpe))
-        else emit(s"var $v $goType = ${adapt(genExpr(rhs), rhs.tpe, tpe)}")
-      emitPlain(s"_ = $v")
+        else
+          emit(s"var $v $goType = ${adapt(genExpr(rhs), rhs.tpe, tpe)}")
+          emitPlain(s"_ = $v")
       deliver(dest, "", Type.Void)
 
     case Block(stats, expr) =>
-      // Code after a statement that always jumps is dead; Go would flag it.
-      val (live, dead) = stats.span(!endsAbruptly(_))
-      live.foreach(genTree(_, Dest.Discard))
-      dead.headOption match
-        case Some(jump) => genTree(jump, Dest.Discard)
-        case None       => genTree(expr, dest)
+      stats.foreach(genTree(_, Dest.Discard))
+      genTree(expr, dest)
 
     case Skip() =>
       deliver(dest, "", Type.Void)
 
     case If(cond, thenp, elsep, _) =>
       val c = genExpr(cond)
-      val (thenLines, _) = nested(genTree(thenp, dest))
-      val (elseLines, _) = nested(genTree(elsep, dest))
+      val (thenLines, _, thenEnds) = nested(genTree(thenp, dest))
+      val (elseLines, _, elseEnds) = nested(genTree(elsep, dest))
       emit(s"if ${unparen(c)} {")
       emitIndented(thenLines)
       if elseLines.nonEmpty then
         emitPlain("} else {")
         emitIndented(elseLines)
       emitPlain("}")
+      unreachable = thenEnds && elseEnds
 
     case While(cond, body) =>
-      val (condLines, c) = nested(genExpr(cond))
-      val (bodyLines, _) = nested(genTree(body, Dest.Discard))
-      if condLines.isEmpty then
-        if c == "true" then emitPlain("for {") else emit(s"for ${unparen(c)} {")
+      val (condLines, c, condEnds) = nested(genExpr(cond))
+      val (bodyLines, _, _) = nested(genTree(body, Dest.Discard))
+      if condEnds then emitInline(condLines, terminates = true) // the loop never starts
       else
-        emitPlain("for {")
-        emitIndented(condLines)
-        emit(s"\tif !$c {")
-        emitPlain("\t\tbreak")
-        emitPlain("\t}")
-      emitIndented(bodyLines)
-      emitPlain("}")
-      // `while (true)` never completes normally (Scala has no `break` statement).
-      if !isInfinite(cond) then deliver(dest, "", Type.Void)
+        if condLines.isEmpty then
+          if c == "true" then emitPlain("for {") else emit(s"for ${unparen(c)} {")
+        else
+          emitPlain("for {")
+          emitIndented(condLines)
+          emit(s"\tif !$c {")
+          emitPlain("\t\tbreak")
+          emitPlain("\t}")
+        emitIndented(bodyLines)
+        emitPlain("}")
+        // `while (true)` never completes normally (Scala has no `break` statement).
+        if isInfinite(cond) then unreachable = true else deliver(dest, "", Type.Void)
 
     case Labeled(label, _, body) =>
       labels(label) = LabelInfo(dest, depth, nextJumpCode)
       nextJumpCode += 1
-      val (bodyLines, _) = nested(genTree(body, dest))
+      val (bodyLines, _, bodyEnds) = nested(genTree(body, dest))
       if usedLabels.contains(label) then
         val goLabel = Mangling.label(label)
         emitPlain(s"$goLabel:")
         emitPlain("for {")
         emitIndented(bodyLines)
-        if !endsAbruptly(body) then emitPlain(s"\tbreak $goLabel")
+        if !bodyEnds then emitPlain(s"\tbreak $goLabel")
         emitPlain("}")
-      else out ++= bodyLines
+      else emitInline(bodyLines, bodyEnds)
 
     case Return(None, expr) =>
       genTree(expr, Dest.Return)
@@ -192,10 +212,11 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     case Return(Some(label), expr) =>
       val info = labels(label)
       genTree(expr, info.dest)
-      if info.dest != Dest.Return && !endsAbruptly(expr) then
+      if info.dest != Dest.Return && !unreachable then
         if info.depth == depth then
           usedLabels += label
           emitPlain(s"break ${Mangling.label(label)}")
+          unreachable = true
         else jumpOutOfClosure(info.code)
 
     case Assign(lhs, rhs) =>
@@ -204,28 +225,33 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
 
     case Throw(expr) =>
       emit(s"panic(rt.Exc(${genExpr(expr)}))")
+      unreachable = true
 
     case Match(selector, cases, default, _) =>
       val sel = genExpr(selector)
       val isString = selector.tpe == Type.String
       emit(if isString then s"switch $sel.GoString() {" else s"switch $sel {")
-      for (alts, body) <- cases do
+      val casesEnd = for (alts, body) <- cases yield
         val values = alts.map {
           case StringLiteral(s) => goStringLiteral(s)
           case lit              => genExpr(lit)
         }
+        val (lines, _, ends) = nested(genTree(body, dest))
         emitPlain(s"case ${values.mkString(", ")}:")
-        emitIndented(nested(genTree(body, dest))._1)
+        emitIndented(lines)
+        ends
+      val (defaultLines, _, defaultEnds) = nested(genTree(default, dest))
       emitPlain("default:")
-      emitIndented(nested(genTree(default, dest))._1)
+      emitIndented(defaultLines)
       emitPlain("}")
+      unreachable = casesEnd.forall(identity) && defaultEnds
 
     case TryCatch(block, cases, tpe) =>
       withValueDest(dest, tpe) { bodyDest =>
         val exc = runInTryClosure(block, bodyDest)
         val branches = cases.map { c =>
           val test = if c.tpe == Type.Class("java.lang.Throwable") then "true" else ctx.typeTest(exc, c.tpe)
-          val (lines, _) = nested {
+          val (lines, _, _) = nested {
             c.binder.foreach { b =>
               val v = Mangling.local(b)
               // The cast cannot fail: the exception's type was tested.
@@ -252,9 +278,9 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       withValueDest(dest, tpe) { bodyDest =>
         val (exc, jumps) = runInTryClosure(block, bodyDest, dispatch = false)
         // A finalizer that throws or returns replaces the block's outcome.
-        val abrupt = endsAbruptly(finalizer)
+        val (finalizerLines, _, abrupt) = nested(genTree(finalizer, Dest.Discard))
         if abrupt then emit(s"_ = $exc")
-        genTree(finalizer, Dest.Discard)
+        emitInline(finalizerLines, abrupt)
         if !abrupt then
           emitPlain(s"if $exc != nil {")
           emitPlain(s"\tpanic(rt.Exc($exc))")
@@ -271,11 +297,18 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     case Dest.Return if isVoidLike(tpe) =>
       body(Dest.Discard)
       deliver(dest, "", Type.Void)
-    case Dest.Return =>
-      val temp = freshTemp()
-      emitPlain(s"var $temp ${ctx.goType(tpe)}")
-      body(Dest.AssignTo(temp, tpe))
-      deliver(dest, temp, tpe)
+    case Dest.Return => deliver(dest, withTemp(tpe)(body), tpe)
+
+  /** Declares a variable for `body` to assign a value of IR type `tpe` to; returns its name. */
+  private def withTemp(tpe: Type)(body: Dest => Unit): String =
+    val temp = freshTemp()
+    val goType = ctx.goType(tpe)
+    val (lines, _, ends) = nested(body(Dest.AssignTo(temp, tpe)))
+    emitPlain(s"var $temp ${if goType.isEmpty then "any" else goType}")
+    // Nothing reads it after a body that never completes, and Go rejects unused variables.
+    if ends then emitPlain(s"_ = $temp")
+    emitInline(lines, ends)
+    temp
 
   private def runInTryClosure(block: Tree, dest: Dest): String =
     runInTryClosure(block, dest, dispatch = true)._1
@@ -285,7 +318,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     val exc = s"exc${freshTemp()}"
     pendingJumps.push(mutable.LinkedHashSet.empty)
     depth += 1
-    val (lines, _) = nested(genTree(block, dest))
+    val (lines, _, _) = nested(genTree(block, dest))
     depth -= 1
     val jumps = pendingJumps.pop().toSet
     emit(s"$exc := rt.Try(func() {")
@@ -324,9 +357,10 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     pendingJumps.top += code
     emitPlain(s"ctl = $code")
     emitPlain("return")
+    unreachable = true
 
   /** Sends the value of an already-evaluated expression to `dest`. `expr` is empty for no value. */
-  private def deliver(dest: Dest, expr: String, tpe: Type): Unit = dest match
+  private def deliver(dest: Dest, expr: String, tpe: Type): Unit = if !unreachable then dest match
     case Dest.Discard =>
       if expr.nonEmpty then
         if isVoidLike(tpe) then emit(expr)
@@ -346,10 +380,9 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
         if expr.nonEmpty then deliver(Dest.Discard, expr, tpe)
         emitPlain("panic(\"unreachable\")")
       else emitUsing(adapt(expr, tpe, method.name.result))(e => s"return $e")
+      unreachable = true
     case Dest.AssignTo(v, target) =>
-      // A call of a method returning Nothing has no Go result: it never completes normally.
-      if expr.nonEmpty then
-        if tpe == Type.Nothing then emit(expr) else emitUsing(adapt(expr, tpe, target))(e => s"$v = $e")
+      if expr.nonEmpty then emitUsing(adapt(expr, tpe, target))(e => s"$v = $e")
 
   /** Emits a line that uses the value `expr`: without a position if `expr` is a variable or a
    *  literal, which cannot fail.
@@ -431,23 +464,27 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
   // ---------------------------------------------------------------------------------------------
 
   /** Go expression for `tree`, emitting any statements it needs first. Empty for void trees. */
-  private def genExpr(tree: Tree): String = atPos(tree.pos) {
-    ctx.analyzer.missingUse(tree) match
-      case Some(use) =>
-        throwMissing(use)
-        zeroValue(tree.tpe)
-      case None => genExprHere(tree)
-  }
+  private def genExpr(tree: Tree): String =
+    if unreachable then zeroValue(tree.tpe)
+    else atPos(tree.pos) {
+      ctx.analyzer.missingUse(tree) match
+        case Some(use) =>
+          throwMissing(use)
+          zeroValue(tree.tpe)
+        case None if tree.tpe == Type.Nothing && !isControlStructure(tree) =>
+          // A call that never returns has no Go result. Go does not know that it never returns:
+          // a terminating statement after it leaves out the code using its value.
+          emit(genExprHere(tree))
+          emitPlain("panic(\"unreachable\")")
+          unreachable = true
+          ""
+        case None => genExprHere(tree)
+    }
 
   private def genExprHere(tree: Tree): String = tree match
     case Block(stats, expr) =>
-      val (live, dead) = stats.span(!endsAbruptly(_))
-      live.foreach(genTree(_, Dest.Discard))
-      dead.headOption match
-        case Some(jump) =>
-          genTree(jump, Dest.Discard)
-          zeroValue(expr.tpe)
-        case None => genExpr(expr)
+      stats.foreach(genTree(_, Dest.Discard))
+      genExpr(expr)
 
     case If(cond, thenp, BooleanLiteral(false), Type.Boolean) => shortCircuit(cond, "&&", thenp)
     case If(cond, BooleanLiteral(true), elsep, Type.Boolean)  => shortCircuit(cond, "||", elsep)
@@ -561,30 +598,25 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     case _ =>
       error(tree, s"unexpected ${tree.productPrefix} in expression position")
 
-  /** A placeholder value after code that never completes (keeps the Go code well-typed). */
+  /** A placeholder value for code left out or missing (keeps the Go code well-typed). */
   private def zeroValue(t: Type): String =
     val goType = ctx.goType(t)
     // Parenthesized: a selector binds tighter than `*` (`(*new(*rt.Array[any])).Data`).
     if goType.isEmpty then "" else s"(*new($goType))"
 
-  private def viaTemp(tree: Tree): String =
-    val temp = freshTemp()
-    val goType = ctx.goType(tree.tpe)
-    emitPlain(s"var $temp ${if goType.isEmpty then "any" else goType}")
-    genTree(tree, Dest.AssignTo(temp, tree.tpe))
-    temp
+  private def viaTemp(tree: Tree): String = withTemp(tree.tpe)(genTree(tree, _))
 
   /** `cond && rhs` / `cond || rhs` when `rhs` needs no statements; a conditional otherwise. */
   private def shortCircuit(cond: Tree, op: String, rhs: Tree): String =
     val c = genExpr(cond)
-    val (rhsLines, r) = nested(genExpr(rhs))
+    val (rhsLines, r, rhsEnds) = nested(genExpr(rhs))
     if rhsLines.isEmpty then s"($c $op $r)"
     else
       val temp = freshTemp()
       emit(s"var $temp bool = $c")
       emitPlain(if op == "&&" then s"if $temp {" else s"if !$temp {")
       emitIndented(rhsLines)
-      emit(s"\t$temp = $r")
+      if !rhsEnds then emit(s"\t$temp = $r")
       emitPlain("}")
       temp
 
@@ -598,7 +630,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
 
   /** Go expressions `gen(t)` for `trees`, evaluated in order: when generating one emits
    *  statements, the impure expressions before it are first evaluated into variables (of Go type
-   *  `goType(t)`).
+   *  `goType(t)`), or for their effects only if those statements never complete.
    */
   private def genInOrder(trees: List[Tree], goType: Tree => String)(gen: Tree => String): List[String] =
     val exprs = mutable.ArrayBuffer.empty[String]
@@ -608,11 +640,14 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       marks += out.size
     val end = out.size
     for i <- trees.indices.reverse if marks(i) < end && !isPure(trees(i)) do
-      val temp = freshTemp()
-      val t = goType(trees(i))
       val p = if trees(i).pos.line > 0 then trees(i).pos else pos
-      out.insert(marks(i), GoLine(s"var $temp ${if t.isEmpty then "any" else t} = ${exprs(i)}", p))
-      exprs(i) = temp
+      if unreachable then
+        if !isSimple(exprs(i)) then out.insert(marks(i), GoLine(s"_ = ${exprs(i)}", p))
+      else
+        val temp = freshTemp()
+        val t = goType(trees(i))
+        out.insert(marks(i), GoLine(s"var $temp ${if t.isEmpty then "any" else t} = ${exprs(i)}", p))
+        exprs(i) = temp
     exprs.toList
 
   /** Converts a Go value of IR type `from` for a location of IR type `to`. Scala upcasts need no
@@ -644,15 +679,30 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
 
   private def genNative(native: Natives.Native, receiver: Option[Tree], args: List[Tree], m: MethodName): String =
     native match
-      case Natives.Native.Static(gen) => gen(genExprs(args, m.params))
+      case Natives.Native.Static(gen) => gen(genNativeArgs(args, m.params))
       case Natives.Native.Instance(gen) =>
-        val r :: as = genExprs(receiver.toList ++ args, receiver.map(_.tpe).toList ++ m.params): @unchecked
+        val r :: as = genNativeArgs(receiver.toList ++ args, receiver.map(_.tpe).toList ++ m.params): @unchecked
         gen(r, as)
       case Natives.Native.NullResult =>
         val values = genExprs(receiver.toList ++ args, receiver.map(_.tpe).toList ++ m.params)
         receiver.foreach(_ => emit(s"rt.CheckNotNull(${values.head})"))
         values.drop(receiver.size).filterNot(isSimple).foreach(v => emit(s"_ = $v"))
         zeroValue(m.result)
+
+  /** The arguments of a native, which emits them inside Go expressions. When all are constants,
+   *  those expressions would be Go constant expressions, which Go evaluates at compile time and
+   *  rejects on overflow, division by zero and negative values converted to unsigned types, where
+   *  the JVM wraps or throws at run time. So they are put in variables (Go folds them anyway).
+   */
+  private def genNativeArgs(trees: List[Tree], expected: List[Type]): List[String] =
+    val values = genExprs(trees, expected)
+    if trees.nonEmpty && trees.forall(isConstant) then
+      values.zip(trees).map { (v, t) =>
+        val temp = freshTemp()
+        emit(s"var $temp ${ctx.goType(t.tpe)} = $v")
+        temp
+      }
+    else values
 
   private def genApply(tree: Apply): String =
     val Apply(receiver, declaringClass, m, args, _) = tree
@@ -884,42 +934,21 @@ object FunctionEmitter:
 
   private def isInfinite(whileCond: Tree): Boolean = whileCond == BooleanLiteral(true)(whileCond.pos)
 
-  /** Whether control never falls through the end of `tree` (it returns, throws, breaks or loops forever). */
-  private def endsAbruptly(tree: Tree): Boolean = tree match
-    case _: Return | _: Throw   => true
-    case Block(stats, expr)     => stats.exists(endsAbruptly) || endsAbruptly(expr)
-    case If(_, thenp, elsep, _) => endsAbruptly(thenp) && endsAbruptly(elsep)
-    case While(cond, _)         => isInfinite(cond)
-    case Match(_, cases, d, _)  => cases.forall((_, body) => endsAbruptly(body)) && endsAbruptly(d)
-    // A jump to the block's own label completes it normally.
-    case Labeled(label, _, body) => endsAbruptly(body) && !jumpsTo(label, body)
-    case _                      => false
-
-  /** Whether `tree` may jump to `label` (a jump whose value throws or returns does not). */
-  private def jumpsTo(label: String, tree: Tree): Boolean = tree match
-    case Return(Some(`label`), expr) => !endsAbruptly(expr) || jumpsTo(label, expr)
-    case _                           => Traversal.children(tree).exists(jumpsTo(label, _))
-
-  /** Whether emitting `tree` against `Dest.Return` ends in a Go terminating statement.
-   *
-   *  A labeled block in tail position also has `Dest.Return`, so jumps to it become `return`s:
-   *  every `Return` reachable through tail positions returns from the function.
-   */
-  private def alwaysReturns(tree: Tree): Boolean = tree match
-    case Block(stats, expr)                => stats.exists(endsAbruptly) || alwaysReturns(expr)
-    case If(_, thenp, elsep, _)            => alwaysReturns(thenp) && alwaysReturns(elsep)
-    case Match(_, cases, d, _)             => cases.forall((_, b) => alwaysReturns(b)) && alwaysReturns(d)
-    case Labeled(_, _, body)               => alwaysReturns(body)
-    case _: Return | _: Throw              => true
-    case While(cond, _)                    => isInfinite(cond)
-    case _: Skip | _: VarDef | _: Assign   => false
-    case _                                 => true
-
   private def isControlStructure(tree: Tree): Boolean = tree match
     case _: If | _: Labeled | _: Block | _: While | _: Return | _: VarDef | _: Assign | _: Skip | _: Throw | _: Match |
         _: TryCatch | _: TryFinally =>
       true
     case _ => false
+
+  /** Whether Go evaluates the expression emitted for `tree` at compile time. */
+  private def isConstant(tree: Tree): Boolean = tree match
+    case _: BooleanLiteral | _: CharLiteral | _: ByteLiteral | _: ShortLiteral | _: IntLiteral | _: LongLiteral |
+        _: FloatLiteral | _: DoubleLiteral =>
+      true
+    case Unary(_, arg)       => isConstant(arg)
+    case Binary(_, _, l, r)  => isConstant(l) && isConstant(r)
+    case Convert(arg, _)     => isConstant(arg)
+    case _                   => false
 
   private def isSimple(expr: String): Boolean = expr.forall(c => c.isLetterOrDigit || c == '_')
 

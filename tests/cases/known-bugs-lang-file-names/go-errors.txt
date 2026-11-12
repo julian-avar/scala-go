@@ -1,1 +1,0 @@
-case-insensitive file name collision: "Entry.go" and "entry.go"

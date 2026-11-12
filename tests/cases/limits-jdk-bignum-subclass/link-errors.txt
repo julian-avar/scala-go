@@ -1,0 +1,1 @@
+class BigInteger10 cannot extend java.math.BigInteger

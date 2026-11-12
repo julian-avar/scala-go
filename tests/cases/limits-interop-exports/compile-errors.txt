@@ -1,3 +1,4 @@
 Api.scala:7:17: scala-go: exported methods cannot have type parameters
 Api.scala:10:17: scala-go: traits cannot be exported to Go yet
 Api.scala:14:17: scala-go: `<init>` is not an exported Go identifier
+scala-go: vals and fields cannot be exported to Go

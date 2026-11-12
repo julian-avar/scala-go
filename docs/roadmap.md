@@ -49,23 +49,9 @@ Each item is a silent or surprising deviation from the JVM; the spec marks those
 ### Known bugs
 
 All **S**. Each is pinned by an end-to-end case named after its area: `known-bugs-lang`,
-`-expr`, `-runtime`, `-jdk`, `-scala-lib`, `-interop`, and `-misc` (several areas, found first).
+`-expr`, `-runtime`, `-jdk`, `-scala-lib`, and `-misc` (several areas, found first).
 Cases ending in `-go-errors`, `-links` or the like expect `go vet`, `go build` or the linker to
 fail. A fix makes its case fail: move the check to a case run on both the JVM and Go.
-
-#### Code the Go compiler rejects
-
-| Bug | Fix in |
-|-----|--------|
-| `try throw e finally return x`, `try throw a finally throw b`, and a `try` around an inlined `throw` passed by name: unreachable code, which `go vet` rejects | `FunctionEmitter` |
-| A `throw` typed as a primitive and boxed (`def h(): Any = (throw e): Int`; `boundary[Int] { throw e }` used as `Any`) emits `any()` with no argument | `FunctionEmitter` |
-| A `throw` argument followed by other arguments (`pair(throw e, 1)`): Go syntax error | `FunctionEmitter` |
-| Constant arguments to natives give constant expressions Go rejects: overflow in `Integer.sum(Int.MaxValue, 1)`, `Long.sum`; division by zero in `Integer.divideUnsigned(1, 0)`, `Long.remainderUnsigned(1L, 0L)`; `uint32`/`uint64` overflow in `Character.isISOControl(-1)`, `Float.intBitsToFloat(0xff800000)`, `Double.longBitsToDouble(0x8000000000000000L)` | Natives emitted as Go expressions: convert through variables, not constants |
-| A string literal containing `math.` (`println("math.abs")`) adds an unused `import "math"` to `support.go` | `Linker.goFile`: scan code, not literals |
-| A class `Entry` in the empty package collides with the linker's `entry.go` (Go rejects file names differing only in case); `support.go` likewise | `Linker`: reserve the names |
-| A Scala subclass of `BigInteger` or `BigDecimal` links, then fails `go build` (`cannot use this (variable of type *S_…) as *rt.BigInteger`) | Linker: a link error naming the class |
-| Overloads exported under one Go name (`@GoExport("Twice")`) link, then fail `go build` (`Export_Twice redeclared`) | `Exports`: a link error |
-| A generic facade instantiated outside its Go constraint (`slices.Max` of a `GoSlice[Any]`: `any` is not `cmp.Ordered`) links, then fails `go build` (`does not satisfy`) | `GoInterop.typeParamBindings`: check type sets, `comparable` and interface constraints; a link error |
 
 #### Language
 
@@ -87,8 +73,6 @@ fail. A fix makes its case fail: move the check to a case run on both the JVM an
 | `getSimpleName` of a local class is `""`; of an operator-named class, the text after the last `$` (`List(1).getClass.getSimpleName` is `colon`; JVM: `$colon$colon`) | `rt.ClassGetSimpleName` |
 | `Array(Array(1, 2), Array(3, 4)).transpose` throws `NullPointerException` (reference arrays do not know their element type) | `ClassTag` arrays of arrays |
 | A negative array index throws `RuntimeException`, not `ArrayIndexOutOfBoundsException` | `rt.Caught`: gc's message for negative indices has no length |
-| `@GoExport` on a `val` or constructor field is ignored, without an error | Plugin: reject, as for traits |
-| An export's tuple result is rejected with a misleading message (`cannot instantiate a generic Go function with Scala type scala.Tuple2[…]`) | `Exports`: say tuple results are not supported |
 
 #### Runtime and threads
 
@@ -125,14 +109,6 @@ fail. A fix makes its case fail: move the check to a case run on both the JVM an
 | `StringBuffer` is not synchronized: concurrent appends lose characters or throw. Not pinned (the result is random) | javalib `StringBuffer` |
 | Exception messages are JDK 8's or Go's: index errors (`index 5, length 3`; JVM: `Index 5 out of bounds for length 3`), `parseInt` (no `under radix N`; radix and null messages), `parseDouble` (`empty String`, `multiple points`), `BigInteger` parsing, `Thread.sleep(-1)`, `Thread.Builder.priority` | javalib: JDK 17+'s messages |
 | String charsets other than the supported three throw `UnsupportedOperationException`, not `UnsupportedEncodingException`/`UnsupportedCharsetException` | javalib charsets |
-
-#### Go interop
-
-| Bug | Fix in |
-|-----|--------|
-| A `GoSlice`/`GoMap` passed for a defined Go slice or map type (`type Names []string`) is a link error (`cannot pass Scala type … as Go type …`), though the spec converts it | `GoInterop.toGoNormalized`: the Go-data case before `GoType.Named` |
-| A Scala `String` passes type tests for Go interfaces it does not implement: `("s": Any).isInstanceOf[fmt.Stringer]` is `true` (JVM and Go code: `false`) | `rt` type tests on `*rt.String` |
-| `GoType.of[Any].name` is `interface {}` on Go, `any` on the JVM, also inside composite types | `GoType` natives: Go's `any` spelling |
 
 ### Silent wrong output
 
@@ -204,7 +180,7 @@ Not planned: ScalaTest (reflection throughout, `java.awt`), and cask, http4s-emb
 | Item | Missing | Size |
 |------|---------|------|
 | Go structs from Scala | Go sees Scala classes only as interfaces. No Scala declaration yields a Go struct with fields and tags, which `encoding/json`, gin binding and database scanners read | M–L |
-| Generics | Constraints checked in Scala (bounds, or at link time: see the [known bug](#code-the-go-compiler-rejects)); type tests against generic facade types, and checked casts to them (type arguments are erased; casts are unchecked); `GoType` instances for facade types | M |
+| Generics | Constraints checked in Scala (bounds), at compile time rather than link time; type tests against generic facade types, and checked casts to them (type arguments are erased; casts are unchecked); `GoType` instances for facade types | M |
 | `select` | Over several Go channels, from Scala and from gears | S–M |
 | Data shapes | What [generated facades leave out](_docs/interop/generated-facades.md#what-is-left-out) but `unsafe.Pointer` (pointer methods of non-struct types through a `GoPtr`; setters of fields of unnameable types through reflection); `GoSlice`/`GoMap` views of named slice and map types; variadic callbacks | M |
 | Exports | Go implementing Scala traits; vals and fields; secondary constructors; tuple results; overloads sharing a Go name; generic methods | M |

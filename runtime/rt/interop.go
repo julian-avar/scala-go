@@ -314,10 +314,23 @@ func CastStruct[T any](x any) any {
 	return nil
 }
 
-// CastForeign implements asInstanceOf for a Go type: null passes, other values must have type T.
+// IsForeign implements isInstanceOf for a Go type (not a struct) T. The runtime's own types for
+// strings, big numbers and classes have methods that Go interfaces name (`String`), but Go code
+// holding such a value sees a Go string or a number: they are never instances of Go types.
+func IsForeign[T any](x any) bool {
+	switch x.(type) {
+	case *String, *BigInteger, *BigDecimal, *Class:
+		return false
+	}
+	_, ok := x.(T)
+	return ok
+}
+
+// CastForeign implements asInstanceOf for a Go type: null passes, other values must be
+// instances of T (see IsForeign).
 func CastForeign[T any](x any) any {
 	if x != nil {
-		if _, ok := x.(T); !ok {
+		if !IsForeign[T](x) {
 			ThrowKind(ClassCast, GetClass(x).name+" cannot be cast to "+reflect.TypeFor[T]().String())
 		}
 	}

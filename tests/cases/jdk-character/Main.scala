@@ -46,7 +46,7 @@ object Main:
     println(s"isUpperCase  ${flags(bmp)(c => Character.isUpperCase(c.toChar))}")
     println(s"isLowerCase  ${flags(bmp)(c => Character.isLowerCase(c.toChar))}")
     println(s"isISOControl ${flags(bmp)(c => Character.isISOControl(c.toChar))}")
-    println(s"negative code point ${Character.isISOControl(Integer.parseInt("-1"))} ${Character.isLetter(-1)} ${Character.isDigit(0x110000)}")
+    println(s"negative code point ${Character.isISOControl(-1)} ${Character.isLetter(-1)} ${Character.isDigit(0x110000)}")
     // Scala's RichChar forwards to Character.
     println(s"RichChar ${'x'.isLetter} ${'7'.isDigit} ${' '.isWhitespace} ${'Q'.isUpper} ${'q'.isLower} ${'q'.toUpper} ${'Q'.toLower} ${'7'.asDigit}")
 

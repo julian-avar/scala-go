@@ -167,3 +167,5 @@ true false true false
 1 -1 0 1
 1231 1237 1231 true
 false
+== constant bit patterns
+-Infinity -0.0

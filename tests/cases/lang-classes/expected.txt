@@ -1,3 +1,4 @@
+classes named like linker files: 1 2
 constructors: 100.0C 2 0.0C 1
 inner: alpha.1 (secret 5) beta.2 (secret 4) true beta
 projection: List(1, 2)

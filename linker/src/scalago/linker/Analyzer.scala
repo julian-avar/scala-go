@@ -44,6 +44,8 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
   def instantiate(cls: ClassName): Unit =
     if instantiated.add(cls) then
       current.foreach(instantiatedFrom(cls) = _)
+      for c <- program.get(cls); hijacked <- List(Hijacked.BigInteger, Hijacked.BigDecimal) if program.ancestors(cls).contains(hijacked) do
+        errors.add(c.pos, s"class $cls cannot extend $hijacked: its instances are Go values, not objects of a Scala class\n${reachabilityChain(current)}")
       for (m, impl) <- program.vtable(cls) if calledNames.contains(m) do reach(impl, m)
       // Go interfaces implemented in Scala: Go code may call any of their methods.
       for f <- program.facadeAncestors(cls) do

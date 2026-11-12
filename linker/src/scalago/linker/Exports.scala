@@ -55,6 +55,30 @@ object Exports:
         analyzer.callVirtual(m.name)
         analyzer.useExport(e)
 
+  /** Link errors for exports Go cannot have: two under one Go name (Go has no overloading; the
+   *  root package has the functions and constructors, a class's interface its methods), and
+   *  tuple results.
+   */
+  def check(program: Program, errors: Errors): Unit =
+    type Export = (MethodDef, String, GoExport)
+    def duplicates(what: String, exports: List[Export]): Unit =
+      for (goName, same) <- exports.groupBy(_._3.goName) if same.size > 1; (m, scalaName, _) <- same.tail do
+        errors.add(m.pos, s"$scalaName: the Go name $goName is already taken by another $what (Go has no overloading)")
+    val functionExports: List[Export] =
+      functions(program).map(f => (f.method, s"${GoInterop.scalaName(f.owner.name)}.${f.method.name.simple}", f.goExport))
+    val classExports = classes(program).map { c =>
+      val name = GoInterop.scalaName(c.cls.name)
+      (name, c.constructor.map((m, e) => (m, s"the constructor of $name", e)).toList,
+        c.methods.map((m, e) => (m, s"$name.${m.name.simple}", e)))
+    }
+    duplicates("export of the library", functionExports ++ classExports.flatMap(_._2))
+    for (name, _, methods) <- classExports do duplicates(s"method of $name", methods)
+    for (m, scalaName, e) <- functionExports ++ classExports.flatMap(_._3) do
+      e.result match
+        case ScalaType.Ref(name, _) if name.matches("scala\\.Tuple\\d+") =>
+          errors.add(m.pos, s"exported $scalaName: tuple results are not supported (return a case class)")
+        case _ => ()
+
   private val goKeywords = Set("break", "case", "chan", "const", "continue", "default", "defer", "else", "fallthrough",
     "for", "func", "go", "goto", "if", "import", "interface", "map", "package", "range", "return", "select", "struct",
     "switch", "type", "var")

@@ -1,1 +1,0 @@
-The Scala code is a library (@GoExport); consumer/ is the Go program using it.

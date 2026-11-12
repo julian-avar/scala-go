@@ -1,5 +1,0 @@
-Main.scala:8:45: missing argument in conversion to any
-Main.scala:9:34: missing argument in conversion to any
-Main.scala:10:25: missing argument in conversion to any
-Main.scala:11:28: missing argument in conversion to any
-Main.scala:12:39: missing argument in conversion to any

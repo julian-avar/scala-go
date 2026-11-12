@@ -3,6 +3,7 @@ package rt
 import (
 	"reflect"
 	"strconv"
+	"strings"
 )
 
 // Go's own data types seen from Scala (scalago.go.GoSlice, GoMap, GoChan, GoPtr): Go values in
@@ -54,7 +55,11 @@ func GoTypeSlice(elem any) any     { return reflect.SliceOf(goType(elem)) }
 func GoTypeMap(key, value any) any { return reflect.MapOf(goType(key), goType(value)) }
 func GoTypeChan(elem any) any      { return reflect.ChanOf(reflect.BothDir, goType(elem)) }
 func GoTypePtr(elem any) any       { return reflect.PointerTo(goType(elem)) }
-func GoTypeName(t any) *String     { return Str(goType(t).String()) }
+
+// GoTypeName spells the type as Go source does (`any`, which reflect prints as `interface {}`).
+func GoTypeName(t any) *String {
+	return Str(strings.ReplaceAll(goType(t).String(), "interface {}", "any"))
+}
 
 // ---- Conversions --------------------------------------------------------------------------
 

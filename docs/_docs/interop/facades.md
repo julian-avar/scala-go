@@ -122,8 +122,8 @@ slices.Max(GoSlice.of[GoInt](GoInt(3), GoInt(7)))         // slices.Max[[]int, i
 val p = new atomic.Pointer[GoString]                      // new(atomic.Pointer[string])
 ```
 
-- Scala does not check Go's constraints: `slices.Max` of a `GoSlice[Any]` links, then fails
-  `go build` ([known bug](../contributing/roadmap.md#known-bugs)).
+- Scala does not check Go's constraints, the linker does: `slices.Max` of a `GoSlice[Any]` is a
+  link error.
 - A type argument that no parameter determines must be given (`reflect.TypeFor[GoInt]()`): the
   plugin rejects those Scala would infer as `Any` or `Nothing`.
 - `GoSlice.of(...)` in an argument of a generic member needs its element type

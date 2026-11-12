@@ -947,6 +947,7 @@ object Natives:
       s"mapType($O$O)$O" -> "rt.GoTypeMap",
       s"chanType($O)$O" -> "rt.GoTypeChan",
       s"ptrType($O)$O" -> "rt.GoTypePtr",
+      s"typeName($O)Ljava.lang.String;" -> "rt.GoTypeName",
       s"isNil($O)Z" -> "rt.GoIsNil",
       s"makeSlice(${O}II)$O" -> "rt.GoMakeSlice",
       s"sliceLength($O)I" -> "rt.GoSliceLength",

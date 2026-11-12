@@ -130,3 +130,7 @@ compare 2 -65535 255 -2
 -300 -44 -300.0 -301 -300 -1 -5
 -7 -7 -7 -14 -7 -1 -128
 true false true false
+== constant operands
+sum: -2147483648 -9223372036854775808
+divideUnsigned: java.lang.ArithmeticException: / by zero
+remainderUnsigned: java.lang.ArithmeticException: / by zero

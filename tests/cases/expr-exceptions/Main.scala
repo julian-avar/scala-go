@@ -1,12 +1,11 @@
-import scala.util.{Failure, Success, Try, Using}
+import scala.util.{Failure, Success, Try, Using, boundary}
 import scala.util.control.{Breaks, ControlThrowable, NonFatal}
 
 // Exceptions (docs/_docs/spec/language.md, "Exceptions"): try/catch/finally ordering, nesting,
-// rethrow, finally after return and break, exceptions replacing outcomes, guards, NonFatal,
-// custom exceptions, getMessage/getCause/addSuppressed, the run-time errors Go detects. Not
-// here: `try throw e finally return x` (known-bugs-expr-finally-return), `try throw e finally
-// throw e2` (known-bugs-expr-finally-throw), negative array indices and NonFatal of
-// StackOverflowError (known-bugs-misc), NullPointerException messages (limits-runtime).
+// rethrow, finally after return and break, exceptions replacing outcomes, guards, throws in
+// operands, NonFatal, custom exceptions, getMessage/getCause/addSuppressed, the run-time errors Go
+// detects. Not here: negative array indices and NonFatal of StackOverflowError (known-bugs-misc),
+// NullPointerException messages (limits-runtime).
 class AppException(val code: Int, msg: String, cause: Throwable = null) extends Exception(msg, cause)
 class ValidationException(field: String) extends AppException(400, s"invalid $field")
 case class Problem(what: String) extends RuntimeException(what)
@@ -106,6 +105,24 @@ object Main:
     }
     -1
 
+  // Code that a `throw` makes unreachable
+  def returnInFinallyAfterThrow(): Int =
+    try throw IllegalStateException("discarded")
+    finally return 1
+
+  def throwInFinallyAfterThrow(): Int =
+    try throw IllegalStateException("from try")
+    finally throw UnsupportedOperationException("from finally")
+
+  def pair(a: String, b: Int): String = a + b
+  inline def failing(n: Int): Int =
+    if n < 0 then throw IllegalArgumentException("negative")
+    n
+  def boxedThrow(): Any = (throw Problem("boxed")): Int
+  def boxedBoundaryThrow(): Any = boundary[Int] { throw Problem("boundary") }
+  def boxedThrowInTry(): Any = try ((throw Problem("in try")): Int) catch case _: IllegalStateException => "caught"
+  def throwingIf(flag: Boolean): Int = if flag then throw Problem("then") else throw Problem("else")
+
   def main(args: Array[String]): Unit =
     show("finally on normal completion")(withFinally(2))
     show("finally on return")(withFinally(0))
@@ -149,6 +166,23 @@ object Main:
     show("throw in getOrElse")(Option.empty[String].getOrElse(throw java.util.NoSuchElementException("none")))
     show("throw null")(Try(throw null).failed.get.getClass.getName)
     show("throw a null variable")(Try({ val e: RuntimeException = null; throw e }).failed.get.getClass.getName)
+
+    // A throw ends the code around it: later operands are not evaluated
+    show("return in finally after a throw")(returnInFinallyAfterThrow())
+    show("throw in finally after a throw")(throwInFinallyAfterThrow())
+    show("throw as an argument")(pair({ step("first"); throw Problem("argument") }, { step("second"); 1 }))
+    show("call returning Nothing as an argument")(pair(sys.error("nothing"), { step("second"); 1 }))
+    show("throwing if as an argument")(pair(String.valueOf(throwingIf(log.isEmpty)), 1))
+    show("inline throw in a try, by name")(try failing(-1) catch case _: IllegalArgumentException => 0)
+    show("boxed throw")(boxedThrow())
+    show("boxed boundary that throws")(boxedBoundaryThrow())
+    show("boxed throw in a try")(boxedThrowInTry())
+    show("boundary that throws, in a try")(try boundary { (throw Problem("f")): Int } catch case e: Problem => e.getMessage)
+    show("throw in a condition")({ while (throw Problem("condition")) do step("body"); 0 })
+    show("throw after &&")(log.isEmpty && (throw Problem("rhs")))
+    show("throw in a concatenation")("a" + (throw Problem("concat")) + { step("after"); "b" })
+    show("val of a throwing if")({ val x: Int = if log.isEmpty then throw Problem("a") else throw Problem("b"); x + 1 })
+    show("throwing match as an operand")(1 + (log.length match { case 0 => throw Problem("zero"); case _ => throw Problem("other") }: Int))
 
     // NonFatal
     val nonFatal = List[Throwable](RuntimeException(), Exception(), AssertionError(), NotImplementedError(),
