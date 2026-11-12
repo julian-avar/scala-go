@@ -11,13 +11,6 @@ object Main:
       catch case e: Exception => s"${e.getClass.getName}: ${e.getMessage}"
     println(s"$label: $r")
 
-  /** Only the exception's class: the messages of some parse errors differ (see known-bugs-jdk). */
-  def attemptType(label: String)(body: => Any): Unit =
-    val r =
-      try String.valueOf(body)
-      catch case e: Exception => e.getClass.getName
-    println(s"$label: $r")
-
   def bi(s: String): BigInteger = new BigInteger(s)
   def bytes(b: Array[Byte]): String = b.map(x => f"${x & 0xff}%02x").mkString("[", " ", "]")
 
@@ -40,10 +33,17 @@ object Main:
     println(s"${new BigInteger("ff", 16)} ${new BigInteger("-FF", 16)} ${new BigInteger("zz", 36)} ${new BigInteger("-101", 2)} ${new BigInteger("777", 8)}")
     println(s"${new BigInteger("123456789abcdef0123456789abcdef", 16)}")
     for s <- Seq("12a", " 1", "1 ", "1.0", "1e3") do attempt(s"new BigInteger(\"$s\")")(bi(s))
-    for s <- Seq("", "-", "+", "--1", "+-1", "0x10") do attemptType(s"new BigInteger(\"$s\")")(bi(s))
-    attemptType("digit out of radix")(new BigInteger("12", 2))
+    for s <- Seq("", "-", "+", "--1", "+-1", "1-", "0x10", "1_000", "\u0661\u0662\u0663", "-\uff11\uff12", "1234567890123x", "00012x") do attempt(s"new BigInteger(\"$s\")")(bi(s))
+    attempt("digit out of radix")(new BigInteger("12", 2))
+    attempt("long digit out of radix")(new BigInteger("12345678901234567890123x", 16))
+    attempt("radix 1")(new BigInteger("1", 1))
+    attempt("radix 37")(new BigInteger("1", 37))
+    attempt("radix 0")(new BigInteger("1", 0))
     println(s"bytes ${new BigInteger(Array[Byte](1, 0))} ${new BigInteger(Array[Byte](-1))} ${new BigInteger(Array[Byte](-128, 0))} ${new BigInteger(Array[Byte](0, -1))} ${new BigInteger(Array[Byte](-1, -1, -1, -1, -1, -1, -1, -1, -1))}")
-    println(s"signum+magnitude ${new BigInteger(1, Array[Byte](-1, -1))} ${new BigInteger(-1, Array[Byte](1, 0))} ${new BigInteger(0, Array[Byte](0, 0))} ${new BigInteger(1, Array[Byte]())}")
+    println(s"signum+magnitude ${new BigInteger(1, Array[Byte](-1, -1))} ${new BigInteger(-1, Array[Byte](1, 0))} ${new BigInteger(0, Array[Byte](0, 0))} ${new BigInteger(1, Array[Byte]())} ${new BigInteger(-1, Array[Byte](0))} ${new BigInteger(0, Array[Byte]())}")
+    attempt("new BigInteger(0, [1])")(new BigInteger(0, Array[Byte](1)))
+    attempt("new BigInteger(2, [1])")(new BigInteger(2, Array[Byte](1)))
+    attempt("new BigInteger(-2, [1])")(new BigInteger(-2, Array[Byte](1)))
     attempt("empty bytes")(new BigInteger(Array[Byte]()))
 
   def arithmetic(): Unit =
@@ -90,10 +90,10 @@ object Main:
 
   def conversions(): Unit =
     println("== conversions")
-    // Not negative powers of two: their toByteArray has an extra 0xff byte (known-bugs-jdk).
-    for v <- values if !(v.signum < 0 && v.negate().bitCount == 1) do
+    for v <- values do
       println(s"$v: int=${v.intValue} long=${v.longValue} short=${v.shortValue} byte=${v.byteValue} double=${v.doubleValue} float=${v.floatValue} " +
         s"bytes=${bytes(v.toByteArray)} hex=${v.toString(16)} r36=${v.toString(36)} r2=${v.toString(2).length} r1=${v.toString(1)} hash=${v.hashCode}")
+    println(s"powers of two ${Seq(-1, -2, -127, -128, -129, -256, -32768, Int.MinValue, Long.MinValue).map(i => bytes(BigInteger.valueOf(i).toByteArray)).mkString(" ")} ${bytes(bi("2").pow(70).negate().toByteArray)} ${bytes(BigInteger.ZERO.toByteArray)}")
     val huge = bi("2").pow(1024)
     println(s"huge double ${huge.doubleValue} ${huge.negate().doubleValue} ${huge.floatValue} ${bi("2").pow(1023).doubleValue}")
     println(s"rounding ${bi("9007199254740993").doubleValue} ${bi("9007199254740995").doubleValue} ${bi("16777217").floatValue} ${bi("18014398509481983").doubleValue}")

@@ -15,42 +15,49 @@ parseInt(777, 8): 511
 parseInt(007, 10): 7
 parseInt("2147483648", 10): java.lang.NumberFormatException: For input string: "2147483648"
 parseInt("-2147483649", 10): java.lang.NumberFormatException: For input string: "-2147483649"
-parseInt("80000000", 16): java.lang.NumberFormatException
-parseInt("12", 2): java.lang.NumberFormatException
+parseInt("80000000", 16): java.lang.NumberFormatException: For input string: "80000000" under radix 16
+parseInt("12", 2): java.lang.NumberFormatException: For input string: "12" under radix 2
 parseInt("", 10): java.lang.NumberFormatException: For input string: ""
-parseInt("", 16): java.lang.NumberFormatException
+parseInt("", 16): java.lang.NumberFormatException: For input string: "" under radix 16
 parseInt("+", 10): java.lang.NumberFormatException: For input string: "+"
 parseInt("-", 10): java.lang.NumberFormatException: For input string: "-"
 parseInt(" 1", 10): java.lang.NumberFormatException: For input string: " 1"
 parseInt("1 ", 10): java.lang.NumberFormatException: For input string: "1 "
 parseInt("1_000", 10): java.lang.NumberFormatException: For input string: "1_000"
-parseInt("0x10", 16): java.lang.NumberFormatException
+parseInt("0x10", 16): java.lang.NumberFormatException: For input string: "0x10" under radix 16
 parseInt("1.0", 10): java.lang.NumberFormatException: For input string: "1.0"
-parseInt("1", 1): java.lang.NumberFormatException
-parseInt("1", 37): java.lang.NumberFormatException
+parseInt("1", 1): java.lang.NumberFormatException: radix 1 less than Character.MIN_RADIX
+parseInt("1", 37): java.lang.NumberFormatException: radix 37 greater than Character.MAX_RADIX
 parseInt("99999999999", 10): java.lang.NumberFormatException: For input string: "99999999999"
-parseInt(null): java.lang.NumberFormatException
+parseInt(null): java.lang.NumberFormatException: Cannot parse null string
 parseInt("12345"): 12345
 valueOf("-17"): -17
 valueOf("x"): java.lang.NumberFormatException: For input string: "x"
 "12".toInt: 12
 "12a".toInt: java.lang.NumberFormatException: For input string: "12a"
+parseInt("٣٢١", 16): 801
+parseInt("-１２", 16): -18
+parseInt("ＡＢ", 16): 171
+parseInt("1١", 16): 17
+parseLong("١٢٣"): 123
+parseInt(null, 16): java.lang.NumberFormatException: Cannot parse null string
+parseLong("x", 16): java.lang.NumberFormatException: For input string: "x" under radix 16
 == parseLong
 parseLong(9223372036854775807, 10): 9223372036854775807
 parseLong(-9223372036854775808, 10): -9223372036854775808
 parseLong(+1, 10): 1
 parseLong(7fffffffffffffff, 16): 9223372036854775807
 parseLong(-8000000000000000, 16): -9223372036854775808
-parseLong(1111111111111111111111111111111111111111111111111111111111111111, 2): java.lang.NumberFormatException
+parseLong(1111111111111111111111111111111111111111111111111111111111111111, 2): java.lang.NumberFormatException: For input string: "1111111111111111111111111111111111111111111111111111111111111111" under radix 2
 parseLong(zzzzzzzzzzzz, 36): 4738381338321616895
 parseLong("9223372036854775808", 10): java.lang.NumberFormatException: For input string: "9223372036854775808"
 parseLong("-9223372036854775809", 10): java.lang.NumberFormatException: For input string: "-9223372036854775809"
-parseLong("8000000000000000", 16): java.lang.NumberFormatException
+parseLong("8000000000000000", 16): java.lang.NumberFormatException: For input string: "8000000000000000" under radix 16
 parseLong("", 10): java.lang.NumberFormatException: For input string: ""
 parseLong("12L", 10): java.lang.NumberFormatException: For input string: "12L"
-parseLong("2", 2): java.lang.NumberFormatException
-parseLong("1", 40): java.lang.NumberFormatException
-parseLong(null): java.lang.NumberFormatException
+parseLong("2", 2): java.lang.NumberFormatException: For input string: "2" under radix 2
+parseLong("1", 40): java.lang.NumberFormatException: radix 40 greater than Character.MAX_RADIX
+parseLong(null): java.lang.NumberFormatException: Cannot parse null string
 parseLong("-5"): -5
 Long.valueOf("123456789012"): 123456789012
 "99999999999".toLong: 99999999999
@@ -77,6 +84,7 @@ Long.valueOf("123456789012"): 123456789012
 -9223372036854775808: -9223372036854775808 8000000000000000 1000000000000000000000 1000000000000000000000000000000000000000000000000000000000000000 r5=-1104332401304422434310311213 r16=-8000000000000000 r36=-1y2p0ij32e8e8 u=9223372036854775808
 1099511627776: 1099511627776 10000000000 20000000000000 10000000000000000000000000000000000000000 r5=121003244434042101 r16=10000000000 r36=e13wu1og u=1099511627776
 4294967295: 4294967295 ffffffff 37777777777 11111111111111111111111111111111 r5=32244002423140 r16=ffffffff r36=1z141z3 u=4294967295
+radixes 255 -255 255 255 255
 RichInt ff 32 10 ffffffffffffffff
 == Integer bits
 0: bitCount=0 nlz=32 ntz=32 highest=0 lowest=0 reverse=0 reverseBytes=0 rotl3=0 rotr3=0 rotl33=0 rotr-1=0 signum=0

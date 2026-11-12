@@ -7,15 +7,28 @@ new BigInteger(" 1"): java.lang.NumberFormatException: For input string: " 1"
 new BigInteger("1 "): java.lang.NumberFormatException: For input string: "1 "
 new BigInteger("1.0"): java.lang.NumberFormatException: For input string: "1.0"
 new BigInteger("1e3"): java.lang.NumberFormatException: For input string: "1e3"
-new BigInteger(""): java.lang.NumberFormatException
-new BigInteger("-"): java.lang.NumberFormatException
-new BigInteger("+"): java.lang.NumberFormatException
-new BigInteger("--1"): java.lang.NumberFormatException
-new BigInteger("+-1"): java.lang.NumberFormatException
-new BigInteger("0x10"): java.lang.NumberFormatException
-digit out of radix: java.lang.NumberFormatException
+new BigInteger(""): java.lang.NumberFormatException: Zero length BigInteger
+new BigInteger("-"): java.lang.NumberFormatException: Zero length BigInteger
+new BigInteger("+"): java.lang.NumberFormatException: Zero length BigInteger
+new BigInteger("--1"): java.lang.NumberFormatException: Illegal embedded sign character
+new BigInteger("+-1"): java.lang.NumberFormatException: Illegal embedded sign character
+new BigInteger("1-"): java.lang.NumberFormatException: Illegal embedded sign character
+new BigInteger("0x10"): java.lang.NumberFormatException: For input string: "x10"
+new BigInteger("1_000"): java.lang.NumberFormatException: For input string: "1_000"
+new BigInteger("١٢٣"): 123
+new BigInteger("-１２"): -12
+new BigInteger("1234567890123x"): java.lang.NumberFormatException: For input string: "67890123x"
+new BigInteger("00012x"): java.lang.NumberFormatException: For input string: "12x"
+digit out of radix: java.lang.NumberFormatException: For input string: "12" under radix 2
+long digit out of radix: java.lang.NumberFormatException: For input string: "890123x" under radix 16
+radix 1: java.lang.NumberFormatException: Radix out of range
+radix 37: java.lang.NumberFormatException: Radix out of range
+radix 0: java.lang.NumberFormatException: Radix out of range
 bytes 256 -1 -32768 255 -1
-signum+magnitude 65535 -256 0 0
+signum+magnitude 65535 -256 0 0 0 0
+new BigInteger(0, [1]): java.lang.NumberFormatException: signum-magnitude mismatch
+new BigInteger(2, [1]): java.lang.NumberFormatException: Invalid signum value
+new BigInteger(-2, [1]): java.lang.NumberFormatException: Invalid signum value
 empty bytes: java.lang.NumberFormatException: Zero length BigInteger
 == arithmetic
 123456789011358024580135802458 123456789013333333222333333322 -121932631137021795212620027521140070120989178480 -124999998860 925925953827160370 124999998860 -925925953827160370
@@ -65,15 +78,19 @@ setBit(-1): java.lang.ArithmeticException: Negative bit address
 1: int=1 long=1 short=1 byte=1 double=1.0 float=1.0 bytes=[01] hex=1 r36=1 r2=1 r1=1 hash=1
 2: int=2 long=2 short=2 byte=2 double=2.0 float=2.0 bytes=[02] hex=2 r36=2 r2=2 r1=2 hash=2
 10: int=10 long=10 short=10 byte=10 double=10.0 float=10.0 bytes=[0a] hex=a r36=a r2=4 r1=10 hash=10
+-1: int=-1 long=-1 short=-1 byte=-1 double=-1.0 float=-1.0 bytes=[ff] hex=-1 r36=-1 r2=2 r1=-1 hash=-1
 127: int=127 long=127 short=127 byte=127 double=127.0 float=127.0 bytes=[7f] hex=7f r36=3j r2=7 r1=127 hash=127
 128: int=128 long=128 short=128 byte=-128 double=128.0 float=128.0 bytes=[00 80] hex=80 r36=3k r2=8 r1=128 hash=128
+-128: int=-128 long=-128 short=-128 byte=-128 double=-128.0 float=-128.0 bytes=[80] hex=-80 r36=-3k r2=9 r1=-128 hash=-128
 -129: int=-129 long=-129 short=-129 byte=127 double=-129.0 float=-129.0 bytes=[ff 7f] hex=-81 r36=-3l r2=9 r1=-129 hash=-129
 255: int=255 long=255 short=255 byte=-1 double=255.0 float=255.0 bytes=[00 ff] hex=ff r36=73 r2=8 r1=255 hash=255
 65536: int=65536 long=65536 short=0 byte=0 double=65536.0 float=65536.0 bytes=[01 00 00] hex=10000 r36=1ekg r2=17 r1=65536 hash=65536
+-2147483648: int=-2147483648 long=-2147483648 short=0 byte=0 double=-2.147483648E9 float=-2.1474836E9 bytes=[80 00 00 00] hex=-80000000 r36=-zik0zk r2=33 r1=-2147483648 hash=-2147483648
 9223372036854775807: int=-1 long=9223372036854775807 short=-1 byte=-1 double=9.223372036854776E18 float=9.223372E18 bytes=[7f ff ff ff ff ff ff ff] hex=7fffffffffffffff r36=1y2p0ij32e8e7 r2=63 r1=9223372036854775807 hash=2147483616
 -9223372036854775809: int=-1 long=9223372036854775807 short=-1 byte=-1 double=-9.223372036854776E18 float=-9.223372E18 bytes=[ff 7f ff ff ff ff ff ff ff] hex=-8000000000000001 r36=-1y2p0ij32e8e9 r2=65 r1=-9223372036854775809 hash=2147483647
 123456789012345678901234567890: int=1312754386 long=-4362896299872285998 short=2770 byte=-46 double=1.2345678901234568E29 float=1.2345679E29 bytes=[01 8e e9 0f f6 c3 73 e0 ee 4e 3f 0a d2] hex=18ee90ff6c373e0ee4e3f0ad2 r36=byw97um9s91dlz68tsi r2=97 r1=123456789012345678901234567890 hash=1915528825
 -123456789012345678901234567890: int=-1312754386 long=4362896299872285998 short=-2770 byte=46 double=-1.2345678901234568E29 float=-1.2345679E29 bytes=[fe 71 16 f0 09 3c 8c 1f 11 b1 c0 f5 2e] hex=-18ee90ff6c373e0ee4e3f0ad2 r36=-byw97um9s91dlz68tsi r2=98 r1=-123456789012345678901234567890 hash=-1915528825
+powers of two [ff] [fe] [81] [80] [ff 7f] [ff 00] [80 00] [80 00 00 00] [80 00 00 00 00 00 00 00] [c0 00 00 00 00 00 00 00 00] [00]
 huge double Infinity -Infinity Infinity 8.98846567431158E307
 rounding 9.007199254740992E15 9.007199254740996E15 1.6777216E7 1.8014398509481984E16
 Number 1312754386 -4362896299872285998

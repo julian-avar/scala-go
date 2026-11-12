@@ -10,17 +10,6 @@ object Main:
       catch case e: Exception => s"${e.getClass.getName}: ${e.getMessage}"
     println(s"$label: $r")
 
-  /** Only the exception's class: some messages differ (see known-bugs-jdk). */
-  def attemptType(label: String)(body: => Any): Unit =
-    val r =
-      try String.valueOf(body)
-      catch case e: Exception => e.getClass.getName
-    println(s"$label: $r")
-
-  /** The message too in radix 10; only the class in other radixes, whose messages differ. */
-  def attemptRadix(label: String, radix: Int)(body: => Any): Unit =
-    if radix == 10 then attempt(label)(body) else attemptType(label)(body)
-
   // Not constants: natives given constant operands can fold into Go constant expressions (known-bugs-jdk-go-errors).
   val zero: Int = Integer.parseInt("0")
   val one: Int = Integer.parseInt("1")
@@ -43,21 +32,27 @@ object Main:
     do attempt(s"parseInt($s, $radix)")(JInteger.parseInt(s, radix))
     for (s, radix) <- Seq("2147483648" -> 10, "-2147483649" -> 10, "80000000" -> 16, "12" -> 2, "" -> 10, "" -> 16, "+" -> 10,
         "-" -> 10, " 1" -> 10, "1 " -> 10, "1_000" -> 10, "0x10" -> 16, "1.0" -> 10, "1" -> 1, "1" -> 37, "99999999999" -> 10)
-    do attemptRadix(s"parseInt(\"$s\", $radix)", radix)(JInteger.parseInt(s, radix))
-    attemptType("parseInt(null)")(JInteger.parseInt(null))
+    do attempt(s"parseInt(\"$s\", $radix)")(JInteger.parseInt(s, radix))
+    attempt("parseInt(null)")(JInteger.parseInt(null))
     attempt("parseInt(\"12345\")")(JInteger.parseInt("12345"))
     attempt("valueOf(\"-17\")")(JInteger.valueOf("-17"))
     attempt("valueOf(\"x\")")(JInteger.valueOf("x"))
     attempt("\"12\".toInt")("12".toInt)
     attempt("\"12a\".toInt")("12a".toInt)
+    // Digits are Character.digit's: any Unicode decimal digit.
+    for s <- Seq("\u0663\u0662\u0661", "-\uff11\uff12", "\uff21\uff22", "1\u0661") do
+      attempt(s"parseInt(\"$s\", 16)")(JInteger.parseInt(s, 16))
+    attempt("parseLong(\"\u0661\u0662\u0663\")")(JLong.parseLong("\u0661\u0662\u0663"))
+    attempt("parseInt(null, 16)")(JInteger.parseInt(null, 16))
+    attempt("parseLong(\"x\", 16)")(JLong.parseLong("x", 16))
     println("== parseLong")
     for (s, radix) <- Seq("9223372036854775807" -> 10, "-9223372036854775808" -> 10, "+1" -> 10, "7fffffffffffffff" -> 16,
         "-8000000000000000" -> 16, "1111111111111111111111111111111111111111111111111111111111111111" -> 2, "zzzzzzzzzzzz" -> 36)
-    do attemptRadix(s"parseLong($s, $radix)", radix)(JLong.parseLong(s, radix))
+    do attempt(s"parseLong($s, $radix)")(JLong.parseLong(s, radix))
     for (s, radix) <- Seq("9223372036854775808" -> 10, "-9223372036854775809" -> 10, "8000000000000000" -> 16, "" -> 10,
         "12L" -> 10, "2" -> 2, "1" -> 40)
-    do attemptRadix(s"parseLong(\"$s\", $radix)", radix)(JLong.parseLong(s, radix))
-    attemptType("parseLong(null)")(JLong.parseLong(null))
+    do attempt(s"parseLong(\"$s\", $radix)")(JLong.parseLong(s, radix))
+    attempt("parseLong(null)")(JLong.parseLong(null))
     attempt("parseLong(\"-5\")")(JLong.parseLong("-5"))
     attempt("Long.valueOf(\"123456789012\")")(JLong.valueOf("123456789012"))
     attempt("\"99999999999\".toLong")("99999999999".toLong)
@@ -72,6 +67,8 @@ object Main:
     for l <- longs do
       println(s"$l: ${JLong.toString(l)} ${JLong.toHexString(l)} ${JLong.toOctalString(l)} ${JLong.toBinaryString(l)} " +
         s"r5=${JLong.toString(l, 5)} r16=${JLong.toString(l, 16)} r36=${JLong.toString(l, 36)} u=${JLong.toUnsignedString(l)}")
+    // An out-of-range radix means 10.
+    println(s"radixes ${JInteger.toString(255, 1)} ${JInteger.toString(-255, 37)} ${JLong.toString(255L, 0)} ${JLong.toString(255L, 37)} ${JInteger.toString(255, -2)}")
     println(s"RichInt ${255.toHexString} ${(-1).toBinaryString.length} ${8.toOctalString} ${(-1L).toHexString}")
 
   def bits(): Unit =

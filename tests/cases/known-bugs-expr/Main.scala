@@ -12,18 +12,7 @@ object Main:
       catch case e: Throwable => s"throws ${e.getClass.getName}${Option(e.getMessage).fold("")(": " + _)}"
     println(s"$what: $result")
 
-  def d(x: Double): Double = x
-
   def main(args: Array[String]): Unit =
-    // Double.NaN is Go's math.NaN(), whose payload is 1. JVM: 9221120237041090560 (0x7ff8000000000000)
-    attempt("doubleToRawLongBits(Double.NaN)")(java.lang.Double.doubleToRawLongBits(d(Double.NaN)))
-
-    // scala.math.BigDecimal(Double), and BigDecimal == Double, call new java.math.BigDecimal(String,
-    // MathContext); the generated MathContext lacks the goBits method that native calls. (The
-    // jdk-bigdecimal case, which uses MathContext itself, is not affected.) JVM: 1.5, true
-    attempt("BigDecimal(1.5)")(BigDecimal(d(1.5)))
-    attempt("BigDecimal(\"1.5\") == 1.5")(BigDecimal("1.5") == d(1.5))
-
     // BoxedUnit's hash code is an identity hash. JVM: true, true
     val unit: Any = ()
     attempt("().## == 0")(unit.## == 0)

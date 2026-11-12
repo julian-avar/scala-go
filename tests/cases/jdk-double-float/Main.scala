@@ -10,13 +10,6 @@ object Main:
       catch case e: Exception => s"${e.getClass.getName}: ${e.getMessage}"
     println(s"$label: $r")
 
-  /** Only the exception's class: some messages differ (see known-bugs-jdk). */
-  def attemptType(label: String)(body: => Any): Unit =
-    val r =
-      try String.valueOf(body)
-      catch case e: Exception => e.getClass.getName
-    println(s"$label: $r")
-
   // Negative bit patterns are not constants here: see known-bugs-jdk-go-errors.
   def main(args: Array[String]): Unit =
     doubleToString()
@@ -46,12 +39,15 @@ object Main:
     val inputs = Seq("1", "-1.5", "+2.5", "1e10", "1E-10", "1.", ".5", "-.5e1", "  3.25  ", "\t7\n", "1d", "1D", "2f", "3.0d",
       "NaN", "Infinity", "-Infinity", "+Infinity", "1e400", "-1e400", "1e-400", "4.9e-324", "2.4703282292062328e-324",
       "0x1p3", "0x1.8p1", "-0x.8p0", "0X10P-2", "0x1p-1074", "abc", "1e", "e5",
-      "0x10", "١", "1,5", "--1", "0.1e+2", "123456789012345678901234567890")
+      "0x10", "١", "1,5", "--1", "0.1e+2", "123456789012345678901234567890",
+      "2.5F", "-NaN", "+NaN", "1_000", "infinity", "nan", "\u00a01", " 1", "NaNd", "Infinityf", "1.e3", "0x1.p1", "0x1p1f", "0x1p", "1e+", ".e5",
+      "1\u0085", "1e99999999999", "0e99999999999", "1.7976931348623158e308", "1.7976931348623159e308")
     for s <- inputs do attempt(s"parseDouble(\"$s\")")(JDouble.parseDouble(s))
-    for s <- Seq("", " ", "1.2.3") do attemptType(s"parseDouble(\"$s\")")(JDouble.parseDouble(s))
-    attemptType("parseDouble(null)")(JDouble.parseDouble(null))
+    for s <- Seq("", " ", "1.2.3", "1..", " 1.2.3 ") do attempt(s"parseDouble(\"$s\")")(JDouble.parseDouble(s))
+    attempt("parseDouble(null)")(try JDouble.parseDouble(null) catch case _: NullPointerException => "NullPointerException")
     println("== parseFloat")
-    for s <- Seq("1.1", "3.4028235e38", "3.5e38", "1e-46", "1.4e-45", "0.1", "16777217", "-0", "NaN", "0x1.fffffep127", "x") do
+    for s <- Seq("1.1", "3.4028235e38", "3.5e38", "1e-46", "1.4e-45", "0.1", "16777217", "-0", "NaN", "0x1.fffffep127", "x", "",
+        "1.00000017881393432617187499", "1.00000017881393432617187501", "1.5f", "3.4028235677973366e38", "7e-46", "7.1e-46", "0x1.0000011p0", "2.5F") do
       attempt(s"parseFloat(\"$s\")")(JFloat.parseFloat(s))
     attempt("Double.valueOf(\"2.5\")")(JDouble.valueOf("2.5"))
     attempt("\"1.5\".toDouble")("1.5".toDouble)
@@ -63,7 +59,7 @@ object Main:
     val ds = Seq(0.0, -0.0, 1.0, -2.0, 0.1, Double.NaN, Double.PositiveInfinity, JDouble.MIN_VALUE, JDouble.MAX_VALUE, JDouble.MIN_NORMAL)
     for d <- ds do
       val bits = JDouble.doubleToLongBits(d)
-      println(s"$d: ${JLong.toHexString(bits)} raw=${if d.isNaN then "(NaN: known-bugs-jdk)" else JLong.toHexString(JDouble.doubleToRawLongBits(d))} back=${JDouble.longBitsToDouble(bits)}")
+      println(s"$d: ${JLong.toHexString(bits)} raw=${JLong.toHexString(JDouble.doubleToRawLongBits(d))} back=${JDouble.longBitsToDouble(bits)}")
     val otherNaN = JDouble.longBitsToDouble(0x7ff0000000000001L)
     println(s"other NaN: ${otherNaN.isNaN} ${JLong.toHexString(JDouble.doubleToLongBits(otherNaN))} ${JLong.toHexString(JDouble.doubleToRawLongBits(otherNaN))}")
     val fs = Seq(0.0f, -0.0f, 1.0f, -2.0f, 0.1f, Float.NaN, Float.NegativeInfinity, JFloat.MIN_VALUE, JFloat.MAX_VALUE)

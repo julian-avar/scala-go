@@ -13,37 +13,3 @@ insert(4): throws java.lang.StringIndexOutOfBoundsException: offset 4, length 3
 append(cs, 2, 1): abc
 appendCodePoint(-1): ffff
 append(chars, 1, 5): throws java.lang.ArrayIndexOutOfBoundsException: arraycopy: last source index 6 out of bounds for length 2
-BigInteger(-128).toByteArray: [ff 80]
-BigInteger(-2^31).toByteArray: [ff 80 00 00 00]
-new BigInteger("1", 1): throws java.lang.RuntimeException: invalid number base 1
-new BigInteger("1", 37): 1
-new BigInteger(0, [1]): 1
-new BigInteger(2, [1]): 1
-new BigInteger(""): throws java.lang.NumberFormatException: For input string: ""
-new BigInteger("--1"): throws java.lang.NumberFormatException: For input string: "--1"
-new BigInteger("12", 2): throws java.lang.NumberFormatException: For input string: "12"
-Character.digit of non-ASCII: -1 -1 -1 -1
-Character.digit('0', 1), ('5', 37): 0 5
-isUpperCase(U+2160), isLowerCase(U+2170, U+00AA, U+02B0): false false false false
-isAlphabetic(U+2160, U+0345, U+24B6): false false false
-Integer.parseInt("١٢٣"): throws java.lang.NumberFormatException: For input string: "١٢٣"
-Integer.parseInt("12", 2): throws java.lang.NumberFormatException: For input string: "12"
-Integer.parseInt("1", 1): throws java.lang.NumberFormatException: For input string: "1"
-Long.parseLong(null): throws java.lang.NumberFormatException: Cannot parse null string: null
-Integer.toString(255, 1): throws java.lang.RuntimeException: strconv: illegal AppendInt/FormatInt base
-Long.toString(255L, 37): throws java.lang.RuntimeException: strconv: illegal AppendInt/FormatInt base
-Double.parseDouble("2.5F"): throws java.lang.NumberFormatException: For input string: "2.5F"
-Double.parseDouble("-NaN"): throws java.lang.NumberFormatException: For input string: "-NaN"
-Double.parseDouble("1_000"): 1000.0
-Double.parseDouble("infinity"): Infinity
-Double.parseDouble("nan"): NaN
-Double.parseDouble(" 1"): 1.0
-Double.parseDouble(""): throws java.lang.NumberFormatException: For input string: ""
-Double.parseDouble("1.2.3"): throws java.lang.NumberFormatException: For input string: "1.2.3"
-doubleToRawLongBits(NaN): 7ff8000000000001
-Float.parseFloat("1.00000017881393432617187499"): 1.0000002
-Math.pow(1, NaN): 1.0
-Math.pow(-1, Infinity): 1.0
-Math.pow(10, 308): 1.0000000000000006E308
-Math.pow(1.0001, 10000): 2.718145926824356
-StrictMath.cbrt(0.5): 0.7937005259840997

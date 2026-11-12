@@ -149,12 +149,9 @@ the JVM's in the last bit.
 - `abs`, `min`, `max`, `floorDiv`, `floorMod`, `signum`, `rint`, `sqrt`, `clamp` (`int` and
   `long` overloads only; the floating-point ones are missing) and `*Exact` (throwing
   `ArithmeticException("integer overflow")`/`("long overflow")`) have the JDK's results.
-- **Deviation:** the transcendental functions (`sin`, `exp`, `log`, `pow`, ...) are Go's `math`
-  and may differ from the JDK's in the last bit; `StrictMath` is `Math`, not fdlibm.
-- **Deviation (bug):** `pow` misses Java's special cases (`pow(1, NaN)` is `1.0`, not `NaN`) and
-  can be off by more than one bit (`pow(10, 308)`).
-- **Deviation (bug):** `Math.round(Double)` rounds twice (`floor(x + 0.5)`):
-  `Math.round(0.49999999999999994)` is `1` (JDK: `0`); large odd values are off by one.
+- **Deviation:** `Math`'s transcendental functions (`sin`, `exp`, `log`, ...) are Go's `math` and
+  may differ from the JDK's in the last bit, as the JDK allows. `Math.pow` and all of
+  `StrictMath` are fdlibm's, bit for bit.
 
 ### String conversion
 
@@ -249,8 +246,7 @@ and by gc's messages and become Java exceptions:
   of range [-1]")`, not `ArrayIndexOutOfBoundsException`.
 - **Deviation:** `NullPointerException`s have no message (the JVM's name the `null` expression).
 - **Deviation (bug):** `String` index errors have JDK 8's messages (`"abc".charAt(5)`:
-  `index 5, length 3`; JDK 25: `Index 5 out of bounds for length 3`), and `Integer.parseInt(s,
-  radix)` omits the JDK's `under radix 16` suffix.
+  `index 5, length 3`; JDK 25: `Index 5 out of bounds for length 3`).
 - Go fatal errors (stack or heap exhaustion, Go's own fatal conditions) are not exceptions: the
   process ends with exit status 2 without running `catch` or `finally`
   ([Runtime: stack](runtime.md#stack)).
