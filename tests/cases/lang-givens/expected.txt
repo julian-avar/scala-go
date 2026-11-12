@@ -1,0 +1,18 @@
+givens: 9 pear List(1, 3)
+using: List(3, 2, 1) List(c, b, a)
+summon: -1 1
+extension in given: true false true
+explicit using: 2
+lazy given: before 0
+verbose=true verbose=true created 1
+local given: verbose=false
+extensions: HI! List(a, b, c) 2 List(x, yyy) 10 DIRECT!
+conversion: 21.0C 1.5C
+implicit class: 3 a, b a | b label #5
+context function: 42 Vector(start, id 7)
+context function value: 10
+NotGiven: a value type a reference type a reference type
+CanEqual: true false false true
+derived instances: 6 ab (3,xy)
+ClassTag: s,s,s 14 java.lang.String int scala.collection.immutable.List [I
+ClassTag newArray: 3 true

@@ -1,0 +1,28 @@
+values: List(Red, Green, Blue) ordinals: List(0, 1, 2)
+valueOf: Green fromOrdinal: Blue companion: Some(Blue)
+valueOf missing: enum Color has no case with name: Purple
+fromOrdinal missing: java.util.NoSuchElementException enum Color has no case with ordinal: 5
+methods: List(true, false, false)
+identity: true true true
+class names: Color$$anon$1 true Color
+type tests: true true true
+productPrefix: Red Nn
+match: blue
+planet: Mercury 0 3.70
+planet: Earth 1 9.80
+adt: Sm(41) Sm(42) Nn Nn 41 0
+adt members: 0 1 41 true -255058844 Sm(1) Sm(41)
+adt class names: Opt$Sm Opt$$anon$4
+tree: Node(Leaf(1),Node(Leaf(2),Leaf(3))) sum 6
+tree of doubles: 3.75
+mixed: List(Active:A:0, Suspended(late):S:1, Closed:C:2)
+enum as trait: S true
+derives CanEqual: East North true
+java enum: Medium 1 -2 List(Low, Medium, High) High
+java enum sorted: List(Low, Medium, High)
+java enum class: true
+opaque: 3.5m 3.5 true java.lang.Double
+opaque bounded: List(1, 2, 3) 6 Some(17) None None
+opaque string: Hello, Ada true
+opaque array: 2
+opaque in collections: 3.0 List(1.0m, 2.0m)

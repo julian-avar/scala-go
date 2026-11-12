@@ -1,0 +1,25 @@
+constructors: 100.0C 2 0.0C 1
+inner: alpha.1 (secret 5) beta.2 (secret 4) true beta
+projection: List(1, 2)
+type member: 3 List(3, 1, 2)
+dispatch: base secret | [sub hook, protected] | fixed | sub secret
+case class: Point(1,2) true true false Point(2,4)
+hashCode: -694993394 -704392347 -1023605901 67081517 509450219 668061469
+copy: Point(1,9) Person(Bo,4,List(a))
+product: 2 2 Point List(x, y) List(1, 2)
+unapply: Cy 40 List(x, y) Point(1,2)
+companion: Point(3,4) Point(5,6) List(Point(7,8))
+defaults: Person(Di,5,List()) Box(List(1)) Box(null) Empty() Singleton WithBody<3> 6
+var field: Mutable(2) false true
+equality across types: true false false
+canEqual: true false
+sets of case classes: 2
+plain equality: false true
+value class: 3.5m List(3.5, 0.0) true true
+before Lazy
+Lazy: constructing
+Lazy: ready ready
+object: 1 2 true
+concurrent construction: 1 construction(s), sum 168
+static: 2 2 static label
+companion: MAIN 2

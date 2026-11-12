@@ -1,0 +1,15 @@
+linearization: log(t:X) log(T:X)
+super[T]: D(B, C, C)
+super chain: List(D, C, B, A)
+stackable: 2 4 | 1 3
+trait parameters: How do you do, Bob
+How do you do, Bob Bob true
+init order: InitBase, InitA, InitB, InitC sees a, InitAll
+transparent: List(cat, dog) true
+universal trait: <W3>
+class over trait: trait+trait
+exports: printed a printed b 2 scanned printer: 2, scanner ok
+exported object members: 42 utils
+traits as functions: cba abab XYXY
+type tests: List((true,true), (false,false), (true,false))
+trait dispatch: List(log(t:M), log(m), log(M))

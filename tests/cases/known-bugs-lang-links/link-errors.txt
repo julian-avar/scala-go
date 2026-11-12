@@ -1,0 +1,3 @@
+Main.scala:20:13: method getDeclaringClass()Ljava.lang.Class; not found in JavaStyle
+Main.scala:21:35: static method java.lang.Enum.valueOf(Ljava.lang.Class;Ljava.lang.String;)Ljava.lang.Enum; is not available
+library/src/scala/reflect/ClassTag.scala:71:32: method java.lang.Class.isInstance(Ljava.lang.Object;)Z is not available

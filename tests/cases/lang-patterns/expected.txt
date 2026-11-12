@@ -1,0 +1,22 @@
+eval: 10 0 9
+simplify: Num(7) Neg(Num(1))
+classify: List(zero, the answer, big even, even, half 15, small even, odd)
+seqs: empty list | one: 5 | starts with 1, then List(2, 3) | two: 4 5 | vector 1, rest Vector(3, 4) | int array 1 2 | seq 9 2 | other
+literals: long one | char c | double 2.5 | true | string str | stable identifier | null | unit | some int | long one
+typed: long string hello | short text hi | short text x | integral 3 | integral 4 | list of 2 | map of 1 | int array 3 | function | runtime exception bad | throwable Error | nested option 1 | nested tuple 1 2 3 | unknown
+switch: ArraySeq(1, 2, 3, 4, 0)
+unapplySeq: a quick,fox
+tuple extractor: user at example.com
+name-based: List(int 12, not x, not -3)
+product-like: key 5
+evaluation order: second unapply(5) guard1(5) guard2(5)
+binders: List(1, 2, 3) 1 List(2, 3)
+binder in extractor: Num(3) 3
+MatchError: 3.5 (of class java.lang.Float)
+MatchError of a case class: Num(1) (of class Num)
+definitions: 1 2 3 4
+for patterns: List(1=one, 3=three) List(1, 3)
+partial functions: true false List(positive 1, string a) fallback -1 None else -5
+pattern-matching lambdas: 6
+regex: 15/03/2024
+interpolator pattern: Ada 37

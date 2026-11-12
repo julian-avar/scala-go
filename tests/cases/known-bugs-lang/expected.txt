@@ -1,0 +1,1 @@
+line of a throw in inlined code: 6

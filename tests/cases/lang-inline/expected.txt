@@ -1,0 +1,18 @@
+inline parameters: 10 2 evaluation(s), 10 1 evaluation(s)
+inline if: then-branch else-branch 6
+transparent inline: 1 [] false
+inline match: 1 8 -1
+recursive inline: 3628800
+constValue: 3 5 99 None literal
+constValueTuple: (1,two,true)
+summonFrom: ordered (true) unordered
+summonInline: -1
+codeOf: 1 + 2 * 3
+derives: Person(name="Ann", age=30, admin=yes)
+derives sum: List(Circle(radius=1), Square(side=2, tags=["a", "b"]))
+fromProduct: Person(Bo,7,false) Person(Cy,8,true)
+ordinal: List(0, 1)
+tuple of product: (Di,9,false)
+macro power: 1024.0 3.375 1.0
+macro fields: List(name, age, admin)
+macro debug: x.*(2) = 3.0

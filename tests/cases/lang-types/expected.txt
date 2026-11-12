@@ -1,0 +1,21 @@
+intersection: walks and swims
+union: int 1 string a null
+union of classes: List(cat Tom, dog Rex)
+type tests: List(true, false) List(true, true)
+match types: h 7 1.5 opt
+recursive match type: 3
+higher-kinded: List(2, 3) Some(4) Right(2) Left(err)
+kind polymorphism: box box box
+dependent: k1 k1
+polymorphic functions: 5 s (x,1)
+singleton types: 2 yes 3 1
+Selectable: Ann 31 greet(Bo)
+Dynamic: select anything apply method(1,a) named named(x=1,y=2) List((color,red), (size,3))
+tuples: (0,1,two,3.0) 4 1 (two,3.0) (1,two,3.0,x,y) List(1, two, 3.0) (3.0,two,1) two
+tuple ops: (1,two) (3.0) ((1,a),(two,b),(3.0,c)) (11,twotwo,3.03.0)
+TupleXXL: 25 25 scala.runtime.TupleXXL 325 true
+TupleXXL cons: 26 0 26
+tuple from array: (a,b) () (solo)
+named tuples: Paris 2100000 (Paris,2100000) (Paris,2100000)
+named destructuring: Paris 2100000
+named pattern: 2100000

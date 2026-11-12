@@ -1,0 +1,41 @@
+lone surrogate: length 1, code d800
+in text: 61 dc00 62
+pair: length 2, code point 1f600
+escapes: 9 a d 8 c 5c 22 27 41
+triple-quoted: 14 [a\nb "quoted" ]
+margin
+stripped
+raw\t2
+equal literals eq: true
+folded literal eq: true
+non-ASCII: 13 e9 2713
+chars: 97 0 65535 65536 10 '
+char arithmetic: 0 b
+ints: 255 -1 1000000 2147483647 -2147483648
+longs: 4294967295 -1 -9223372036854775808 1000000000000
+doubles: 1000.0 0.0015 0.5 1.0 200.0 0.30000000000000004 Infinity
+floats: 1.5 0.001 3.0 0.3 1.4E-45
+specials: NaN Infinity -Infinity -0.0 -Infinity true
+byte/short: 127 -128 127 -1
+folded: 44 -2147483648 -2147483648 -2147483648 -2147483648
+folded conversions: 2147483647 -2147483648 0 3 -3 66
+folded division: -3 -1 -9223372036854775808 -2147483648
+folded shifts: 2 2 -4 15
+identifiers: 15
+precedence: Vec(7,10)
+prefix: Vec(-1,-2)
+right-assoc: Vec(11,2)
+infix: 11 true
+precedence of ints: 5 8 true 9
+cons: List(0, 1, 2) List(1, 2, 3) List(-1, 1, 2)
+assignment operators: 5
+shadowed: inner
+restored: outer
+imports: ArrayBuffer(1, 2, 3) LinkedHashSet(3, 1, 2)
+nested defs: 12
+names: Main$ TopLevel TopLevelObject$
+nested: Main$Nested Main$Inner$ Main$Inner$Deeper
+local: Main$LocalC$1
+anonymous: Main$$anon$1 Main$$anon$2
+simple names: TopLevel Nested Deeper [] int[] String[]
+case class: Vec Vec$

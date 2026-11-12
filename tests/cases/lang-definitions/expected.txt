@@ -1,0 +1,27 @@
+balance: 30
+setter: requirement failed: negative balance -1
+volatile: true, transient: cached
+pattern vals: 3 2 1 List(2, 3) x 10 20
+pattern vars: 11 6
+before access: 0
+20 computed 1 computed 1 evaluations=1
+local lazy declared: []
+local lazy: 198 local lazy
+by-name: 42 eval,eval
+by-name skipped: skipped []
+by-name used: y [once]
+defaults: abc/4/1/t abc/5/2/t de/5/3/named xyz/1/0/t
+named order: n/1/4/T tag,name,size
+varargs: 0 1 6 6 9 10
+p(0):  | q(4): 1 two 3.0 null | a-b-c | x+y
+curried: 123 124 List(785, 786)
+tailrec: 500000500000 21
+targetName: 3 ab
+overloads: Int Long Double String Int Any Double
+bean: set 7 false
+@throws: thrown
+misc: 1 2 3 3 abc?
+@unchecked: 1
+given with @implicitNotFound: 5!
+closures over vars: 10
+alias: (1,one) scala.Tuple2

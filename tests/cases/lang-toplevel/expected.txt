@@ -1,0 +1,14 @@
+arguments: 0
+top-level val and def: Point(0,0) 5.0
+bounds: (Point(-1,-6),Point(5,4))
+top-level given: List(Point(-1,2), Point(3,4), Point(5,-6)) Point(5,-6)
+top-level opaque type: 3.1416
+before scaling
+Settings: initialized
+cyclic packages: Point(10,20)
+top-level var: 8
+class names: geometry.Point app.Settings$ geometry.Geometry$package$$anon$1 / geometry.Holder$
+anonymous class in a package: geometry.util.Util$package$$anon$1
+package-private: package-private
+package object: legacy helper 1 app.legacy.package$$anon$1
+main class: app.start
