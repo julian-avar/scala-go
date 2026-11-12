@@ -1,0 +1,7 @@
+parallel: sum 4950, 100 threads, main among them: false
+thread local: initial then goroutine's; main still has main's
+same thread twice: true, not main: true
+from a goroutine: List(1, 2, 3, 4, 5)
+to Go: 55
+Go mutex: 1225
+main ends

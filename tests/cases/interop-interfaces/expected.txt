@@ -1,0 +1,26 @@
+Square value 4
+Circle pointer 3
+Square value 9
+Circle pointer 12
+Tag value t
+string text
+nil
+another Shape 10
+total: 6.0
+a String as a Shape: throws java.lang.ClassCastException
+a Go struct without Area as a Shape: throws java.lang.ClassCastException
+a Scala object not extending Shape: throws java.lang.ClassCastException
+null as a Shape: nil
+identity: true false true
+stored: true Rect 1.0 x 1.0
+stored Go struct: 16.0 true
+named ada
+ada->eve (1); bob->eve (1)
+error: java.lang.IllegalArgumentException: no name
+eve->zoe (2)
+person:zoe
+"": empty (empty: true); "abc": ok; "abcd": java.lang.IllegalArgumentException: too long: abcd (empty: false)
+"abc": ok; "aBc": empty (empty: true)
+Rect: Shape true, Named false, Stringer false
+Person: Shape false, Named true, Stringer true
+isInstanceOf: true false true

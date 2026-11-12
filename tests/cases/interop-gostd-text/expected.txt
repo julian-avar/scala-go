@@ -1,0 +1,33 @@
+Split: [a,b,,c] [a,b,c]
+Index: 3 3 -1
+Count: 3 5 EqualFold: true
+Replace: oinky oinky oink moo moo
+Trim: [x y] [hixx] [abc]
+ToTitle: GRÜßE Compare: -1 ContainsRune: true
+Cut: k v=w true
+Builder: 7-x! 4
+Format: -ff 18446744073709551615 0.3333 1e+21 true
+Parse: -255 511 2500.0 true
+Quote: "héllo\n" "h\u00e9llo" '☺' a	b
+NumError: ParseInt 12x syntax true range false
+NumError: ParseInt 99999999999999999999 syntax false range true
+Append: n=42" q"
+Equal: true Compare: -1
+Fields: x|yy|z ToUpper: ABC
+Buffer: 18 [line one] 9
+Runes: 233,128512
+unicode: true false 196 true true
+utf8: 5 4 (233,2) true false 1114111
+AppendRune: x世
+Sort: a,bb,ccc,dddd true
+Reverse: dddd,ccc,bb,a
+Slice: [bob:25,alice:30,carol:35]
+Search: 2 2
+IntSlice: 3 2
+$12.34(s, plus: false) $12.34(v, plus: false) [     right]
+$12.34(d, plus: false) $12.34(d, plus: true)
+a1 2btruex 3|
+Sscanf: 3 42 apples 2.5
+>007
+errors: layer: base true true true
+Join: base / other true

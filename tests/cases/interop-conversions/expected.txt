@@ -1,0 +1,40 @@
+uint8: 44 255; int8: -56
+uint32: 4294967295; uint64: -1 1.8446744073709552E19
+int from double: 2 -2
+float32: 0.10000000149011612; bool: false
+duration: 1.5s 1000000000; defined float: 37.5
+as any: string hi
+as any: int32 42
+as any: int64 42
+as any: float64 1.5
+as any: float32 1.5
+as any: bool true
+as any: uint16 120
+as any: int8 3
+as any: int16 4
+as any: <nil> <nil>
+as any: string gö
+bytes: c3 a9 f0 9f 98 80 | 61 ef bf bd 62 | c3 a9
+invalid UTF-8: length 3, 61 fffd 62
+invalid UTF-8 as GoString: 3 bytes
+null String: throws java.lang.NullPointerException
+by value: 101 2, original 1
+by pointer: 101
+null by value: throws java.lang.NullPointerException
+result by value is a copy: 50 1
+result by pointer is shared: 60
+shared: 2,4,6
+copied: 1,2,3 -> 2,4,6
+null array is nil: true false
+seq: a+b+c, array: x+ü
+result shared: 105
+maps: a=1 b=3 | z=26
+none 0 []
+literal 3 [1 2 3]
+array 2 [4 5]
+seq 3 [6 7 8]
+triple: (1,two,true)
+constants: 1099511627776 7.0 conv 0.25 -3
+variable: 11 11
+send-only: List(1, 2, 3, 4)
+receive-only: 11

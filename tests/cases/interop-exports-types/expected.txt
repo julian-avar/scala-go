@@ -1,0 +1,27 @@
+2.5
+true -3 é -128 1.5
+GRÜSSE
+3
+[3 2 1] [1 2 3]
+[0 1 4 9]
+[0 0 0]
+["to" "be" "or"]
+6
+42
+<x><y>
+nil error
+error: from Go
+true from Scala
+7 13
+s-1-2
+rex says woof / rex / woof
+bit says yip / bit / yip
+pip says yip 2
+pip says yip
+true false
+before first use
+[scala] Registry initialized
+1
+2
+[scala] one; go after one
+[scala] two; go after two

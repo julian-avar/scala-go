@@ -1,0 +1,26 @@
+WaitGroup: 210 TryLock: true false
+Once runs once
+OnceValue: value 1 value 1 computed 1
+Map: (1,true) false LoadOrStore: 1 true
+Range: a=1,b=2
+RWMutex: true false
+Pool: fresh
+before cancel: null
+after cancel: context canceled true AfterFunc ran
+Value: req-7 null
+deadline set: true false
+after the timeout: true
+Cause: shutting down context canceled
+Date: 2024-03-09 14:30:05 +0000 UTC 2024-03-09T14:30:05Z 2:30PM Saturday day 69
+Add: 2024-04-09 16:0 745h30m0s true true
+Unix: 1970-01-01 00:00:00 +0000 UTC 1709994605
+Parse: 2023 December 31 February
+Parse failed: parsing time "31/12/2023" as "2006-01-02": cannot parse "31/12/2023" as "2006"
+In: 2024-03-09T16:30:05+02:00 UTC+2
+Duration: 1h15m30.5s 1.2584722222222222 75.50833333333334 1h15m0s 1h0m0s 1.5µs
+ParseDuration failed: time: invalid duration "forever"
+Inf: Infinity -Infinity true NaN: true
+limits: 9223372036854775807 -9223372036854775808 4294967295 1.7976931348623157E308 4.9E-324
+rounding: -2.0 -1.0 -1.0 3.0 2.0 -1.0
+functions: 1024.0 5.0 3.0 3.0 2.0 -3.0
+bits: 1.0 true 2.220446049250313E-16

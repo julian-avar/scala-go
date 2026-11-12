@@ -1,0 +1,25 @@
+{"name":"pen","note":null,"qty":2,"tags":["office","\u003cblue\u003e"]}
+{
+  "a": [
+    1.5,
+    true
+  ],
+  "b": 1
+}
+["x","y"]
+{}
+[1,2]
+TreeMap(name -> ink, none -> null, ok -> true, price -> 1.25, qty -> 3.0, tags -> Vector(a))
+Valid: true false
+Unmarshal failed: unexpected end of JSON input
+into *int: 42
+type error: json: cannot unmarshal string into Go value of type int
+stream: TreeMap(n -> 1.0) TreeMap(n -> 2.0) Vector(3.0)
+base64: aGVsbG8sIGfDtj8+ aGVsbG8sIGfDtj8- YQ
+decoded: hello
+corrupt: true illegal base64 data at input byte 1
+hex: 476f21 Go!
+invalid: true encoding/hex: invalid byte: U+007A 'z'
+odd length: true encoding/hex: odd length hex string
+00000000  30 31 32 33 34 35 36 37  38 39 61 62 63 64 65 66  |0123456789abcdef|
+00000010  58 59 5a                                          |XYZ|

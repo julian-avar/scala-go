@@ -1,0 +1,1 @@
+Go code calls Scala code from many goroutines, and Scala threads share Go channels with Go code.

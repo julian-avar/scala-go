@@ -1,0 +1,31 @@
+Parse("abc"): returns 3
+Parse(""): throws scalago.go.GoException: my error 400
+wrapped: 400 *fail.MyError my error 400
+Check(true): returns ()
+Check(false): throws scalago.go.GoException: check: base failure
+wraps ErrBase: true
+(Int, GoError): (2,null) my error 400
+GoError alone: null check: base failure
+nil *MyError: true *fail.MyError
+Scala GoError: true -1 false
+GoException message: scala error 2
+panic(string): throws java.lang.RuntimeException: boom
+panic(error): throws java.lang.RuntimeException: base failure
+panic(int): throws java.lang.RuntimeException: 42
+index out of range: throws java.lang.ArrayIndexOutOfBoundsException: Index 5 out of bounds for length 3
+nil dereference: throws java.lang.NullPointerException: null
+division by zero: throws java.lang.ArithmeticException: / by zero
+failed type assertion: throws java.lang.ClassCastException: interface conversion: interface {} is int32, not string
+scala: finally runs
+caught unwinding
+after the panic: 5
+scala: inner finally runs
+go: deferred call runs
+caught the same exception: true
+recovered error "java.lang.IllegalStateException: bad state"
+recovered go panic inside a callback
+scala: no exception
+no panic
+nil error
+"base failure" is base: true
+"java.lang.IllegalArgumentException: bad argument" is base: false

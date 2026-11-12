@@ -1,0 +1,33 @@
+kind: Pair(1, 2)
+kind: Pair(3, 4)
+kind: Stringer named n
+kind: Stringer info
+kind: error an error
+kind: null
+isInstanceOf: true true false
+null cast: null
+cast copy: 30 3
+bad cast: ClassCastException
+int32: Int 7, int64: Long 7, float64: Double 2.5, bool: Boolean true
+Go int: false false, as data: 7
+Go uint8: false, as data: 7
+Go string: false true, as data: go
+struct values: true false
+struct pointers: false true
+defined ints: true false
+different types: false false
+Go ints: true true
+slices: true false; maps: true
+hashes: true true true
+in a set: 2
+toString: an error | named n | debug | *vals.Pair@<hash>
+string interpolation: warn
+class: *vals.Pair
+class: vals.Pair
+class: int
+class: vals.Level
+class: []int
+class: map[string]int
+class: *errors.errorString
+synchronized: 400
+synchronized on a struct pointer

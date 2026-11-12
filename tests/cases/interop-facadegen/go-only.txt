@@ -1,0 +1,1 @@
+Calls a local Go module through facades generated from it (facades.txt).

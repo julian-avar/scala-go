@@ -1,0 +1,15 @@
+"xxx" <nil>
+EOF true true
+java.lang.IllegalArgumentException: negative: -1 false
+<nil>
+java.lang.IllegalStateException: empty
+called <nil>
+mine true
+wrapped: mine true
+255 <nil>
+true java.lang.NumberFormatException: For input string: "zz"
+recovered error: true java.lang.UnsupportedOperationException: boom
+[scala] finally runs
+go deferred call runs
+recovered: java.lang.IllegalStateException: bang
+still running

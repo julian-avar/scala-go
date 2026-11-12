@@ -1,0 +1,2 @@
+before
+panic: java.lang.IllegalStateException: from a goroutine

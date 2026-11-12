@@ -1,0 +1,33 @@
+int32 int64 int uint8 uint16 string []string map[string][]int32 chan float64 *bool
+make: length 2 capacity 4 0,0 empty true
+append within capacity: a=0,0,2 b=0,0,2
+append beyond capacity copies: 1,2 / 10,2,3
+appendedAll: 1,2,3
+slice: 2,3 capacity 3; reslice within capacity: 2,3,4
+index -1: throws ArrayIndexOutOfBoundsException
+write out of range: throws ArrayIndexOutOfBoundsException
+copy: 2
+toSeq/toArray: Vector(a, b) ArraySeq(1.5, 2.5)
+uint64: -1 uint32: -1 byte: 255 -1
+NaN key: None size 2; -0.0 is 0.0: Some(3)
+apply: 1 getOrElse: -1 contains: true
+missing key: throws NoSuchElementException
+toMap: List((a,1), (b,2)) keys: List(a, b)
+nested: 2
+negative capacity: throws IllegalArgumentException
+unbuffered: trySend false tryReceive None capacity 0
+buffered: length 1 tryReceive Some(x) then None
+closed: receive Some(y) then None tryReceive None
+close twice: throws RuntimeException
+send on closed: throws RuntimeException
+trySend on closed: throws RuntimeException
+for over a channel: 6
+receive interrupted
+box 1, box 2, box 3
+pointers: a ab zero: [] false 0.0
+nil pointer: isNil true
+get through nil: throws NullPointerException
+pointer to a slice: 1,2,3
+null slice: throws NullPointerException
+TreeMap(1 -> null, 10 -> TreeMap(k -> Vector(1.5)), 2 -> x)
+Vector(TreeMap(value -> 1), TreeMap(value -> r))

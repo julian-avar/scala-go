@@ -1,0 +1,30 @@
+ReadAll: abcd
+LimitReader: abc
+scala, then go, then scala
+copied to standard output
+26 bytes copied
+Fprintln to os.Stdout 1 true
+Pipe: chunk 1;chunk 2;chunk 3;
+lines: one|two||three
+words: to|be|or|not
+pairs: ab|cd|e
+ReadString: [first]
+at the end: true EOF
+scala first (16 bytes buffered)
+buffered by Go, flushed
+Getenv: from env.txt [] (,false)
+ReadFile: bee
+Stat: a.txt 3 false false -rw-r--r--
+missing: true true
+walk: . dir=true
+walk: b.txt dir=false
+walk: sub dir=true
+walk: sub/a.txt dir=false
+Glob: b.txt
+path: a/c/d y.tar.gz .gz a/b /x (a/b/,c) true true
+filepath: ../c/d (/x/,y.txt) a/b false a/b 2
+Values: a=1&a=x+y&b=two&c=3 1
+ParseQuery: é
+escape: a+b%26c a%20b%2Fc
+ResolveReference: https://example.com/a/d?r=2 true
+built: https://me:secret@go.dev/doc

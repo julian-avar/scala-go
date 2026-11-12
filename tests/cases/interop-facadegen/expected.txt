@@ -1,0 +1,19 @@
+util a / util b
+NewError: a value
+Validate: empty input
+Open: no name
+conn: db 2 base 2 Err null
+closed: base 7 Err closed
+Close again: true
+variables: default 0
+assigned: changed 5
+constants: 3.14 42 hi 4611686018427387904 true red none
+interfaces: 4.0 square 5.0
+Visit: 2
+Visit failed: visiting xena: closed
+visiting ann
+visiting bob
+visiting xena
+visiting zed
+Visit with a lambda: 4
+Join: a+b=2

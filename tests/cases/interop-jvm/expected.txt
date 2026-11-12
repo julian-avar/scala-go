@@ -1,0 +1,7 @@
+42 "tab\there \"q\""
+function: true
+constant: true
+method: true
+key not found key not found true
+matched key not found
+3 abc 3

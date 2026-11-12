@@ -1,0 +1,1 @@
+Calls a local Go module and Go's slices and cmp packages through facades.

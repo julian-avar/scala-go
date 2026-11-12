@@ -1,0 +1,1 @@
+Pins known bugs of Go interop: the comments give the correct results.

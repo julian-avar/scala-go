@@ -1,0 +1,15 @@
+Map: #1,#22,#333
+Map: 1,2,3
+First: (x,true) false (5,true)
+Larger: 7 pear -0.5
+TypeOf: int64 int32 int string []uint8
+Describe: says (1, 2) / says 21.5°C
+Count: 2
+Ptr: 42
+Reverse: c,b,a
+BinarySearch: (1,true) (1,false)
+Equal: true false
+IndexFunc: 2
+Insert: 1,10,11,22,333
+Clone: 3 2
+Compare: -1 1 -1 0

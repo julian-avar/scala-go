@@ -1,0 +1,4 @@
+gears Futures run on goroutines, with channels that Go goroutines feed. One benign race in gears
+itself is tolerated (see gears/race.txt): Future's AwaitListener.complete writes `state` after
+resuming the waiting thread, which then reads it.
+allow-race: Impl_gears_dasync_dFuture_SRunnableFuture_SFutureAsync_SAwaitListener__state_p_rI

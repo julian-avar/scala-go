@@ -1,0 +1,19 @@
+defined func type: 7
+closure: A!,B!,C!
+null is a nil func: true false
+0 parameters: zero (<Go func>)
+2 parameters: 42
+3 parameters: abc
+nil func: true
+composed: 50 List(20, 30)
+round trip: 15
+ok: 25
+error: java.lang.ArithmeticException: / by zero
+error: from Go's errors
+two results: GO/2
+scala before; scala callback 0 x; go after 0
+scala callback 1 y; go after 1
+scala after
+arg1 arg2 arg3 go says 1 2 3
+receiver arg4 arg5 = 45
+receiver value assigned 7

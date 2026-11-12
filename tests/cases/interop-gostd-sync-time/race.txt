@@ -1,0 +1,1 @@
+Scala closures run on goroutines that sync.WaitGroup.Go and context.AfterFunc start.

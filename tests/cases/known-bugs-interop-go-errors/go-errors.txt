@@ -1,0 +1,1 @@
+does not match inferred type func(int) U for func(T) U

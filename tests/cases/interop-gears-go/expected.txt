@@ -1,0 +1,8 @@
+squares: 204
+from Go: List(1, 2, 3, 4, 5)
+in a Future: 5050
+cancelled receive: CancellationException
+race: Some(timeout)
+cancelled context: CancellationException context canceled
+already cancelled: CancellationException
+background: 81

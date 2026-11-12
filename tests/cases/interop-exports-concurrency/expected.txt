@@ -1,0 +1,8 @@
+v0 v3 v9 initialized 1 time(s)
+first goroutine: 3
+second goroutine: 1
+1 1
+2
+results for go <nil>
+true java.util.concurrent.CancellationException: Go context done: context deadline exceeded true
+true
