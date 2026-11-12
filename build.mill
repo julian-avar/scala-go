@@ -205,8 +205,9 @@ object gears extends WithPlugin with Published {
   }
 }
 
-/** Facades of the most-used Go standard library packages (`scalago.gostd`), generated from the
- *  packages' APIs by FacadeGen, with the types of other packages that they use.
+/** Facades of the whole Go standard library (`scalago.gostd`), generated from the packages' APIs
+ *  by FacadeGen: one object per package, named after it. `mill gostd.usage.goBuild` checks every
+ *  member: it links and builds a program that uses them all.
  */
 object gostd extends WithPlugin with Published {
   def artifactName = "scalago-gostd"
@@ -214,25 +215,60 @@ object gostd extends WithPlugin with Published {
   // Generated code: unused-parameter warnings would be noise.
   def scalacOptions = Task { Seq("-deprecation", "-feature") ++ pluginOptions() }
 
-  def goPackages = Seq(
-    "bufio", "bytes", "context", "encoding/base64", "encoding/hex", "encoding/json", "errors", "fmt", "io",
-    "math", "net/url", "os", "path", "path/filepath", "sort", "strconv", "strings", "sync", "time",
-    "unicode", "unicode/utf8"
-  )
-
   /** The Go that the facades are generated from: a new release has new API, so it is an input. */
   def goVersion = Task.Input {
     os.proc("go", "version").call(env = Task.env).out.text().trim
   }
 
-  def generatedSources = Task {
+  /** Every package of the standard library that other modules can import (`go list std` without
+   *  `internal` and `vendor` packages, and `unsafe`, whose pointers Scala cannot hold).
+   */
+  def goPackages = Task {
     goVersion()
+    os.proc("go", "list", "std").call(env = Task.env).out.lines()
+      .filter(p => p != "unsafe" && !p.split('/').exists(e => e == "internal" || e == "vendor"))
+  }
+
+  /** The objects of the packages whose names other packages share, as Go import aliases name them.
+   *  `encoding/json` keeps `json`.
+   */
+  def goPackageNames = Map(
+    "crypto/rand" -> "cryptorand",
+    "math/rand" -> "mathrand",
+    "math/rand/v2" -> "randv2",
+    "encoding/json/v2" -> "jsonv2",
+    "go/scanner" -> "goscanner",
+    "text/scanner" -> "textscanner",
+    "html/template" -> "htmltemplate",
+    "text/template" -> "texttemplate",
+    "net/http/pprof" -> "httppprof",
+    "runtime/pprof" -> "runtimepprof"
+  )
+
+  def generatedSources = Task {
     // Task.env is the environment of the `mill` command (a Mill daemon outlives its shell).
+    val packages = goPackages().map(p => goPackageNames.get(p).fold(p)(name => s"$p=$name"))
     os.proc(
       "java", "-cp", linker.runClasspath().map(_.path).mkString(java.io.File.pathSeparator),
-      "scalago.linker.FacadeGen", "--out", Task.dest, "--package", "scalago.gostd", goPackages
+      "scalago.linker.FacadeGen", "--out", Task.dest, "--package", "scalago.gostd", packages
     ).call(stdout = os.Pipe, env = Task.env)
     Seq(PathRef(Task.dest))
+  }
+
+  /** A program that uses every member of the facades (in code that never runs): building it
+   *  (`mill gostd.usage.goBuild`) checks that the linker accepts them all and Go compiles the result.
+   */
+  object usage extends InBuildScalaGoModule {
+    override def moduleDeps = Seq(library, gostd)
+    def sources = Task.Sources()
+    def generatedSources = Task {
+      os.proc(
+        "java", "-cp", linker.runClasspath().map(_.path).mkString(java.io.File.pathSeparator),
+        "scalago.linker.FacadeUsage", "--classpath", gostd.compile().classes.path, "--package", "scalago.gostd",
+        "--out", Task.dest / "Main.scala"
+      ).call()
+      Seq(PathRef(Task.dest))
+    }
   }
 }
 
@@ -454,7 +490,7 @@ object examples extends Module {
   object gin extends InBuildScalaGoModule {
     override def moduleDeps = Seq(library, gostd)
     def goRequires = Seq("github.com/gin-gonic/gin@v1.12.0")
-    def goFacadePackages = Seq("net", "net/http", "github.com/gin-gonic/gin")
+    def goFacadePackages = Seq("github.com/gin-gonic/gin")
 
     def check() = Task.Command {
       val output = os.proc(goBuild().path, "--self-test").call().out.text()
