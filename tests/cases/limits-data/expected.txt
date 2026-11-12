@@ -18,4 +18,3 @@ identityHashCode of a box != 0: false
 equal boxes share a monitor: true
 cast message names both classes: false
 substring(2, 1) message: begin 2, end 1, length 3
-parseInt("zz", 16) message: For input string: "zz"

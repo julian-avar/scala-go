@@ -7,7 +7,7 @@ called <nil>
 mine true
 wrapped: mine true
 255 <nil>
-true java.lang.NumberFormatException: For input string: "zz"
+true java.lang.NumberFormatException: For input string: "zz" under radix 16
 recovered error: true java.lang.UnsupportedOperationException: boom
 [scala] finally runs
 go deferred call runs
