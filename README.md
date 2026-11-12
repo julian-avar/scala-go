@@ -123,6 +123,13 @@ and runs the binary. Both outputs must equal `expected.txt`. Optional files chan
 | `library.txt`       | links the case as a library, used by the Go program in `consumer/`      |
 | `<dir>/go.mod`      | a subdirectory with a `go.mod` is a local Go module                     |
 
+Cases named `limits-*` and `known-bugs*` pin what does not work: each limitation in
+[Limitations](docs/_docs/user/limitations.md) and the not-planned list in
+[design.md](docs/design.md#status), and each known bug in the [roadmap](docs/roadmap.md#known-bugs).
+They expect the failure (an error file, or `expected.txt` holding today's Go output, with the
+JVM's in comments). A change that lifts a limitation or fixes a bug makes its case fail: move the
+check to a case that runs on the JVM and Go, and update the documentation.
+
 | Variable                    | Effect                                                          |
 |-----------------------------|-----------------------------------------------------------------|
 | `SCALAGO_TEST_ONLY`         | runs only the named cases: `SCALAGO_TEST_ONLY=regex,traits`     |

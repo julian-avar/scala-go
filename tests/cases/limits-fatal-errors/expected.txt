@@ -1,0 +1,4 @@
+exit status: 2
+fatal error: stack overflow
+caught StackOverflowError: false
+buffered output printed: false

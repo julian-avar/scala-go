@@ -46,7 +46,8 @@ Design questions, decided by default unless changed:
 ## M0: Correct
 
 Every item is a silent or surprising deviation from the JVM. The spec marks each as
-**Deviation (bug)**. Each fix adds an end-to-end case run on both the JVM and Go.
+**Deviation (bug)**. The `known-bugs*` end-to-end cases pin each bug's current behavior, so a fix
+makes its case fail: move the check to a case run on both the JVM and Go.
 
 ### Known bugs
 

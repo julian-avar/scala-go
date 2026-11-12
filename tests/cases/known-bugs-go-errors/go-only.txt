@@ -1,0 +1,1 @@
+Linking succeeds; go vet fails.

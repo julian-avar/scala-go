@@ -9,7 +9,8 @@ What scala-go cannot do yet, by area, with workarounds. What runs but behaves di
 missing pieces by priority and lists known bugs.
 
 Using an API scala-go does not implement is a link error that names it, not a silent difference
-at run time ([Troubleshooting](troubleshooting.md#link-errors)).
+at run time ([Troubleshooting](troubleshooting.md#link-errors)). Each limitation here is checked
+by an end-to-end test (`tests/cases/limits-*`) that expects it to fail.
 
 ## Language and runtime
 

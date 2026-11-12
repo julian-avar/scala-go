@@ -1,0 +1,2 @@
+Main.scala:9:64: cannot use this (variable of type *S_BigInteger10) as *rt.BigInteger value in argument to rt.BigIntegerAdd
+Main.scala:20:71: cannot call pointer method UnmarshalText on slog.Level

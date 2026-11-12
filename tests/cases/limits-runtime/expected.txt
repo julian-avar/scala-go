@@ -1,0 +1,18 @@
+resource found: false
+Class.forName of a missing class: no.such.Class
+weak reference cleared: false
+WeakHashMap size: 1
+finalized: false
+parallel stream used other threads: false
+Array[String] class: [Ljava.lang.Object;
+Arrays.copyOf class: [Ljava.lang.Object;
+toArray class: [Ljava.lang.Object;
+ClassTag newArray class: [Ljava.lang.Object;
+Integer.valueOf(1000) eq Integer.valueOf(1000): true
+same boxed NaN == itself: false
+lambda toString: <function1>
+@native method: throws java.lang.RuntimeException: native method stub
+NPE message: throws java.lang.NullPointerException
+charAt(5): throws java.lang.StringIndexOutOfBoundsException: index 5, length 3
+java.version is null: true
+java.specification.version is null: true

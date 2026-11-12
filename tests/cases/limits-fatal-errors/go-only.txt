@@ -1,0 +1,1 @@
+Pins Go's fatal errors; the child process runs the Go binary itself.

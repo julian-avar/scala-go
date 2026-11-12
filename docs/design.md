@@ -990,7 +990,11 @@ What works is documented for users in [The JDK](_docs/libraries/jdk.md),
 [Scala libraries](_docs/libraries/scala.md), [Differences from the JVM](_docs/user/differences.md) and
 [Limitations](_docs/user/limitations.md); the sections above list the smaller differences per area.
 Features are covered by end-to-end tests (`tests/cases`: each program runs as Go, and on the JVM
-unless it calls Go, against the same expected output) and by `examples/`.
+unless it calls Go, against the same expected output) and by `examples/`. What does not work is
+pinned by tests too: the `limits-*` cases expect each limitation below and in
+[Limitations](_docs/user/limitations.md) to fail (a compile or link error, or today's output),
+and the `known-bugs*` cases pin each [known bug](roadmap.md#known-bugs). Lifting a limitation
+or fixing a bug makes its case fail, so the documentation is updated with it.
 
 These limitations follow from the design and are not planned to change:
 

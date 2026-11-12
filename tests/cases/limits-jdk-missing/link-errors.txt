@@ -1,0 +1,79 @@
+Main.scala:7:13: class java.util.Scanner is not available (no IR)
+Main.scala:7:49: method java.util.Scanner.nextInt()I is not available (no IR and no native implementation)
+Main.scala:8:13: class java.util.Formatter is not available (no IR)
+Main.scala:8:45: method java.util.Formatter.format(Ljava.lang.String;[Ljava.lang.Object;)Ljava.util.Formatter; is not available (no IR and no native implementation)
+Main.scala:9:37: static method java.util.EnumSet.noneOf(Ljava.lang.Class;)Ljava.util.EnumSet; is not available
+Main.scala:10:13: class java.util.EnumMap is not available (no IR)
+Main.scala:11:43: static method java.util.Calendar.getInstance()Ljava.util.Calendar; is not available
+Main.scala:12:13: class java.util.Timer is not available (no IR)
+Main.scala:13:43: static method java.util.Currency.getInstance(Ljava.lang.String;)Ljava.util.Currency; is not available
+Main.scala:14:41: static method java.util.ServiceLoader.load(Ljava.lang.Class;)Ljava.util.ServiceLoader; is not available
+Main.scala:15:47: static method java.util.ResourceBundle.getBundle(Ljava.lang.String;)Ljava.util.ResourceBundle; is not available
+Main.scala:16:37: static method java.util.Arrays.compare([I[I)I is not available
+Main.scala:17:38: static method java.util.Arrays.mismatch([I[I)I is not available
+Main.scala:19:47: static method java.util.logging.Logger.getLogger(Ljava.lang.String;)Ljava.util.logging.Logger; is not available
+Main.scala:21:47: static method java.text.NumberFormat.getInstance()Ljava.text.NumberFormat; is not available
+Main.scala:21:56: method java.text.NumberFormat.format(J)Ljava.lang.String; is not available (no IR and no native implementation)
+Main.scala:22:13: class java.text.DecimalFormat is not available (no IR)
+Main.scala:22:59: method java.text.DecimalFormat.format(D)Ljava.lang.String; is not available (no IR and no native implementation)
+Main.scala:23:13: class java.text.SimpleDateFormat is not available (no IR)
+Main.scala:23:58: method java.text.SimpleDateFormat.format(Ljava.util.Date;)Ljava.lang.String; is not available (no IR and no native implementation)
+Main.scala:24:43: static method java.text.MessageFormat.format(Ljava.lang.String;[Ljava.lang.Object;)Ljava.lang.String; is not available
+Main.scala:25:43: static method java.text.Normalizer.normalize(Ljava.lang.CharSequence;Ljava.text.Normalizer$Form;)Ljava.lang.String; is not available
+Main.scala:25:75: static field java.text.Normalizer$Form.NFD is not available
+Main.scala:26:43: static method java.text.Collator.getInstance()Ljava.text.Collator; is not available
+Main.scala:27:52: static method java.text.BreakIterator.getWordInstance()Ljava.text.BreakIterator; is not available
+Main.scala:29:26: method java.lang.String.formatted([Ljava.lang.Object;)Ljava.lang.String; is not available (no native implementation)
+Main.scala:30:31: method java.lang.String.stripLeading()Ljava.lang.String; is not available (no native implementation)
+Main.scala:31:32: method java.lang.String.stripTrailing()Ljava.lang.String; is not available (no native implementation)
+Main.scala:32:28: method java.lang.String.stripIndent()Ljava.lang.String; is not available (no native implementation)
+Main.scala:33:23: method java.lang.String.indent(I)Ljava.lang.String; is not available (no native implementation)
+Main.scala:34:36: method java.lang.String.translateEscapes()Ljava.lang.String; is not available (no native implementation)
+Main.scala:35:32: method java.lang.String.codePointCount(II)I is not available (no native implementation)
+Main.scala:36:31: method java.lang.String.contentEquals(Ljava.lang.CharSequence;)Z is not available (no native implementation)
+Main.scala:37:30: static method java.lang.Character.getType(C)I is not available
+Main.scala:38:34: static method java.lang.Character.toTitleCase(C)C is not available
+Main.scala:39:30: static method java.lang.Character.toChars(I)[C is not available
+Main.scala:40:38: static method java.lang.Character.getNumericValue(C)I is not available
+Main.scala:41:39: static method java.lang.Character.isValidCodePoint(I)Z is not available
+Main.scala:42:38: static method java.lang.Character$UnicodeBlock.of(C)Ljava.lang.Character$UnicodeBlock; is not available
+Main.scala:43:39: static method java.lang.Character$UnicodeScript.of(I)Ljava.lang.Character$UnicodeScript; is not available
+Main.scala:44:26: static method java.lang.Math.copySign(DD)D is not available
+Main.scala:45:21: static method java.lang.Math.fma(DDD)D is not available
+Main.scala:46:30: static method java.lang.Math.multiplyHigh(JJ)J is not available
+Main.scala:47:27: static method java.lang.Math.nextAfter(DD)D is not available
+Main.scala:48:31: static method java.lang.Math.IEEEremainder(DD)D is not available
+Main.scala:49:23: static method java.lang.Math.scalb(DI)D is not available
+Main.scala:50:29: static method java.lang.Math.getExponent(D)I is not available
+Main.scala:51:25: static method java.lang.Math.ceilDiv(II)I is not available
+Main.scala:52:37: static method java.lang.Integer.parseUnsignedInt(Ljava.lang.String;)I is not available
+Main.scala:53:45: static method java.lang.Long.parseUnsignedLong(Ljava.lang.String;)J is not available
+Main.scala:54:27: static method java.lang.System.console()Ljava.io.Console; is not available
+Main.scala:55:22: static method java.lang.System.gc()V is not available
+Main.scala:56:35: static method java.lang.System.runFinalization()V is not available
+Main.scala:57:13: method getStackTrace()[Ljava.lang.StackTraceElement; not found in java.lang.Thread
+Main.scala:58:13: method getContextClassLoader()Ljava.lang.ClassLoader; not found in java.lang.Thread
+Main.scala:59:13: static method java.lang.Thread.getAllStackTraces()Ljava.util.Map; is not available
+Main.scala:60:62: method activeCount()I not found in java.lang.ThreadGroup
+Main.scala:61:60: method enumerate([Ljava.lang.Thread;)I not found in java.lang.ThreadGroup
+Main.scala:63:13: class java.lang.ref.PhantomReference is not available (no IR)
+Main.scala:64:41: static method java.lang.ref.Cleaner.create()Ljava.lang.ref.Cleaner; is not available
+Main.scala:65:60: method poll()Ljava.lang.ref.Reference; not found in java.lang.ref.ReferenceQueue
+Main.scala:67:60: method parallel()Ljava.util.stream.IntStream; not found in java.util.stream.IntStream
+Main.scala:69:13: class java.util.concurrent.SubmissionPublisher is not available (no IR)
+Main.scala:71:13: class java.util.jar.JarFile is not available (no IR)
+Main.scala:72:13: class java.util.jar.JarInputStream is not available (no IR)
+Main.scala:74:13: class java.net.DatagramSocket is not available (no IR)
+Main.scala:75:49: static method java.nio.channels.SocketChannel.open()Ljava.nio.channels.SocketChannel; is not available
+Main.scala:76:49: static method javax.net.ssl.SSLContext.getInstance(Ljava.lang.String;)Ljavax.net.ssl.SSLContext; is not available
+Main.scala:77:44: static method javax.crypto.Cipher.getInstance(Ljava.lang.String;)Ljavax.crypto.Cipher; is not available
+Main.scala:78:48: static method java.security.Signature.getInstance(Ljava.lang.String;)Ljava.security.Signature; is not available
+Main.scala:79:55: static method java.security.KeyPairGenerator.getInstance(Ljava.lang.String;)Ljava.security.KeyPairGenerator; is not available
+Main.scala:80:47: static method java.security.KeyStore.getInstance(Ljava.lang.String;)Ljava.security.KeyStore; is not available
+Main.scala:81:13: class java.net.HttpCookie is not available (no IR)
+Main.scala:82:13: static method java.net.ProxySelector.getDefault()Ljava.net.ProxySelector; is not available
+Main.scala:83:13: class java.net.CookieManager is not available (no IR)
+Main.scala:84:56: method proxy(Ljava.net.ProxySelector;)Ljava.net.http.HttpClient$Builder; not found in java.net.http.HttpClient$Builder
+Main.scala:85:64: method cookieHandler(Ljava.net.CookieHandler;)Ljava.net.http.HttpClient$Builder; not found in java.net.http.HttpClient$Builder
+Main.scala:86:64: method authenticator(Ljava.net.Authenticator;)Ljava.net.http.HttpClient$Builder; not found in java.net.http.HttpClient$Builder
+library/src/scala/io/Source.scala:226:109: method getContextClassLoader()Ljava.lang.ClassLoader; not found in java.lang.Thread
