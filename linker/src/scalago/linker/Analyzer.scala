@@ -137,7 +137,7 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
       case LoadModule(cls) if program.isFacade(cls) =>
         error(tree, s"the Go package facade $cls can only be used to call its members")
 
-      case Apply(receiver, decl, m, args, _) if program.facadeMember(decl, m).isDefined =>
+      case app @ Apply(receiver, decl, m, args, _) if program.facadeMember(decl, m).isDefined =>
         val (facade, member) = program.facadeMember(decl, m).get
         useFacade(decl)
         useFacade(facade.name)
@@ -151,6 +151,10 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
             case Some(array) => scan(array)
             case None        => scan(arg)
         useScalaType(g.result, toScala = true)
+        // Type parameters' values go both ways (`slices.Index[E](s, v E)`, `slices.Max[E]: E`).
+        for (_, t) <- app.typeArgs do
+          useScalaType(t, toScala = true)
+          useScalaType(t, toScala = false)
         reachGoException()
 
       case ApplyStatically(receiver, cls, m, args, _) if program.isFacade(cls) =>
@@ -286,6 +290,7 @@ final class Analyzer(program: Program, lambdas: Lambdas, errors: Errors, missing
           args.foreach(useScalaType(_, toScala))
     case ScalaType.Arr(elem) => useScalaType(elem, toScala)
     case ScalaType.Prim(_)   => ()
+    case ScalaType.Param(_)  => ()
 
   /** Makes reachable what an export's conversions need (Go arguments to Scala, result to Go). */
   def useExport(e: GoExport): Unit =

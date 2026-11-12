@@ -34,6 +34,8 @@ object GoType:
   given GoType[String] = basic("scala.String")
   given GoType[Any] = basic("any")
   given GoType[GoError] = basic("error")
+  given GoType[Unit] = basic("struct{}")
+  given GoType[GoComplex] = basic("complex128")
 
   given slice[T](using elem: GoType[T]): GoType[GoSlice[T]] = GoNatives.sliceType(elem.underlying)
   given map[K, V](using key: GoType[K], value: GoType[V]): GoType[GoMap[K, V]] = GoNatives.mapType(key.underlying, value.underlying)

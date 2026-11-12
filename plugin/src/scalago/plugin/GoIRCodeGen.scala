@@ -275,7 +275,9 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
         report.error("scala-go: unexpected definition in a Go facade", other.srcPos)
         Nil
     }
-    val withAliases = if facade.isPackage then facade.copy(typeAliases = typeAliases(sym)) else facade
+    val withAliases =
+      if facade.isPackage then facade.copy(typeAliases = typeAliases(sym))
+      else facade.copy(typeParams = atPhase(erasurePhase)(sym.typeParams).map(_.name.toString))
     ir.ClassDef(className(sym), classKind(sym), sym.is(Abstract), superClass, interfaces, Nil, methods, position(td),
       Some(withAliases))
 
@@ -301,18 +303,22 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
     locals = LocalNames()
     val params = dd.termParamss.flatten.map(p => ir.ParamDef(locals.define(p.symbol), toIRType(p.symbol.info)))
     // The signature before erasure: it keeps type arguments and opaque types such as GoString.
-    val (paramTypes, resultType, isProperty) = atPhase(erasurePhase)(sym.info) match
-      case ExprType(res)   => (Nil, res, true)
-      case mt: MethodType  => (mt.paramInfos, mt.resultType, false)
+    val (paramTypes, resultType, isProperty, typeParams) = atPhase(erasurePhase)(sym.info) match
+      case ExprType(res)   => (Nil, res, true, Nil)
+      case mt: MethodType  => (mt.paramInfos, mt.resultType, false, Nil)
       case pt: PolyType    =>
-        report.error("scala-go: Go facade members cannot have type parameters", dd.srcPos)
-        (Nil, pt.resultType, false)
-      case other           => (Nil, other, true)
+        val names = pt.paramNames.map(_.toString)
+        pt.resultType match
+          case mt: MethodType => (mt.paramInfos, mt.resultType, false, names)
+          case other =>
+            report.error("scala-go: generic Go facade members need a parameter list", dd.srcPos)
+            (Nil, other, true, names)
+      case other           => (Nil, other, true, Nil)
     resultType match
       case _: MethodType => report.error("scala-go: Go facade members can have at most one parameter list", dd.srcPos)
       case _             => ()
     val goName = goNameOf(sym).getOrElse(sym.name.toString.stripSuffix("_="))
-    val member = ir.GoMember(goName, paramTypes.map(scalaType), scalaType(resultType), isProperty)
+    val member = ir.GoMember(goName, paramTypes.map(scalaType), scalaType(resultType), isProperty, typeParams)
     Some(ir.MethodDef(methodName(sym), params, None, isStatic = false, isPrivate = false, position(dd), Some(member)))
 
   private def isNativeCall(tree: Tree): Boolean = tree match
@@ -330,6 +336,11 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
 
   private def scalaTypeBeforeErasure(tpe: Type)(using Context): ir.ScalaType =
     tpe match
+      // Type parameters of generic facade members (only their signatures have unbound ones) and
+      // classes, which uses instantiate.
+      case tp: TypeParamRef => ir.ScalaType.Param(tp.paramName.toString)
+      case tr: TypeRef if tr.symbol.is(TypeParam) && GoTypeArgs.isFacade(tr.symbol.owner) =>
+        ir.ScalaType.Param(tr.symbol.name.toString)
       case tr: TypeRef if tr.symbol.isAliasType || tr.symbol.isOpaqueAlias =>
         goOpaqueType(tr.symbol) match
           case Some(name) => ir.ScalaType.Ref(name, Nil)
@@ -347,6 +358,29 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
         else erasedScalaType(tpe)
       case _ => erasedScalaType(tpe)
 
+  /** A use of a generic facade must have its type arguments (a tree transformation that dropped
+   *  them would otherwise give Go code instantiated with the wrong types).
+   */
+  private def checkTypeArgs(tree: Apply): Unit =
+    val sym = tree.fun.symbol
+    if sym.exists && atPhase(erasurePhase)(GoTypeArgs.isFacade(sym.owner) && GoTypeArgs.isGeneric(sym)) &&
+        attachedTypeArgs(tree).isEmpty then
+      report.error("scala-go: the type arguments of this use of a generic Go facade were lost (a scala-go bug)", tree.srcPos)
+
+  /** The type arguments of a use of a generic facade (see [[GoTypeArgs]]), as Scala types. */
+  private def goTypeArgs(tree: Apply): List[(String, ir.ScalaType)] =
+    attachedTypeArgs(tree).fold(Nil)(_.map { (n, t) =>
+      // Nothing and Null have no Go type (`slices.Collect(null)` infers Nothing).
+      val arg = t.stripTypeVar.widenDealias
+      if arg.isExactlyNothing || arg.isNullType then
+        report.error(s"scala-go: the type argument of $n of this generic Go facade is ${arg.show}, which no Go type stands for", tree.srcPos)
+      n -> scalaType(t)
+    })
+
+  /** On the call, or on the selection that erasure made a call (`p.Value`). */
+  private def attachedTypeArgs(tree: Apply): Option[List[(String, Type)]] =
+    tree.getAttachment(GoTypeArgs.Key).orElse(tree.fun.getAttachment(GoTypeArgs.Key))
+
   /** The opaque types of `scalago.go` that stand for Go types (`GoString`, `GoSlice`, ...), by
    *  their full name. They are top-level definitions, so owned by package objects.
    */
@@ -355,7 +389,7 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
     Option.when(GoOpaqueTypes(name) && sym.owner.is(ModuleClass) &&
       sym.owner.owner.showFullName == "scalago.go")(s"scalago.go.$name")
 
-  private val GoOpaqueTypes = Set("GoString", "GoSlice", "GoMap", "GoChan", "GoPtr",
+  private val GoOpaqueTypes = Set("GoString", "GoSlice", "GoMap", "GoChan", "GoPtr", "GoComplex",
     "GoInt", "GoUint", "GoUint64", "GoUintptr", "GoUint32", "GoByte")
 
   private def scalaArg(arg: Type): ir.ScalaType = arg match
@@ -627,7 +661,9 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
               if e.tpe.isPrimitive then G.Box(e)(pos) else e
             }
             G.New(tuple, SpecializedTuples.constructor(args.size), elems)(pos)
-          case None => G.New(cls, methodName(sym), args.map(genExpr))(pos)
+          case None =>
+            checkTypeArgs(tree)
+            G.New(cls, methodName(sym), args.map(genExpr))(pos, goTypeArgs(tree))
 
       case _ if primitives.isPrimitive(tree.fun) =>
         genPrimitiveOp(tree)
@@ -652,7 +688,9 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
           val receiver = genExpr(receiverOf(tree.fun))
           if sym.is(Private) || sym.isConstructor then
             G.ApplyStatically(receiver, className(staticOwner(sym)), name, genArgs, name.result)(pos)
-          else G.Apply(receiver, className(staticOwner(sym)), name, genArgs, name.result)(pos)
+          else
+            checkTypeArgs(tree)
+            G.Apply(receiver, className(staticOwner(sym)), name, genArgs, name.result)(pos, goTypeArgs(tree))
 
   /** `handle.compareAndSet(obj, expected, update)` on a lazy val's `VarHandle`: an atomic
    *  compare-and-set of the (volatile) lazy val field.

@@ -980,7 +980,14 @@ object Natives:
       s"call0($O)$O" -> "rt.GoCall0",
       s"call1($O$O)$O" -> "rt.GoCall1",
       s"call2($O$O$O)$O" -> "rt.GoCall2",
-      s"call3($O$O$O$O)$O" -> "rt.GoCall3"
+      s"call3($O$O$O$O)$O" -> "rt.GoCall3",
+      s"complexMake(DD)$O" -> "rt.GoComplexMake",
+      s"complexReal($O)D" -> "rt.GoComplexReal",
+      s"complexImag($O)D" -> "rt.GoComplexImag",
+      s"complexAdd($O$O)$O" -> "rt.GoComplexAdd",
+      s"complexSub($O$O)$O" -> "rt.GoComplexSub",
+      s"complexMul($O$O)$O" -> "rt.GoComplexMul",
+      s"complexDiv($O$O)$O" -> "rt.GoComplexDiv"
     )
   do staticFn(GoNatives, desc, fn)
 

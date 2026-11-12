@@ -150,10 +150,10 @@ final class LinkContext(val program: Program, val analyzer: Analyzer, val errors
   val instanceTests = mutable.LinkedHashSet.empty[ClassName]
 
   /** A Go boolean expression testing whether `e` (any reference) is an instance of `t`. */
-  def typeTest(e: String, t: Type): String = t match
+  def typeTest(e: String, t: Type, pos: Position = Position.NoPosition): String = t match
     case Type.Class(ClassName.Object)           => s"($e != nil)"
     case Type.Class(c) if Hijacked.arrayAncestors(c) => s"(rt.IsArray($e) || ${classTypeTest(e, c)})"
-    case Type.Class(c) if program.isFacade(c)   => interop.typeTest(e, c)
+    case Type.Class(c) if program.isFacade(c)   => interop.typeTest(e, c, pos)
     case Type.Class(c) if Hijacked.isHijacked(c) => s"rt.Is[${Hijacked.instanceGoType(c)}]($e)"
     case Type.Class(c)                           => classTypeTest(e, c)
     // Arrays of references do not know their element type (see rt.IsUnitArray).

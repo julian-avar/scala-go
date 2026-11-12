@@ -14,8 +14,10 @@ import scalago.ir.{ClassName, ScalaType, Type}
  *  Scala object, in one file:
  *  {{{
  *  scalago-facadegen --out <dir> --package <scala package> [--classpath <cp>]
- *                    [--go-require m@v]... [--go-replace m=dir]... <import path>...
+ *                    [--go-require m@v]... [--go-replace m=dir]... <import path>[=<object>]...
  *  }}}
+ *  A package's object is named as the Go package, or, when several have that name, after its
+ *  import path (`math_rand`); `<import path>=<object>` names it, as a Go import alias does.
  *  Types map as the facade conversions allow, choosing exact and cheap types:
  *  - parameters and results: Go numbers as Scala numbers (`int` is `Long`), `string` as `String`,
  *    `error` as `GoError`, `any` as `Any`, Go types of the generated packages as their facades,
@@ -27,11 +29,17 @@ import scalago.ir.{ClassName, ScalaType, Type}
  *    Scala functions and values are passed as they are; other named non-struct types get a
  *    conversion named as the type (`def Color(value: String): Color`), as in Go, and named slice
  *    and map types their composite literals too (`def H(entries: (String, Any)*): H`).
- *  - generic functions whose type parameters are constrained by interfaces take the interfaces.
+ *  - generic functions are generic methods (`def Max[E](x: GoSlice[E]): E` for
+ *    `Max[S ~[]E, E cmp.Ordered](x S) E`): a type parameter whose constraint has a core type
+ *    (`~[]E`) is that type, the others are type parameters, whose type arguments are canonical
+ *    views (`GoInt`, `GoString`); Go checks them against the constraints. Those constrained by
+ *    named interfaces, used in parameters, take the interfaces (`Matches[K fmt.Stringer](k K)`
+ *    takes a `fmt.Stringer`). Generic types are generic classes, traits and aliases
+ *    (`type Seq[V] = (V => Boolean) => Unit`).
  *  The types of other packages that the members use are generated too (only the types), so the
  *  facades of a package are complete without listing its dependencies. Members whose types cannot
- *  be represented (generics with type sets, unnamed structs and interfaces, arrays, funcs inside
- *  Go data) are left out, with a comment saying why. Facades are checked against Go at link time
+ *  be represented (unnamed structs and interfaces, arrays and funcs inside Go data, ...) are left
+ *  out, with a comment saying why. Facades are checked against Go at link time
  *  only where used, so unused members cost nothing.
  *
  *  The facades that the dependencies on `--classpath` provide (see [[FacadeIndex]]) are used
@@ -39,10 +47,23 @@ import scalago.ir.{ClassName, ScalaType, Type}
  *  return their types, generated types extend their interfaces, and a requested package that they
  *  provide completely is not generated at all.
  */
+/** Go integer constants as Scala `Long`s. */
+object GoConstants:
+  private val Uint64Max = BigInt(2).pow(64) - 1
+
+  /** Whether integer constant `value` (Go syntax) fits a `Long`, or a `uint64` (as its bits). */
+  def fitsUint64Bits(value: String): Boolean =
+    value.toLongOption.isDefined || scala.util.Try(BigInt(value)).toOption.exists(v => v >= 0 && v <= Uint64Max)
+
+  /** Whether integer constant `value` fits a `Long`. */
+  def fitsLong(value: String): Boolean = value.toLongOption.isDefined
+
 object FacadeGen:
-  /** @param classpath the dependencies of the generated facades, whose Go facades are reused */
+  /** @param classpath   the dependencies of the generated facades, whose Go facades are reused
+   *  @param objectNames the names of the objects of some packages (by import path)
+   */
   final case class Config(scalaPackage: String, packages: Seq[String], goRequires: Seq[(String, String)] = Nil,
-      goReplaces: Seq[(String, String)] = Nil, classpath: Seq[Path] = Nil)
+      goReplaces: Seq[(String, String)] = Nil, classpath: Seq[Path] = Nil, objectNames: Map[String, String] = Map.empty)
 
   /** Generated sources (file name to content), and notes on the requested packages that were not
    *  generated because dependencies provide them.
@@ -66,11 +87,11 @@ object FacadeGen:
       Files.writeString(moduleDir.resolve("go.mod"), goMod.toString, UTF_8)
       // The packages whose types the generated members use are loaded too, until none is missing.
       var api = GoApi.load(moduleDir, config.packages)
-      var missing = Generator(api, config.scalaPackage, config.packages, provided).missingPackages
+      var missing = Generator(api, config.scalaPackage, config.packages, provided, config.objectNames).missingPackages
       while missing.nonEmpty do
         api = GoApi.load(moduleDir, (api.packages.keySet ++ missing).toSeq.sorted)
-        missing = Generator(api, config.scalaPackage, config.packages, provided).missingPackages
-      val output = generate(api, config.scalaPackage, config.packages, provided)
+        missing = Generator(api, config.scalaPackage, config.packages, provided, config.objectNames).missingPackages
+      val output = generate(api, config.scalaPackage, config.packages, provided, config.objectNames)
       Files.createDirectories(outDir)
       val files = for (name, source) <- output.files.toSeq.sortBy(_._1) yield
         val file = outDir.resolve(name)
@@ -82,10 +103,11 @@ object FacadeGen:
   /** The Scala sources for `packages` of `api`, and for the types of other packages of `api` that
    *  their members use, except what the dependencies' facades (`provided`) already have.
    */
-  def generate(api: GoApi, scalaPackage: String, packages: Seq[String], provided: FacadeIndex = FacadeIndex.empty): Output =
-    val all = Generator(api, scalaPackage, packages, provided)
+  def generate(api: GoApi, scalaPackage: String, packages: Seq[String], provided: FacadeIndex = FacadeIndex.empty,
+      objectNames: Map[String, String] = Map.empty): Output =
+    val all = Generator(api, scalaPackage, packages, provided, objectNames)
     val (complete, own) = packages.partition(all.isProvided)
-    val generator = if complete.isEmpty then all else Generator(api, scalaPackage, own, provided)
+    val generator = if complete.isEmpty then all else Generator(api, scalaPackage, own, provided, objectNames)
     val notes = complete.map { p =>
       s"Go package $p is not generated: dependencies provide its facades (${provided.packageObjects(p).mkString(", ")})"
     }
@@ -97,7 +119,11 @@ object FacadeGen:
     "this", "throw", "trait", "true", "try", "type", "val", "var", "while", "with", "yield", "end", "inline",
     "opaque", "open", "transparent", "infix", "derives", "erased")
 
-  def ident(name: String): String = if scalaKeywords(name) || !name.head.isLetter then s"`$name`" else name
+  /** A Go identifier as a Scala one: keywords and names that do not start with a letter are quoted,
+   *  as are names ending in `_` (`x_: T` would read as the operator `x_:`).
+   */
+  def ident(name: String): String =
+    if scalaKeywords(name) || !name.head.isLetter || name.last == '_' then s"`$name`" else name
 
   /** Whether code outside a package's module can import it (not `internal`, not `vendor`). */
   private def importable(path: String): Boolean =
@@ -112,6 +138,8 @@ object FacadeGen:
     case GoType.MapOf(k, v)    => namedIn(k) ++ namedIn(v)
     case GoType.Chan(e, _)     => namedIn(e)
     case GoType.Func(sig)      => namedIn(sig)
+    case GoType.Generic(p, n, as) => (if p.isEmpty then Nil else List(p -> n)) ++ as.flatMap(namedIn)
+    case GoType.Constraint(c, ts, _) => (c.toList ++ ts).flatMap(namedIn)
     case _                     => Nil
 
   private def namedIn(sig: GoSignature): List[(String, String)] =
@@ -140,6 +168,8 @@ object FacadeGen:
 
     def function(params: List[SType], result: SType): SType =
       val source = params match
+        // A function parameter is parenthesized: `(V => Boolean) => Unit`, not `V => (Boolean => Unit)`.
+        case List(one) if one.source.contains("=>") => s"(${one.source}) => ${result.source}"
         case List(one) => s"${one.source} => ${result.source}"
         case ps        => ps.map(_.source).mkString("(", ", ", s") => ${result.source}")
       SType(source, ScalaType.Ref(s"scala.Function${params.size}", (params :+ result).map(_.ir)))
@@ -153,7 +183,8 @@ object FacadeGen:
   /** A Scala name (`a.b.C`) as a source reference from the root package. */
   private def rootRef(scalaName: String): String = scalaName.split('.').map(ident).mkString("_root_.", ".", "")
 
-  private final class Generator(api: GoApi, scalaPackage: String, roots: Seq[String], provided: FacadeIndex):
+  private final class Generator(api: GoApi, scalaPackage: String, roots: Seq[String], provided: FacadeIndex,
+      names: Map[String, String]):
     /** The types facades are generated for: all types of the root packages, and the types of other
      *  packages their members use (transitively), except those that dependencies provide. The
      *  other packages' objects only have these.
@@ -179,6 +210,7 @@ object FacadeGen:
         decl.methods.values.foreach(sig => use(namedIn(sig)))
         decl.fields.values.foreach(t => use(namedIn(t)))
         decl.underlying.foreach(t => use(namedIn(t)))
+        decl.typeParams.foreach((_, c) => use(namedIn(c)))
       (seen.toSet, missing.toSet)
 
     /** Packages whose types are used but whose APIs are not loaded. */
@@ -188,44 +220,71 @@ object FacadeGen:
     private val packages: Seq[String] =
       (roots.filter(api.packages.contains) ++ included.toSeq.map(_._1).sorted).distinct
 
-    /** Scala object name of each generated package: its Go name, or its path when ambiguous. A
-     *  root package that is the only root of its name keeps its name: the packages that other
-     *  packages' types come from (`encoding/json/v2` for `encoding/json`) do not take it.
+    /** Scala object name of each generated package: the one given (`names`), else its Go name,
+     *  or its path when ambiguous. A root package that is the only root of its name keeps its
+     *  name: the packages that other packages' types come from (`encoding/json/v2` for
+     *  `encoding/json`) do not take it.
      */
     private val objectNames: Map[String, String] =
-      val byName = packages.groupBy(p => api.packages(p).name)
-      packages.map { p =>
+      val named = names.filter((p, _) => packages.contains(p))
+      val others = packages.filterNot(named.contains)
+      val byName = others.groupBy(p => api.packages(p).name)
+      val taken = named.values.toSet
+      named ++ others.map { p =>
         val name = api.packages(p).name
         val same = byName(name)
-        p -> (if same.size == 1 || same.filter(roots.contains) == Seq(p) then name else p.replaceAll("[^A-Za-z0-9]", "_"))
-      }.toMap
+        val unique = !taken(name) && (same.size == 1 || same.filter(roots.contains) == Seq(p))
+        p -> (if unique then name else p.replaceAll("[^A-Za-z0-9]", "_"))
+      }
 
-    /** The Scala type standing for Go type `pkg.name`: a dependency's facade, or a generated one. */
-    private def facadeRef(pkg: String, name: String): Option[SType] =
+    /** The Scala type standing for Go type `pkg.name` (an instance of it, for a generic type): a
+     *  dependency's facade, or a generated one.
+     */
+    private def facadeRef(pkg: String, name: String, args: List[SType] = Nil): Option[SType] =
+      def applied(source: String) = if args.isEmpty then source else args.map(_.source).mkString(s"$source[", ", ", "]")
       provided.typeOf(pkg, name) match
         case Some(t) =>
           // A type alias is compared as what it is an alias of (as the plugin records it).
-          Some(SType(rootRef(t.scalaName), t.facade.fold(expansion(pkg, name, t.scalaName))(c => ScalaType.Ref(c.name, Nil))))
+          Some(SType(applied(rootRef(t.scalaName)),
+            t.facade.fold(expansion(pkg, name, t.scalaName, args))(c => ScalaType.Ref(c.name, args.map(_.ir)))))
         case None =>
           for
             obj <- objectNames.get(pkg)
             p <- api.packages.get(pkg)
             if included((pkg, name)) || (roots.contains(pkg) && p.aliases.contains(name))
-          yield SType(s"_root_.$scalaPackage.${ident(obj)}.$name", expansion(pkg, name, s"$scalaPackage.$obj$$$name"))
+          yield SType(applied(s"_root_.$scalaPackage.${ident(obj)}.$name"), expansion(pkg, name, s"$scalaPackage.$obj$$$name", args))
 
-    /** What the plugin records for Go type `pkg.name`: for a Go alias (`type A = B`) that of its
-     *  target, for the types generated as Scala aliases their expansion, otherwise class `cls`.
+    /** What the plugin records for Go type `pkg.name` (applied to `args`): for a Go alias
+     *  (`type A = B`) that of its target, for the types generated as Scala aliases their
+     *  expansion, otherwise class `cls`.
      */
-    private def expansion(pkg: String, name: String, cls: ClassName): ScalaType =
+    private def expansion(pkg: String, name: String, cls: ClassName, args: List[SType] = Nil): ScalaType =
       api.packages.get(pkg).flatMap(_.aliases.get(name)) match
         case Some(GoType.Named(p, n)) => named(p, n).ir
-        case _                        => aliasOf(pkg, name).fold(ScalaType.Ref(cls, Nil))(_.ir)
+        case _ =>
+          aliasOf(pkg, name) match
+            case Some(alias) =>
+              val params = api.typeDecl(pkg, name).fold(Nil)(_.typeParams.map(_._1))
+              substituteParams(alias.ir, params.zip(args.map(_.ir)).toMap)
+            case None => ScalaType.Ref(cls, args.map(_.ir))
 
     private final class Unrepresentable(val reason: String) extends Exception(reason)
     private def no(reason: String): Nothing = throw Unrepresentable(reason)
 
     private def isStruct(pkg: String, name: String): Boolean =
       api.typeDecl(pkg, name).exists(_.kind == GoTypeKind.Struct)
+
+    private def substituteParams(t: ScalaType, bindings: Map[String, ScalaType]): ScalaType = t match
+      case ScalaType.Param(n)     => bindings.getOrElse(n, t)
+      case ScalaType.Ref(n, args) => ScalaType.Ref(n, args.map(substituteParams(_, bindings)))
+      case ScalaType.Arr(e)       => ScalaType.Arr(substituteParams(e, bindings))
+      case other                  => other
+
+    /** An instance of generic Go type `pkg.name`; its type arguments are canonical views. */
+    private def generic(pkg: String, name: String, args: List[GoType]): SType =
+      val decl = api.typeDecl(pkg, name).getOrElse(no(s"type $pkg.$name is not generated"))
+      if decl.typeParams.size != args.size then no(s"type $pkg.$name with ${args.size} type arguments")
+      facadeRef(pkg, name, args.map(inner)).getOrElse(no(s"type $pkg.$name is not generated"))
 
     // ---- Types ------------------------------------------------------------------------------------
 
@@ -239,6 +298,7 @@ object FacadeGen:
       case "int8" | "uint8" | "byte"                      => SType.prim(Type.Byte)
       case "float32"                                      => SType.prim(Type.Float)
       case "float64" | "float"                            => SType.prim(Type.Double)
+      case "complex128" | "complex64" | "complex"         => SType.ref(GoInterop.GoComplexType)
       case other                                          => no(s"Go type $other")
 
     private def named(pkg: String, name: String): SType =
@@ -257,22 +317,47 @@ object FacadeGen:
         else None
       }
 
+    /** A type parameter of the member or class being generated: a Scala type parameter. */
+    private def typeParam(name: String): SType = SType(name, ScalaType.Param(name))
+
     private def isFuncAlias(pkg: String, name: String): Boolean =
       api.typeDecl(pkg, name).exists(_.funcSignature.isDefined) && aliasOf(pkg, name).isDefined
 
     private def goData(name: String, args: SType*): SType = SType.ref(s"scalago.go.$name", args.toList)
 
+    /** A type that code outside its package cannot name (unexported, of an `internal` package):
+     *  the interface of its package it implements with the most methods (`binary.ByteOrder` for
+     *  `binary.BigEndian`'s type), or `Any`. Its values pass through Scala as they are.
+     */
+    private def opaqueView(g: GoType): Option[SType] =
+      val target = g match
+        case GoType.Named(p, n)                       => Some((p, n))
+        case GoType.Generic(p, n, _)                  => Some((p, n))
+        case GoType.Ptr(GoType.Named(p, n))           => Some((p, n))
+        case GoType.Ptr(GoType.Generic(p, n, _))      => Some((p, n))
+        case _                                        => None
+      target.flatMap((p, n) => api.opaque(p, n)).map { ifaces =>
+        ifaces.collectFirst { case GoType.Named(ip, in) if facadeRef(ip, in).isDefined => named(ip, in) }.getOrElse(SType.Any)
+      }
+
     /** The Scala type of a parameter or result. */
     def outer(g: GoType, isResult: Boolean): SType = g match
+      case _ if opaqueView(g).isDefined                      => opaqueView(g).get
       case GoType.Basic(b)                                   => basic(b)
       case GoType.Named(pkg, n)                              => named(pkg, n)
       case GoType.Ptr(GoType.Named(pkg, n)) if isStruct(pkg, n) => named(pkg, n)
+      case GoType.Generic(pkg, n, as)                        => generic(pkg, n, as)
+      case GoType.Ptr(GoType.Generic(pkg, n, as)) if isStruct(pkg, n) => generic(pkg, n, as)
       case GoType.EmptyInterface                             => SType.Any
       case GoType.Func(sig)                                  => function(sig, isResult)
+      case GoType.EmptyStruct                                => no("a struct{} value")
+      // A Go array is a value: Scala gets a slice of a copy, and gives a slice to copy from.
+      case GoType.ArrayOf(_, e)                              => goData("GoSlice", inner(e))
       case other                                             => inner(other)
 
     /** The canonical Scala view of a Go type inside Go data. */
     def inner(g: GoType): SType = g match
+      case _ if opaqueView(g).isDefined => opaqueView(g).get
       case GoType.Basic(b) =>
         b.stripPrefix("untyped-") match
           case "int"              => goData("GoInt")
@@ -282,18 +367,24 @@ object FacadeGen:
           case "uint32"           => goData("GoUint32")
           case "uint8" | "byte"   => goData("GoByte")
           case "string"           => goData("GoString")
+          case "complex64"        => no("complex64 inside Go data")
           case other              => basic(other)
       case GoType.Named(pkg, n) if isFuncAlias(pkg, n)       => no("a func inside Go data")
       case GoType.Named(pkg, n)                              => named(pkg, n)
       case GoType.Ptr(GoType.Named(pkg, n)) if isStruct(pkg, n) => named(pkg, n)
+      case GoType.Generic(pkg, n, _) if isFuncAlias(pkg, n)  => no("a func inside Go data")
+      case GoType.Generic(pkg, n, as)                        => generic(pkg, n, as)
+      case GoType.Ptr(GoType.Generic(pkg, n, as)) if isStruct(pkg, n) => generic(pkg, n, as)
       case GoType.Ptr(e)                                     => goData("GoPtr", inner(e))
       case GoType.Slice(e)                                   => goData("GoSlice", inner(e))
       case GoType.MapOf(k, v)                                => goData("GoMap", inner(k), inner(v))
       case GoType.Chan(e, _)                                 => goData("GoChan", inner(e))
       case GoType.EmptyInterface                             => SType.Any
+      case GoType.EmptyStruct                                => SType("_root_.scala.Unit", ScalaType.Ref(GoInterop.UnitClass, Nil))
       case GoType.Func(_)                                    => no("a func inside Go data")
-      case GoType.ArrayOf(_, _)                              => no("a Go array type")
-      case GoType.TypeParam(n)                               => no(s"type parameter $n")
+      case GoType.ArrayOf(_, _)                              => no("a Go array inside Go data")
+      case GoType.TypeParam(n)                               => typeParam(n)
+      case c: GoType.Constraint                              => no(s"constraint $c")
       case GoType.Other(d)                                   => no(d)
 
     /** A Go func type as a Scala function type. Its results are as a function's: a trailing
@@ -301,7 +392,7 @@ object FacadeGen:
      *  several results are a tuple.
      */
     private def function(sig: GoSignature, isResult: Boolean): SType =
-      if sig.variadic || sig.generic then no("a variadic or generic func type")
+      if sig.variadic then no("a variadic func type")
       if isResult && sig.params.size > 3 then no("a returned func with more than 3 parameters")
       SType.function(sig.params.map(outer(_, isResult = false)), results(sig.results))
 
@@ -335,30 +426,34 @@ object FacadeGen:
     def params(sig: GoSignature): String =
       paramList(sig).map((n, t) => s"${ident(n)}: ${t.source}").mkString("(", ", ", ")")
 
-    /** A generic function as a monomorphic one, when each type parameter's constraint is an
-     *  interface without type sets: the parameter becomes the constraint (`Matches[K fmt.Stringer](k K)`
-     *  takes a `fmt.Stringer`), which satisfies it, and the linker passes values of that type, so
-     *  that Go infers it as the type argument.
+    /** A generic function's signature as Scala declares it, with the Scala type parameters.
+     *
+     *  - When each type parameter is constrained by a named interface and used by a parameter,
+     *    the function is monomorphic: the parameter becomes the constraint
+     *    (`Matches[K fmt.Stringer](k K)` takes a `fmt.Stringer`), which satisfies it, and the
+     *    linker passes values of that type, so that Go infers it as the type argument.
+     *  - Otherwise a type parameter whose constraint has a core type (`S ~[]E`) is that type
+     *    (`[]E`), and the others are Scala type parameters.
      */
-    private def monomorphic(sig: GoSignature): GoSignature =
-      if !sig.generic then sig
+    private def prepare(sig: GoSignature): (GoSignature, List[String]) =
+      if !sig.generic then (sig, Nil)
       else
-        val bounds = sig.typeParams.map { (n, c) =>
-          c match
-            case GoType.EmptyInterface | _: GoType.Named => n -> c
-            case _                                     => no(s"generic, with a type set constraint on $n")
-        }.toMap
-        def subst(g: GoType): GoType = g match
-          case GoType.TypeParam(n)  => bounds.getOrElse(n, no(s"generic, type parameter $n"))
-          case GoType.Ptr(e)        => GoType.Ptr(subst(e))
-          case GoType.Slice(e)      => GoType.Slice(subst(e))
-          case GoType.ArrayOf(l, e) => GoType.ArrayOf(l, subst(e))
-          case GoType.MapOf(k, v)   => GoType.MapOf(subst(k), subst(v))
-          case GoType.Chan(e, d)    => GoType.Chan(subst(e), d)
-          case GoType.Func(s)       => GoType.Func(s.copy(params = s.params.map(subst), results = s.results.map(subst)))
-          case other                => other
-        if bounds.isEmpty then no("generic")
-        sig.copy(params = sig.params.map(subst), results = sig.results.map(subst), generic = false, typeParams = Nil)
+        val interfaceBounds = sig.typeParams.collect { case (n, c: GoType.Named) => n -> (c: GoType) }.toMap
+        val used = (n: String) => sig.params.exists(_.mentions(n))
+        if interfaceBounds.size == sig.typeParams.size && sig.typeParams.forall((n, _) => used(n)) then
+          (sig.substitute(interfaceBounds), Nil)
+        else
+          val cores = sig.typeParams.collect { case (n, GoType.Constraint(Some(core), _, _)) if isComposite(core) => n -> core }.toMap
+          // Cores may mention each other's parameters (`M ~map[K]V`): substitute until none is left.
+          var resolved = cores
+          for _ <- cores.toSeq do resolved = resolved.map((n, c) => n -> c.substitute(resolved))
+          if resolved.values.exists(c => cores.keys.exists(c.mentions)) then no("generic, with cyclic core types")
+          val substituted = sig.substitute(resolved)
+          (substituted.copy(generic = false, typeParams = Nil), substituted.typeParams.map(_._1))
+
+    private def isComposite(g: GoType): Boolean = g match
+      case _: GoType.Slice | _: GoType.MapOf | _: GoType.Chan | _: GoType.Ptr | _: GoType.Func | _: GoType.ArrayOf => true
+      case _ => false
 
     // ---- Members ---------------------------------------------------------------------------------
 
@@ -367,9 +462,10 @@ object FacadeGen:
       catch case e: Unrepresentable => skipped += s"$name (${e.reason})"
 
     private def method(name: String, genericSig: GoSignature, abstractMember: Boolean): String =
-      val sig = monomorphic(genericSig)
+      val (sig, typeParams) = prepare(genericSig)
       val rhs = if abstractMember then "" else " = _root_.scalago.go.native"
-      s"def $name${params(sig)}: ${results(sig.results, name).source}$rhs"
+      val tparams = if typeParams.isEmpty then "" else typeParams.map(ident).mkString("[", ", ", "]")
+      s"def $name$tparams${params(sig)}: ${results(sig.results, name).source}$rhs"
 
     /** The methods of a type that can be generated. */
     private def representable(decl: GoTypeDecl): Map[String, GoSignature] =
@@ -386,8 +482,8 @@ object FacadeGen:
       declared.keySet == methods.keySet && methods.forall { (m, genericSig) =>
         val g = declared(m)
         try
-          val sig = monomorphic(genericSig)
-          !g.isProperty && g.params == paramList(sig).map(_._2.ir) && g.result == results(sig.results, m).ir
+          val (sig, typeParams) = prepare(genericSig)
+          typeParams.isEmpty && !g.isProperty && g.params == paramList(sig).map(_._2.ir) && g.result == results(sig.results, m).ir
         catch case _: Unrepresentable => false
       }
 
@@ -396,7 +492,7 @@ object FacadeGen:
      */
     private lazy val interfaces: Seq[((String, String), Map[String, GoSignature])] =
       def complete(d: GoTypeDecl): Option[Map[String, GoSignature]] =
-        Option.when(d.kind == GoTypeKind.Interface)(representable(d)).filter(ms => ms.size == d.methods.size && ms.nonEmpty)
+        Option.when(d.kind == GoTypeKind.Interface && !d.isGeneric)(representable(d)).filter(ms => ms.size == d.methods.size && ms.nonEmpty)
       val generated =
         for
           key @ (p, n) <- included.toSeq.sorted
@@ -415,7 +511,8 @@ object FacadeGen:
      */
     private def parents(self: (String, String), decl: GoTypeDecl): Seq[String] =
       val mine = representable(decl).map((m, sig) => m -> sig.copy(paramNames = Nil))
-      for
+      if decl.isGeneric then Nil
+      else for
         (key @ (p, n), methods) <- interfaces
         if key != self && methods.forall((m, sig) => mine.get(m).contains(sig))
         if decl.kind != GoTypeKind.Interface || methods.size < mine.size || provided.typeOf(p, n).isDefined ||
@@ -426,7 +523,7 @@ object FacadeGen:
       aliasOf(pkg.path, name) match
         case Some(alias) =>
           val kind = if decl.isEmptyInterface then "interface type" else "func type"
-          s"  /** Go $kind `${pkg.name}.$name`. */\n  type $name = ${alias.source}\n"
+          s"  /** Go $kind `${pkg.name}.$name`. */\n  type $name${typeParamClause(decl)} = ${alias.source}\n"
         case None => classDef(pkg, name, decl)
 
     private def classDef(pkg: GoPackage, name: String, decl: GoTypeDecl): String =
@@ -435,10 +532,14 @@ object FacadeGen:
       val isInterface = decl.kind == GoTypeKind.Interface
       for (f, t) <- decl.fields.toSeq.sortBy(_._1) do
         member(f, lines, skipped)(s"def $f: ${outer(t, isResult = true).source} = _root_.scalago.go.native")
-        member(s"$f (setter)", lines, skipped)(
-          s"def ${f}_=(value: ${outer(t, isResult = false).source}): _root_.scala.Unit = _root_.scalago.go.native")
+        member(s"$f (setter)", lines, skipped) {
+          if api.mentionsOpaque(t) then no(s"a field of a type that code outside its package cannot name")
+          s"def ${f}_=(value: ${outer(t, isResult = false).source}): _root_.scala.Unit = _root_.scalago.go.native"
+        }
       for (m, sig) <- decl.methods.toSeq.sortBy(_._1) if !decl.fields.contains(m) do
         member(m, lines, skipped)(method(m, sig, abstractMember = isInterface))
+      for m <- decl.pointerMethods.keys.toSeq.sorted do
+        skipped += s"$m (a method of *$name: Scala holds $name values as copies, which it would change)"
       val extendsClause = parents((pkg.path, name), decl) match
         case Nil => ""
         case ps  => ps.mkString(" extends ", ", ", "")
@@ -447,7 +548,7 @@ object FacadeGen:
         case GoTypeKind.Struct    => "struct type"
         case GoTypeKind.Interface => "interface type"
         case GoTypeKind.Other     => "type"
-      val sb = StringBuilder(s"  /** Go $kind `${pkg.name}.$name`. */\n  $keyword $name$extendsClause")
+      val sb = StringBuilder(s"  /** Go $kind `${pkg.name}.$name`. */\n  $keyword $name${typeParamClause(decl)}$extendsClause")
       if lines.isEmpty && skipped.isEmpty then sb ++= "\n"
       else
         sb ++= ":\n"
@@ -456,13 +557,17 @@ object FacadeGen:
         if lines.isEmpty then sb ++= s"  end $name\n"
       sb.toString
 
+    /** The type parameters of a generic type (`[T]`), for its class, trait or alias. */
+    private def typeParamClause(decl: GoTypeDecl): String =
+      if decl.isGeneric then decl.typeParams.map(tp => ident(tp._1)).mkString("[", ", ", "]") else ""
+
     /** The conversion to a named non-struct type, as in Go (`lipgloss.Color("205")`): a method of
      *  the package object, named as the type. Named slice and map types also get their composite
      *  literals, from elements or key-value pairs (`gin.H("message" -> "pong")`).
      */
     private def conversions(pkg: GoPackage, name: String, decl: GoTypeDecl, skipped: mutable.ListBuffer[String]): List[String] =
       val out = mutable.ListBuffer.empty[String]
-      for u <- decl.underlying if decl.kind == GoTypeKind.Other && aliasOf(pkg.path, name).isEmpty do
+      for u <- decl.underlying if decl.kind == GoTypeKind.Other && !decl.isGeneric && aliasOf(pkg.path, name).isEmpty do
         def define(what: String, param: => String): Unit =
           member(s"$name ($what)", out, skipped)(s"def $name($param): ${named(pkg.path, name).source} = _root_.scalago.go.native")
         define("conversion", s"value: ${outer(u, isResult = false).source}")
@@ -473,21 +578,25 @@ object FacadeGen:
           case _ => ()
       out.toList
 
-    /** An untyped constant, typed by its value (big integers that do not fit a Long are left out). */
+    /** A constant's type; an untyped one is typed by its value. Integers beyond `Long` that fit a
+     *  `uint64` (`math.MaxUint64`) are the `Long` of their bits, as `uint64` values are; bigger ones
+     *  are left out.
+     */
     private def constant(pkg: GoPackage, name: String, t: GoType): SType = t match
       case GoType.Basic(b) if b.startsWith("untyped-") =>
         val value = pkg.constValues.getOrElse(name, "")
         b.stripPrefix("untyped-") match
-          case "int" if value.toLongOption.isEmpty => no(s"the value $value does not fit a Long")
+          case "int" if !GoConstants.fitsUint64Bits(value) => no(s"the value $value does not fit a Long or a uint64")
           case "int"                               => SType.prim(Type.Long)
           case "rune"                              => SType.prim(Type.Int)
           case "float"                             => SType.prim(Type.Double)
+          case "complex"                           => SType.ref(GoInterop.GoComplexType)
           case "string"                            => SType.ref(ClassName.String)
           case "bool"                              => SType.prim(Type.Boolean)
           case other                               => no(s"untyped $other constant")
       case GoType.Basic(b) if b.startsWith("int") || b.startsWith("uint") =>
         val value = pkg.constValues.getOrElse(name, "0")
-        if value.toLongOption.isEmpty then no(s"the value $value does not fit a Long")
+        if !GoConstants.fitsUint64Bits(value) then no(s"the value $value does not fit a Long or a uint64")
         outer(t, isResult = true)
       case other => outer(other, isResult = true)
 
@@ -528,7 +637,9 @@ object FacadeGen:
         for (n, target) <- pkg.aliases.toSeq.sortBy(_._1) if provided.typeOf(path, n).isEmpty do
           member(n, lines, skipped) {
             target match
-              case GoType.Named(p, tn) => s"type $n = ${named(p, tn).source}"
+              case t if opaqueView(t).isDefined => s"type $n = ${opaqueView(t).get.source}"
+              case GoType.Named(p, tn)       => s"type $n = ${named(p, tn).source}"
+              case GoType.Generic(p, tn, as) => s"type $n = ${generic(p, tn, as).source}"
               case other               => no(s"alias of $other")
           }
       val typeDefs = types.map((n, d) => typeDef(pkg, n, d))
@@ -564,7 +675,10 @@ object FacadeGen:
       pairs += args(i) -> args.lift(i + 1).getOrElse("")
       i += 2
     val options = pairs.toList
-    val packages = args.toList.drop(i)
+    val (packages, objectNames) = args.toList.drop(i).foldRight((List.empty[String], Map.empty[String, String])) {
+      case (s"$path=$name", (ps, ns)) => (path :: ps, ns + (path -> name))
+      case (path, (ps, ns))           => (path :: ps, ns)
+    }
     def all(key: String) = options.collect { case (`key`, v) => v }
     def split(s: String, sep: Char) =
       val i = s.indexOf(sep)
@@ -573,11 +687,11 @@ object FacadeGen:
     val scalaPackage = all("--package").lastOption
     if out.isEmpty || scalaPackage.isEmpty || packages.isEmpty then
       System.err.println("usage: scalago-facadegen --out <dir> --package <scala package> [--classpath <cp>] " +
-        "[--go-require m@v]... [--go-replace m=dir]... <import path>...")
+        "[--go-require m@v]... [--go-replace m=dir]... <import path>[=<object>]...")
       sys.exit(2)
     val classpath = all("--classpath").flatMap(_.split(java.io.File.pathSeparator)).filter(_.nonEmpty).map(Path.of(_))
     val config = Config(scalaPackage.get, packages, all("--go-require").map(split(_, '@')), all("--go-replace").map(split(_, '=')),
-      classpath)
+      classpath, objectNames)
     try
       val result = run(config, Path.of(out.get))
       result.notes.foreach(System.err.println)

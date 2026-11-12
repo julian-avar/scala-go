@@ -22,8 +22,16 @@ enum GoType:
   case Func(sig: GoSignature)
   /** `any` / `interface{}`. */
   case EmptyInterface
-  /** A type parameter of a generic function. */
+  /** `struct{}`, which Scala sees as `Unit` (in Go data: `GoChan[Unit]`). */
+  case EmptyStruct
+  /** A type parameter of a generic function or type. */
   case TypeParam(name: String)
+  /** An instance of a generic type (`iter.Seq[string]`). */
+  case Generic(pkg: String, name: String, args: List[GoType])
+  /** A constraint with a type set: its core type (`~[]E`), the types of its unions (`~int |
+   *  ~string`), and whether it is comparable.
+   */
+  case Constraint(core: Option[GoType], terms: List[GoType], comparable: Boolean)
   /** Anything the linker cannot convert yet: interface and struct literals, generics. */
   case Other(description: String)
 
@@ -40,8 +48,40 @@ enum GoType:
     case Chan(e, _)        => s"chan $e"
     case Func(sig)         => s"func$sig"
     case EmptyInterface    => "any"
+    case EmptyStruct       => "struct{}"
     case TypeParam(n)      => n
+    case Generic(p, n, as) => as.mkString(s"$p.$n[", ", ", "]")
+    case Constraint(c, ts, comparable) =>
+      (c.map(t => s"~$t").toList ++ ts.map(_.toString).filterNot(t => c.exists(_.toString == t)) ++
+        Option.when(comparable && ts.isEmpty)("comparable")).mkString(" | ")
     case Other(d)          => d
+
+  /** This type with the type parameters replaced (those `bindings` has). */
+  def substitute(bindings: Map[String, GoType]): GoType =
+    if bindings.isEmpty then this
+    else this match
+      case TypeParam(n)          => bindings.getOrElse(n, this)
+      case Ptr(e)                => Ptr(e.substitute(bindings))
+      case Slice(e)              => Slice(e.substitute(bindings))
+      case ArrayOf(n, e)         => ArrayOf(n, e.substitute(bindings))
+      case MapOf(k, v)           => MapOf(k.substitute(bindings), v.substitute(bindings))
+      case Chan(e, d)            => Chan(e.substitute(bindings), d)
+      case Func(sig)             => Func(sig.substitute(bindings))
+      case Generic(p, n, as)     => Generic(p, n, as.map(_.substitute(bindings)))
+      case Constraint(c, ts, cm) => Constraint(c.map(_.substitute(bindings)), ts.map(_.substitute(bindings)), cm)
+      case other                 => other
+
+  /** Whether this type mentions type parameter `name`. */
+  def mentions(name: String): Boolean = this match
+    case TypeParam(n)          => n == name
+    case Ptr(e)                => e.mentions(name)
+    case Slice(e)              => e.mentions(name)
+    case ArrayOf(_, e)         => e.mentions(name)
+    case MapOf(k, v)           => k.mentions(name) || v.mentions(name)
+    case Chan(e, _)            => e.mentions(name)
+    case Func(sig)             => (sig.params ++ sig.results).exists(_.mentions(name))
+    case Generic(_, _, as)     => as.exists(_.mentions(name))
+    case _                     => false
 
 object GoType:
   val Error: GoType = Named("", "error")
@@ -53,6 +93,14 @@ final case class GoSignature(params: List[GoType], results: List[GoType], variad
      *  named interface type, or `Other` for constraints with type sets (`~int | string`, `comparable`).
      */
     typeParams: List[(String, GoType)] = Nil):
+  /** This signature with type parameters replaced (it stays generic if some are left). */
+  def substitute(bindings: Map[String, GoType]): GoSignature =
+    if bindings.isEmpty then this
+    else
+      val left = typeParams.filterNot((n, _) => bindings.contains(n)).map((n, c) => n -> c.substitute(bindings))
+      copy(params = params.map(_.substitute(bindings)), results = results.map(_.substitute(bindings)),
+        generic = left.nonEmpty, typeParams = left)
+
   override def toString: String =
     val ps = params.zipWithIndex.map((t, i) => if variadic && i == params.size - 1 then s"...${t.asInstanceOf[GoType.Slice].elem}" else t.toString)
     val rs = results match
@@ -67,9 +115,25 @@ enum GoTypeKind:
 /** A defined Go type: its kind, its method set (of `*T`, or of `T` for interfaces; exported
  *  methods only), its fields, and for kind `Other` its underlying type (`type Celsius float64`,
  *  `type Cmd func() Msg`); for interfaces without any methods, `EmptyInterface`.
+ *
+ *  @param pointerMethods for kind `Other`, the methods with pointer receivers, which are not in
+ *                        `methods`: Scala holds such values as copies, which they would change
+ *  @param typeParams     for a generic type, its type parameters with their constraints; its
+ *                        methods, fields and underlying type mention them
  */
 final case class GoTypeDecl(kind: GoTypeKind, methods: Map[String, GoSignature], fields: Map[String, GoType],
-    underlying: Option[GoType] = None):
+    underlying: Option[GoType] = None, pointerMethods: Map[String, GoSignature] = Map.empty,
+    typeParams: List[(String, GoType)] = Nil):
+  def isGeneric: Boolean = typeParams.nonEmpty
+
+  /** The declaration of instance `T[args]` of a generic type (this one, if it is not generic). */
+  def instantiate(args: List[GoType]): GoTypeDecl =
+    if typeParams.isEmpty || args.size != typeParams.size then this
+    else
+      val b = typeParams.map(_._1).zip(args).toMap
+      GoTypeDecl(kind, methods.map((m, s) => m -> s.substitute(b)), fields.map((f, t) => f -> t.substitute(b)),
+        underlying.map(_.substitute(b)), pointerMethods.map((m, s) => m -> s.substitute(b)), Nil)
+
   /** The signature of a named func type (`type Cmd func() Msg`). */
   def funcSignature: Option[GoSignature] = underlying.collect { case GoType.Func(sig) => sig }
   /** The basic type of a named basic type (`type Color string`). */
@@ -88,11 +152,33 @@ final case class GoPackage(
     constValues: Map[String, String],
     types: Map[String, GoTypeDecl],
     /** `type A = B`: the aliased type. */
-    aliases: Map[String, GoType]
+    aliases: Map[String, GoType],
+    /** Types the APIs use that code outside the package cannot name (unexported, or of an
+     *  `internal` package), with the exported interfaces of the package they implement.
+     */
+    opaque: Map[String, List[GoType]] = Map.empty
 )
 
 /** The APIs of the Go packages a program uses. */
 final class GoApi(val packages: Map[String, GoPackage]):
+  /** For a type that code outside its package cannot name (see [[GoPackage.opaque]]): the
+   *  interfaces it implements.
+   */
+  def opaque(pkg: String, name: String): Option[List[GoType]] =
+    if GoApi.isNameable(pkg, name) then None else Some(packages.get(pkg).flatMap(_.opaque.get(name)).getOrElse(Nil))
+
+  /** Whether `t` mentions a type that code outside its package cannot name. */
+  def mentionsOpaque(t: GoType): Boolean = t match
+    case GoType.Named(p, n)        => !GoApi.isNameable(p, n)
+    case GoType.Generic(p, n, as)  => !GoApi.isNameable(p, n) || as.exists(mentionsOpaque)
+    case GoType.Ptr(e)             => mentionsOpaque(e)
+    case GoType.Slice(e)           => mentionsOpaque(e)
+    case GoType.ArrayOf(_, e)      => mentionsOpaque(e)
+    case GoType.MapOf(k, v)        => mentionsOpaque(k) || mentionsOpaque(v)
+    case GoType.Chan(e, _)         => mentionsOpaque(e)
+    case GoType.Func(s)            => (s.params ++ s.results).exists(mentionsOpaque)
+    case _                         => false
+
   /** The declaration of a named type; aliases are followed. Predeclared `error` is built in. */
   def typeDecl(pkg: String, name: String): Option[GoTypeDecl] =
     if pkg == "" && name == "error" then Some(GoApi.errorDecl)
@@ -102,6 +188,10 @@ final class GoApi(val packages: Map[String, GoPackage]):
       }
 
 object GoApi:
+  /** Whether code outside package `pkg` can name its type `name`. */
+  def isNameable(pkg: String, name: String): Boolean =
+    pkg.isEmpty || (name.head.isUpper && !pkg.split('/').exists(e => e == "internal" || e == "vendor"))
+
   val errorDecl: GoTypeDecl =
     GoTypeDecl(GoTypeKind.Interface, Map("Error" -> GoSignature(Nil, List(GoType.Basic("string")), false, false)), Map.empty)
 
@@ -161,13 +251,16 @@ object GoApi:
       val constValues = mutable.LinkedHashMap.empty[String, String]
       val kinds = mutable.LinkedHashMap.empty[String, GoTypeKind]
       val methods = mutable.LinkedHashMap.empty[String, mutable.LinkedHashMap[String, GoSignature]]
+      val pointerMethods = mutable.LinkedHashMap.empty[String, mutable.LinkedHashMap[String, GoSignature]]
+      val typeParams = mutable.LinkedHashMap.empty[String, List[(String, GoType)]]
+      val opaque = mutable.LinkedHashMap.empty[String, List[GoType]]
       val fields = mutable.LinkedHashMap.empty[String, mutable.LinkedHashMap[String, GoType]]
       val aliases = mutable.LinkedHashMap.empty[String, GoType]
       val underlying = mutable.LinkedHashMap.empty[String, GoType]
       def build = GoPackage(path, name, funcs.toMap, vars.toMap, consts.toMap, constValues.toMap,
         kinds.map((t, k) => t -> GoTypeDecl(k, methods.get(t).fold(Map.empty)(_.toMap), fields.get(t).fold(Map.empty)(_.toMap),
-          underlying.get(t))).toMap,
-        aliases.toMap)
+          underlying.get(t), pointerMethods.get(t).fold(Map.empty)(_.toMap), typeParams.getOrElse(t, Nil))).toMap,
+        aliases.toMap, opaque.toMap)
 
     val builders = mutable.LinkedHashMap.empty[String, Builder]
     val errors = mutable.ListBuffer.empty[String]
@@ -181,6 +274,9 @@ object GoApi:
           pkg(path).consts(name) = goType(t)
           rest.collectFirst { case Str(v) => v }.foreach(pkg(path).constValues(name) = _)
         case SList(Atom("alias") :: Str(path) :: Atom(name) :: t :: Nil) => pkg(path).aliases(name) = goType(t)
+        case SList(Atom("opaque") :: Str(path) :: Atom(name) :: ifaces) => pkg(path).opaque(name) = ifaces.map(goType)
+        case SList(Atom("tparams") :: Str(path) :: Atom(name) :: tps) =>
+          pkg(path).typeParams(name) = tps.collect { case SList(List(Atom(n), c)) => n -> goType(c) }
         case SList(Atom("type") :: Str(path) :: Atom(name) :: Atom(kind) :: rest) =>
           rest.headOption.foreach(u => pkg(path).underlying(name) = goType(u))
           pkg(path).kinds(name) = kind match
@@ -189,6 +285,8 @@ object GoApi:
             case _           => GoTypeKind.Other
         case SList(Atom("method") :: Str(path) :: Atom(tpe) :: Atom(name) :: sig :: Nil) =>
           pkg(path).methods.getOrElseUpdate(tpe, mutable.LinkedHashMap.empty)(name) = signature(sig)
+        case SList(Atom("method") :: Str(path) :: Atom(tpe) :: Atom(name) :: sig :: Atom("pointer") :: Nil) =>
+          pkg(path).pointerMethods.getOrElseUpdate(tpe, mutable.LinkedHashMap.empty)(name) = signature(sig)
         case SList(Atom("field") :: Str(path) :: Atom(tpe) :: Atom(name) :: t :: Nil) =>
           pkg(path).fields.getOrElseUpdate(tpe, mutable.LinkedHashMap.empty)(name) = goType(t)
         case SList(Atom("error") :: Str(message) :: Nil) => errors += message
@@ -217,9 +315,14 @@ object GoApi:
     case SList(List(Atom("send-chan"), t))                 => GoType.Chan(goType(t), "send")
     case SList(List(Atom("func"), sig))                    => GoType.Func(signature(sig))
     case SList(List(Atom("interface")))                    => GoType.EmptyInterface
-    case SList(List(Atom("generic"), Str(pkg), Atom(name))) => GoType.Other(s"$pkg.$name[...] (generic)")
+    case SList(List(Atom("empty-struct")))                 => GoType.EmptyStruct
+    case SList(Atom("generic") :: Str(pkg) :: Atom(name) :: args) => GoType.Generic(pkg, name, args.map(goType))
     case SList(List(Atom("tparam"), Atom(name)))           => GoType.TypeParam(name)
-    case SList(List(Atom("constraint")))                   => GoType.Other("a constraint with a type set")
+    case SList(Atom("constraint") :: parts)                =>
+      GoType.Constraint(
+        parts.collectFirst { case SList(List(Atom("core"), t)) => goType(t) },
+        parts.collectFirst { case SList(Atom("terms") :: ts) => ts.map(goType) }.getOrElse(Nil),
+        parts.contains(Atom("comparable")))
     case SList(List(Atom("unknown"), Str(d)))              => GoType.Other(d)
     case SList(Atom(other) :: _)                           => GoType.Other(s"$other type")
     case other                                             => throw GoApiException(s"bad type: $other")

@@ -2,6 +2,7 @@ package rt
 
 import (
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"unsafe"
@@ -202,6 +203,8 @@ func foreignToString(x any) (string, bool) {
 		return v.Error(), true
 	case interface{ String() string }:
 		return v.String(), true
+	case complex128: // scalago.go.GoComplex, formatted as fmt's %v
+		return strconv.FormatComplex(v, 'g', -1, 128), true
 	}
 	return "", false
 }

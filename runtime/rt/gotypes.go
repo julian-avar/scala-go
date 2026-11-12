@@ -17,6 +17,7 @@ import (
 //	int8, uint8                        Byte (int8)
 //	float32, float64, bool             Float, Double, Boolean
 //	string                             GoString (the Go string itself)
+//	struct{}                           Unit
 //	struct values                      a pointer to a copy (facades of struct types hold pointers)
 //	anything else                      the Go value itself
 //
@@ -32,9 +33,12 @@ var basicTypes = map[string]reflect.Type{
 	"uint": reflect.TypeFor[uint](), "uint8": reflect.TypeFor[uint8](), "uint16": reflect.TypeFor[uint16](),
 	"uint32": reflect.TypeFor[uint32](), "uint64": reflect.TypeFor[uint64](), "uintptr": reflect.TypeFor[uintptr](),
 	"float32": reflect.TypeFor[float32](), "float64": reflect.TypeFor[float64](),
-	"any": reflect.TypeFor[any](), "error": reflect.TypeFor[error](),
+	"any": reflect.TypeFor[any](), "error": reflect.TypeFor[error](), "struct{}": emptyStruct,
+	"complex128":   reflect.TypeFor[complex128](),
 	"scala.String": reflect.TypeFor[*String](),
 }
+
+var emptyStruct = reflect.TypeFor[struct{}]()
 
 func GoTypeBasic(name *String) any {
 	t, ok := basicTypes[name.GoString()]
@@ -79,6 +83,9 @@ func toScalaValue(v reflect.Value) any {
 	}
 	switch t.Kind() {
 	case reflect.Struct:
+		if t == emptyStruct {
+			return UnitValue
+		}
 		p := reflect.New(t)
 		p.Elem().Set(v)
 		return p.Interface()
@@ -123,6 +130,9 @@ func fromScalaValue(x any, t reflect.Type) reflect.Value {
 	}
 	if t.Kind() == reflect.Struct && v.Kind() == reflect.Pointer && v.Type().Elem() == t {
 		return v.Elem()
+	}
+	if t == emptyStruct && x == any(UnitValue) {
+		return reflect.Zero(t)
 	}
 	if !v.Type().AssignableTo(t) {
 		ThrowKind(ClassCast, GetClass(x).name+" cannot be stored as Go type "+t.String())
@@ -461,3 +471,73 @@ func GoCall0(f any) any              { return f.(func() any)() }
 func GoCall1(f any, a any) any       { return f.(func(any) any)(a) }
 func GoCall2(f any, a, b any) any    { return f.(func(any, any) any)(a, b) }
 func GoCall3(f any, a, b, c any) any { return f.(func(any, any, any) any)(a, b, c) }
+
+// ---- Complex numbers (scalago.go.GoComplex: a complex128 in an any) ------------------------------
+
+func GoComplexMake(re, im float64) any { return complex(re, im) }
+func GoComplexReal(z any) float64      { return real(Cast[complex128](z)) }
+func GoComplexImag(z any) float64      { return imag(Cast[complex128](z)) }
+func GoComplexAdd(z, w any) any        { return Cast[complex128](z) + Cast[complex128](w) }
+func GoComplexSub(z, w any) any        { return Cast[complex128](z) - Cast[complex128](w) }
+func GoComplexMul(z, w any) any        { return Cast[complex128](z) * Cast[complex128](w) }
+func GoComplexDiv(z, w any) any        { return Cast[complex128](z) / Cast[complex128](w) }
+
+// ---- Calls through reflection ----------------------------------------------------------------
+
+// CallReflect calls func f with args and, if f is variadic, the elements of slice spread (or
+// none if nil). The generated code calls this when parameter or result types are ones it cannot
+// name (unexported, or of internal packages): reflection converts the arguments.
+func CallReflect(f any, args []any, spread any) []any {
+	fv := reflect.ValueOf(f)
+	ft := fv.Type()
+	in := make([]reflect.Value, 0, len(args))
+	for i, a := range args {
+		in = append(in, reflectArg(a, ft.In(i)))
+	}
+	if ft.IsVariadic() && spread != nil {
+		elem := ft.In(ft.NumIn() - 1).Elem()
+		sv := reflect.ValueOf(spread)
+		for i := 0; i < sv.Len(); i++ {
+			in = append(in, reflectArg(sv.Index(i).Interface(), elem))
+		}
+	}
+	out := fv.Call(in)
+	results := make([]any, len(out))
+	for i, o := range out {
+		results[i] = o.Interface()
+	}
+	return results
+}
+
+func reflectArg(a any, t reflect.Type) reflect.Value {
+	if a == nil {
+		return reflect.Zero(t)
+	}
+	v := reflect.ValueOf(a)
+	switch {
+	case v.Type().AssignableTo(t):
+		return v
+	case v.Type().ConvertibleTo(t):
+		return v.Convert(t)
+	}
+	ThrowKind(ClassCast, GetClass(a).name+" cannot be passed as Go type "+t.String())
+	return reflect.Value{}
+}
+
+// resultAs is a result of CallReflect as type T (nil is T's zero value).
+func resultAs[T any](x any) T {
+	if x == nil {
+		var zero T
+		return zero
+	}
+	return x.(T)
+}
+
+func Results1[A any](r []any) A         { return resultAs[A](r[0]) }
+func Results2[A, B any](r []any) (A, B) { return resultAs[A](r[0]), resultAs[B](r[1]) }
+func Results3[A, B, C any](r []any) (A, B, C) {
+	return resultAs[A](r[0]), resultAs[B](r[1]), resultAs[C](r[2])
+}
+func Results4[A, B, C, D any](r []any) (A, B, C, D) {
+	return resultAs[A](r[0]), resultAs[B](r[1]), resultAs[C](r[2]), resultAs[D](r[3])
+}

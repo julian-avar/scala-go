@@ -15,7 +15,7 @@ class ScalaGoPlugin extends StandardPlugin:
 
   override def initialize(options: List[String])(using Context): List[PluginPhase] =
     val renames = options.collect { case s"rename:$from:$to" => (from + ".", to + ".") }
-    List(GenGoIR(GoIRCodeGen.Options(lenient = options.contains("lenient"), renames,
+    List(GoTypeArgs(), GenGoIR(GoIRCodeGen.Options(lenient = options.contains("lenient"), renames,
       staticForwarders = options.contains("static-forwarders"))))
 
 /** Runs after all tree transformations (the trees are erased, flattened, with constructors

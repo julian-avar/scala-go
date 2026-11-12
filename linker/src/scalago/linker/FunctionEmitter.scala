@@ -504,8 +504,8 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     case GetAndSet(field, value) => atomicUpdate(tree, field, value, "GetAndSet")
     case GetAndAdd(field, delta) => atomicUpdate(tree, field, delta, "GetAndAdd")
 
-    case New(cls, _, _) if program.isFacade(cls) =>
-      ctx.interop.zeroValue(cls, tree.pos)
+    case n @ New(cls, _, _) if program.isFacade(cls) =>
+      ctx.interop.zeroValue(cls, tree.pos, n.typeArgs)
 
     case New(cls, ctor, args) =>
       Natives.lookup(cls, ctor) match
@@ -545,7 +545,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     case Unbox(arg, tpe) => s"rt.Cast[${ctx.goType(tpe)}](${genExpr(arg)})"
 
     case AsInstanceOf(arg, tpe) => ctx.cast(genExpr(arg), arg.tpe, tpe)
-    case IsInstanceOf(arg, tpe) => ctx.typeTest(genExpr(arg), tpe)
+    case IsInstanceOf(arg, tpe) => ctx.typeTest(genExpr(arg), tpe, tree.pos)
 
     case NewArray(elem, length) => s"rt.NewArray[${ctx.goArrayElemType(elem)}](${genExpr(length)})"
     case ArrayValue(elem, elems) =>
@@ -718,7 +718,7 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
     }
     emit("rt.FlushStdout()")
     val (receiver, args) = if isPackage then (None, values) else (Some(values.head), values.tail)
-    ctx.interop.use(facade, member, receiver, args, argTypes, tree.pos, emit)
+    ctx.interop.use(facade, member, receiver, args, argTypes, tree.pos, emit, tree.typeArgs)
 
   private def genApplyStatically(tree: ApplyStatically): String =
     val ApplyStatically(receiver, cls, m, args, _) = tree

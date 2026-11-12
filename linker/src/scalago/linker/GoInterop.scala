@@ -27,8 +27,13 @@ object GoInterop:
   val GoMapType = "scalago.go.GoMap"
   val GoChanType = "scalago.go.GoChan"
   val GoPtrType = "scalago.go.GoPtr"
+  /** `complex128` (and `complex64`, converted). */
+  val GoComplexType = "scalago.go.GoComplex"
+  /** `Unit` as a type argument (`GoChan[Unit]`, for Go's `chan struct{}`). */
+  val UnitClass = "scala.Unit"
+  val BoxedUnitClass = "scala.runtime.BoxedUnit"
   /** Opaque types whose values are Go values (in an `any`). */
-  val GoValueTypes: Set[String] = Set(GoStringType, GoSliceType, GoMapType, GoChanType, GoPtrType)
+  val GoValueTypes: Set[String] = Set(GoStringType, GoSliceType, GoMapType, GoChanType, GoPtrType, GoComplexType)
   /** Go numeric types (opaque over Scala numbers), with the Go type and the Scala type they stand for. */
   val GoNumberTypes: Map[String, (String, Type)] = Map(
     "scalago.go.GoInt" -> ("int", Type.Long), "scalago.go.GoUint" -> ("uint", Type.Long),
@@ -38,6 +43,7 @@ object GoInterop:
 
   /** `s` with the Go numeric types replaced by the Scala types they are opaque over. */
   def normalize(s: ScalaType): ScalaType = s match
+    case p: ScalaType.Param                               => p
     case ScalaType.Ref(n, _) if GoNumberTypes.contains(n) => ScalaType.Prim(GoNumberTypes(n)._2)
     case ScalaType.Ref(n, args)                           => ScalaType.Ref(n, args.map(normalize))
     case ScalaType.Arr(e)                                 => ScalaType.Arr(normalize(e))
@@ -60,16 +66,20 @@ object GoInterop:
 
   /** The erased IR type of values of Scala type `t`. */
   def erased(t: ScalaType): Type = t match
+    case ScalaType.Param(_)             => Type.Object
     case ScalaType.Prim(p)              => p
     case ScalaType.Ref(n, _) if GoNumberTypes.contains(n) => GoNumberTypes(n)._2
     case ScalaType.Ref(t, _) if GoValueTypes(t) => Type.Object
     case ScalaType.Ref(name, _)         => Type.Class(name)
     case ScalaType.Arr(e)               => Type.Array(erased(e))
 
-  /** The facade's arguments: varargs built by the compiler are passed as their array. */
+  /** The facade's arguments: varargs built by the compiler are passed as their array (not those
+   *  of a type parameter's type, whose array is erased: they are passed as the `Seq`).
+   */
   def facadeArgs(args: List[Tree], params: List[ScalaType]): List[(Tree, ScalaType)] =
     args.zip(params).map { (arg, t) =>
       (t, varargsArray(arg)) match
+        case (ScalaType.Ref(SeqClass, List(ScalaType.Param(_))), _) => (arg, t)
         case (ScalaType.Ref(SeqClass, List(elem)), Some(array)) => (array, ScalaType.Arr(elem))
         case _                                                  => (arg, t)
     }
@@ -95,6 +105,7 @@ object GoInterop:
   private val integerBasics = Set("int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64",
     "uintptr", "byte", "rune")
   private val numericBasics = integerBasics ++ Set("float32", "float64")
+  private val complexBasics = Set("complex64", "complex128")
 
   private def normalizeBasic(b: String): String = b match
     case "byte" => "uint8"
@@ -147,9 +158,10 @@ final class GoInterop(ctx: LinkContext):
 
   /** The Go spelling of `t`, with package aliases. */
   def typeString(t: GoType): String = t match
-    case GoType.Basic(b) if !b.startsWith("untyped") && (numericBasics(b) || b == "string" || b == "bool") => b
+    case GoType.Basic(b) if !b.startsWith("untyped") && (numericBasics(b) || complexBasics(b) || b == "string" || b == "bool") => b
     case GoType.Named(ScalaExportPkg, cls) => ctx.exports.ifaceName(cls)
     case GoType.Named(p, n)    => qualified(p, n)
+    case GoType.Generic(p, n, as) => as.map(typeString).mkString(s"${qualified(p, n)}[", ", ", "]")
     case GoType.Ptr(e)         => s"*${typeString(e)}"
     case GoType.Slice(e)       => s"[]${typeString(e)}"
     case GoType.ArrayOf(n, e)  => s"[$n]${typeString(e)}"
@@ -159,6 +171,7 @@ final class GoInterop(ctx: LinkContext):
     case GoType.Chan(e, _)     => s"chan ${typeString(e)}"
     case GoType.Func(sig)      => s"func${signatureString(sig, None)}"
     case GoType.EmptyInterface => "any"
+    case GoType.EmptyStruct    => "struct{}"
     case other                 => fail(s"Go type $other is not supported")
 
   /** `typeString` for the public root package of a library, where exported classes are spelled
@@ -194,19 +207,32 @@ final class GoInterop(ctx: LinkContext):
       case several   => several.mkString(" (", ", ", ")")
     s"(${params.mkString(", ")})$results"
 
-  /** A Go type that a facade class stands for. */
-  private final case class FacadeType(facade: GoFacade, decl: GoTypeDecl):
-    def name: String = qualified(facade.pkg, facade.name)
+  /** A Go type that a facade class stands for: for a generic type, the instance with `args`
+   *  (its declaration instantiated with them).
+   */
+  private final case class FacadeType(facade: GoFacade, decl: GoTypeDecl, args: List[GoType]):
+    def goType: GoType = if args.isEmpty then GoType.Named(facade.pkg, facade.name) else GoType.Generic(facade.pkg, facade.name, args)
+    def name: String = typeString(goType)
     def isStruct: Boolean = decl.kind == GoTypeKind.Struct
     /** The Go type of the values facade references hold. */
     def stored: String = if isStruct then s"*$name" else name
 
-  private def facadeType(cls: ClassName): FacadeType =
+  /** The Go type that facade class `cls` stands for; `typeArgs` instantiate a generic one. */
+  private def facadeType(cls: ClassName, typeArgs: List[ScalaType] = Nil): FacadeType =
     val facade = program.facade(cls).flatMap(_.goFacade).getOrElse(fail(s"$cls is not a Go facade"))
     if facade.isPackage then fail(s"$cls stands for a Go package, not a type")
     val decl = api.typeDecl(facade.pkg, facade.name)
       .getOrElse(fail(s"Go package ${facade.pkg} has no exported type ${facade.name} (facade ${scalaName(cls)})"))
-    FacadeType(facade, decl)
+    if decl.isGeneric && facade.typeParams.size != decl.typeParams.size then
+      fail(s"Go type ${facade.pkg}.${facade.name} is generic: its facade ${scalaName(cls)} needs ${decl.typeParams.size} type parameters")
+    if decl.isGeneric && typeArgs.size != decl.typeParams.size then
+      fail(s"the type arguments of generic Go type ${facade.pkg}.${facade.name} are not known here")
+    val args = if decl.isGeneric then typeArgs.map(goTypeOf) else Nil
+    FacadeType(facade, decl.instantiate(args), args)
+
+  /** Whether facade class `cls` stands for a generic Go type. */
+  private def isGenericFacade(cls: ClassName): Boolean =
+    program.facade(cls).flatMap(_.goFacade).exists(_.typeParams.nonEmpty)
 
   /** Whether facade `cls` stands for the Go named type `pkg.name` (directly or through an alias). */
   private def standsFor(cls: ClassName, pkg: String, name: String): Boolean =
@@ -222,13 +248,24 @@ final class GoInterop(ctx: LinkContext):
   private object EmptyInterfaceNamed:
     def unapply(g: GoType): Boolean = g match
       case GoType.Named(pkg, n) if pkg != ScalaExportPkg => api.typeDecl(pkg, n).exists(_.isEmptyInterface)
+      case GoType.Generic(pkg, n, _)                   => api.typeDecl(pkg, n).exists(_.isEmptyInterface)
       case _                                           => false
 
-  /** The signature of a named func type (`type Cmd func() Msg`), which converts as its func type. */
+  /** The signature of a named func type (`type Cmd func() Msg`, `iter.Seq[string]`), which
+   *  converts as its func type.
+   */
   private object NamedFunc:
     def unapply(g: GoType): Option[GoSignature] = g match
       case GoType.Named(pkg, n) if pkg != ScalaExportPkg => api.typeDecl(pkg, n).flatMap(_.funcSignature)
+      case GoType.Generic(pkg, n, as)                  => api.typeDecl(pkg, n).flatMap(_.instantiate(as).funcSignature)
       case _                                           => None
+
+  /** A named type, or an instance of a generic one: its package, name and declaration. */
+  private object Defined:
+    def unapply(g: GoType): Option[(String, String, GoTypeDecl)] = g match
+      case GoType.Named(pkg, n) if pkg != ScalaExportPkg => Some((pkg, n, namedDecl(pkg, n)))
+      case GoType.Generic(pkg, n, as) => Some((pkg, n, namedDecl(pkg, n).instantiate(as)))
+      case _                          => None
 
   private def scalaGoType(s: ScalaType): String =
     val t = ctx.goType(erased(s))
@@ -256,9 +293,8 @@ final class GoInterop(ctx: LinkContext):
     case (Ref(Arity("scala.Function", _), args), NamedFunc(sig)) => funcToGo(e, args, sig)
     case (Prim(p), GoType.Named(pkg, n)) if p.isNumeric && namedDecl(pkg, n).kind == GoTypeKind.Other =>
       s"${qualified(pkg, n)}($e)"
-    case (Ref(cls, _), GoType.Named(pkg, n)) =>
-      val decl = namedDecl(pkg, n)
-      val goT = qualified(pkg, n)
+    case (Ref(cls, _), Defined(pkg, n, decl)) =>
+      val goT = typeString(g)
       decl.kind match
         case GoTypeKind.Interface if holdsGoValues(cls) => s"rt.ToGoInterface[$goT]($e)"
         case GoTypeKind.Interface => s"rt.Cast[$goT]($e)"
@@ -266,8 +302,12 @@ final class GoInterop(ctx: LinkContext):
         case GoTypeKind.Other if standsFor(cls, pkg, n)  => s"rt.Cast[$goT]($e)"
         case GoTypeKind.Other if cls == ClassName.String  => s"$goT($e.GoString())"
         case _ => fail(s"cannot pass Scala type $s as Go type $g")
-    case (Ref(cls, _), GoType.Ptr(GoType.Named(pkg, n))) if standsFor(cls, pkg, n) =>
-      s"rt.Cast[*${qualified(pkg, n)}]($e)"
+    case (Ref(cls, _), GoType.Ptr(t @ Defined(pkg, n, _))) if standsFor(cls, pkg, n) =>
+      s"rt.Cast[*${typeString(t)}]($e)"
+    case (Ref(GoSliceType, _), GoType.ArrayOf(n, ge)) =>
+      // A Go array is a value: a copy of the slice's first n elements (a shorter one panics).
+      checkCanonical(s, GoType.Slice(ge))
+      s"[$n]${typeString(ge)}(rt.ConvertGo[[]${typeString(ge)}]($e))"
     case (Ref(t, _), _) if GoValueTypes(t) && t != GoStringType =>
       checkCanonical(s, g)
       s"rt.ConvertGo[${typeString(g)}]($e)"
@@ -283,6 +323,8 @@ final class GoInterop(ctx: LinkContext):
   private def basicToGo(e: String, s: ScalaType, b: String): String = (s, normalizeBasic(b)) match
     case (Ref(ClassName.String, _), "string") => s"$e.GoString()"
     case (Ref(GoStringType, _), "string")     => s"rt.Cast[string]($e)"
+    case (Ref(GoComplexType, _), "complex128") => s"rt.Cast[complex128]($e)"
+    case (Ref(GoComplexType, _), "complex64")  => s"complex64(rt.Cast[complex128]($e))"
     case (Prim(Type.Boolean), "bool")         => e
     case (Prim(p), goB) if p.isNumeric && numericBasics(goB) =>
       if Hijacked.primitiveGoType(p) == goB then e else s"$b($e)"
@@ -363,20 +405,28 @@ final class GoInterop(ctx: LinkContext):
   def fromGo(e: String, g: GoType, s: ScalaType): String = fromGoNormalized(e, g, normalize(s))
 
   private def fromGoNormalized(e: String, g: GoType, s: ScalaType): String = (g, s) match
+    // A value of a type Go code outside its package cannot name: Scala holds it as it is.
+    case (GoType.Named(_, _) | _: GoType.Generic | GoType.Ptr(GoType.Named(_, _) | _: GoType.Generic), _) if api.mentionsOpaque(g) =>
+      ctx.cast(s"any($e)", Type.Object, erased(s))
     case (GoType.Named(ScalaExportPkg, _), _: Ref) => ctx.cast(s"any($e)", Type.Object, erased(s))
     case (GoType.Basic(b), _) => basicFromGo(e, b, s)
     case (EmptyInterfaceNamed(), _) => fromGoNormalized(e, GoType.EmptyInterface, s)
     case (NamedFunc(sig), Ref(Arity("scala.Function", n), args)) => funcFromGo(e, sig, n, args)
     case (GoType.Named(pkg, n), Prim(p)) if p.isNumeric && namedDecl(pkg, n).kind == GoTypeKind.Other =>
       s"${Hijacked.primitiveGoType(p)}($e)"
-    case (GoType.Named(pkg, n), Ref(cls, _)) =>
-      namedDecl(pkg, n).kind match
+    case (Defined(pkg, n, decl), Ref(cls, _)) =>
+      decl.kind match
         case GoTypeKind.Interface => ctx.cast(s"any($e)", Type.Object, erased(s))
         case GoTypeKind.Struct if standsFor(cls, pkg, n) => s"rt.Addr($e)"
         case GoTypeKind.Other if standsFor(cls, pkg, n) => s"any($e)"
         case GoTypeKind.Other if cls == ClassName.String => s"rt.Str(string($e))"
         case _ => fail(s"cannot convert Go type $g to Scala type $s")
-    case (GoType.Ptr(GoType.Named(pkg, n)), Ref(cls, _)) if standsFor(cls, pkg, n) => s"rt.FromPtr($e)"
+    case (GoType.Ptr(Defined(pkg, n, _)), Ref(cls, _)) if standsFor(cls, pkg, n) => s"rt.FromPtr($e)"
+    case (GoType.ArrayOf(n, ge), Ref(GoSliceType, _)) =>
+      // A slice of a copy of the array.
+      checkCanonical(s, GoType.Slice(ge))
+      val a = fresh("a")
+      s"any(func($a [$n]${typeString(ge)}) []${typeString(ge)} { return $a[:] }($e))"
     case (_, Ref(t, _)) if GoValueTypes(t) && t != GoStringType =>
       checkCanonical(s, g)
       s"any($e)"
@@ -389,6 +439,8 @@ final class GoInterop(ctx: LinkContext):
   private def basicFromGo(e: String, b: String, s: ScalaType): String = (normalizeBasic(b), s) match
     case ("string", Ref(ClassName.String, _))           => s"rt.Str($e)"
     case ("string", Ref(GoStringType | ClassName.Object, _)) => s"any($e)"
+    case ("complex128", Ref(GoComplexType | ClassName.Object, _)) => s"any($e)"
+    case ("complex64" | "complex", Ref(GoComplexType | ClassName.Object, _)) => s"any(complex128($e))"
     case ("bool", Prim(Type.Boolean))                   => e
     case (goB, Prim(p)) if p.isNumeric && (numericBasics(goB) || goB == "int" || goB == "float" || goB == "rune") =>
       if Hijacked.primitiveGoType(p) == goB then e else s"${Hijacked.primitiveGoType(p)}($e)"
@@ -431,8 +483,10 @@ final class GoInterop(ctx: LinkContext):
 
   private def isCanonical(s: ScalaType, g: GoType): Boolean = (s, g) match
     case (Ref(ClassName.Object, _), _)                          => true
+    case (Prim(Type.Void) | Ref(UnitClass | BoxedUnitClass, _), GoType.EmptyStruct) => true
     case (Prim(p), GoType.Basic(b))                             => canonicalPrimitive.get(normalizeBasic(b)).contains(p)
     case (Ref(GoStringType, _), GoType.Basic(b))                => normalizeBasic(b) == "string"
+    case (Ref(GoComplexType, _), GoType.Basic(b))               => normalizeBasic(b) == "complex128"
     case (Ref(GoSliceType, List(e)), GoType.Slice(ge))          => isCanonical(e, ge)
     case (Ref(GoMapType, List(k, v)), GoType.MapOf(gk, gv))     => isCanonical(k, gk) && isCanonical(v, gv)
     case (Ref(GoChanType, List(e)), GoType.Chan(ge, _))         => isCanonical(e, ge)
@@ -440,7 +494,11 @@ final class GoInterop(ctx: LinkContext):
     case (Ref(cls, _), GoType.Named(ScalaExportPkg, c))         => cls == c
     case (Ref(cls, _), GoType.Named(pkg, n))                    =>
       standsFor(cls, pkg, n) || (namedDecl(pkg, n).kind == GoTypeKind.Interface && program.isFacade(cls))
+    case (Ref(cls, targs), GoType.Generic(pkg, n, as))          =>
+      standsFor(cls, pkg, n) && targs.size == as.size && targs.zip(as).forall(isCanonical(_, _))
     case (Ref(cls, _), GoType.Ptr(GoType.Named(pkg, n)))        => standsFor(cls, pkg, n)
+    case (Ref(cls, targs), GoType.Ptr(GoType.Generic(pkg, n, as))) =>
+      standsFor(cls, pkg, n) && targs.size == as.size && targs.zip(as).forall(isCanonical(_, _))
     case _                                                      => false
 
   private def canonicalSpelling(g: GoType): String = g match
@@ -453,6 +511,7 @@ final class GoInterop(ctx: LinkContext):
     case GoType.Ptr(e)            => s"GoPtr[${canonicalSpelling(e)}]"
     case GoType.Named(p, n)       => s"a facade of ${if p.isEmpty then n else s"$p.$n"}"
     case GoType.EmptyInterface    => "Any"
+    case GoType.EmptyStruct       => "Unit"
     case other                    => s"not representable ($other)"
 
   // ---- Calls --------------------------------------------------------------------------------------
@@ -464,90 +523,190 @@ final class GoInterop(ctx: LinkContext):
    *  @param emit     emits statements (assignments to Go fields and variables)
    *  @return a Go expression of the member's (erased) Scala result type; empty for none
    */
-  def use(owner: ClassDef, member: MethodDef, receiver: Option[String], args: List[String], argTypes: List[ScalaType],
-      pos: Position, emit: String => Unit): String =
-    val g = member.goMember.get
+  def use(owner: ClassDef, member: MethodDef, receiver: Option[String], args0: List[String], declaredArgTypes: List[ScalaType],
+      pos: Position, emit: String => Unit, typeArgs: List[(String, ScalaType)] = Nil): String =
+    val declared = member.goMember.get
     val facade = owner.goFacade.get
     reporting(pos, s"Go facade member ${scalaName(owner.name)}.${member.name.simple.stripSuffix("_$eq")}") {
-      val isSetter = member.name.simple.endsWith("_$eq") && args.size == 1
-      def assign(lhs: String, t: GoType): String =
-        emit(s"$lhs = ${toGo(args.head, argTypes.head, t)}")
-        ""
-      if facade.isPackage then
-        val pkg = api.packages.getOrElse(facade.pkg, fail(s"Go package ${facade.pkg} could not be loaded"))
-        val q = qualified(facade.pkg, g.goName)
-        if isSetter then assign(q, pkg.vars.getOrElse(g.goName, fail(s"Go package ${facade.pkg} has no variable ${g.goName}")))
+      // The type parameters of the member and of its generic class, by the call's type arguments.
+      val bindings = typeArgs.toMap
+      def subst(t: ScalaType): ScalaType = t match
+        case ScalaType.Param(n) =>
+          bindings.getOrElse(n, fail(s"the type argument of type parameter $n is not known here"))
+        case Ref(n, as) => Ref(n, as.map(subst))
+        case Arr(e)     => Arr(subst(e))
+        case other      => other
+      val g = declared.copy(params = declared.params.map(subst), result = subst(declared.result))
+      val argTypes = declaredArgTypes.map(subst)
+      // An argument of a type parameter's type is erased (an `any`): unboxed to its type argument's.
+      val args = args0.zip(declaredArgTypes).zip(argTypes).map {
+        case ((a, ScalaType.Param(_)), actual) => ctx.cast(a, Type.Object, erased(actual))
+        case ((a, _), _)                       => a
+      }
+      val classTypeArgs = facade.typeParams.map(n => bindings.getOrElse(n, fail(s"the type argument of $n is not known here")))
+      // A result of a type parameter's type is erased too: boxed.
+      def erasedResult(e: String): String = declared.result match
+        case ScalaType.Param(_) if e.nonEmpty => ctx.cast(e, erased(g.result), Type.Object)
+        case _                                => e
+      erasedResult {
+        val isSetter = member.name.simple.endsWith("_$eq") && args.size == 1
+        def assign(lhs: String, t: GoType): String =
+          emit(s"$lhs = ${toGo(args.head, argTypes.head, t)}")
+          ""
+        if facade.isPackage then
+          val pkg = api.packages.getOrElse(facade.pkg, fail(s"Go package ${facade.pkg} could not be loaded"))
+          val q = qualified(facade.pkg, g.goName)
+          if isSetter then assign(q, pkg.vars.getOrElse(g.goName, fail(s"Go package ${facade.pkg} has no variable ${g.goName}")))
+          else
+            pkg.funcs.get(g.goName) match
+              case Some(sig) if !(g.isProperty && sig.params.nonEmpty) => call(q, sig, args, argTypes, g.result, bindings)
+              case _ if args.isEmpty && pkg.vars.contains(g.goName)   => fromGo(q, pkg.vars(g.goName), g.result)
+              case _ if args.isEmpty && pkg.consts.contains(g.goName) =>
+                // A typed constant is converted as a value: converting the constant itself is checked
+                // against the range of the Scala type (`uint32` 0xfeedface to `int32`).
+                val t = pkg.consts(g.goName)
+                val (value, goType) = t match
+                  case GoType.Basic("untyped-int") if !GoConstants.fitsLong(pkg.constValues.getOrElse(g.goName, "0")) =>
+                    // Beyond int64 (`math.MaxUint64`): the bits of a uint64.
+                    (s"func() uint64 { return $q }()", GoType.Basic("uint64"))
+                  case GoType.Basic(b) if b.startsWith("untyped") => (q, t)
+                  case _                                          => (s"func() ${typeString(t)} { return $q }()", t)
+                fromGo(value, goType, g.result)
+              case _ if args.size == 1 && pkg.types.get(g.goName).exists(d => d.kind == GoTypeKind.Other && d.underlying.isDefined) =>
+                // A conversion to a named type (`lipgloss.Color("205")`, `time.Duration(n)`).
+                val underlying = pkg.types(g.goName).underlying.get
+                fromGo(s"$q(${toGo(args.head, argTypes.head, underlying)})", GoType.Named(facade.pkg, g.goName), g.result)
+              case _ => fail(s"Go package ${facade.pkg} has no exported function, variable, constant or type ${g.goName}")
         else
-          pkg.funcs.get(g.goName) match
-            case Some(sig) if !(g.isProperty && sig.params.nonEmpty) => call(q, sig, args, argTypes, g.result)
-            case _ if args.isEmpty && pkg.vars.contains(g.goName)   => fromGo(q, pkg.vars(g.goName), g.result)
-            case _ if args.isEmpty && pkg.consts.contains(g.goName) => fromGo(q, pkg.consts(g.goName), g.result)
-            case _ if args.size == 1 && pkg.types.get(g.goName).exists(d => d.kind == GoTypeKind.Other && d.underlying.isDefined) =>
-              // A conversion to a named type (`lipgloss.Color("205")`, `time.Duration(n)`).
-              val underlying = pkg.types(g.goName).underlying.get
-              fromGo(s"$q(${toGo(args.head, argTypes.head, underlying)})", GoType.Named(facade.pkg, g.goName), g.result)
-            case _ => fail(s"Go package ${facade.pkg} has no exported function, variable, constant or type ${g.goName}")
-      else
-        val t = facadeType(owner.name)
-        val recv = s"rt.Cast[${t.stored}](${receiver.get})"
-        if isSetter then
-          assign(s"$recv.${g.goName}", t.decl.fields.getOrElse(g.goName, fail(s"Go type ${t.facade.pkg}.${t.facade.name} has no field ${g.goName}")))
-        else
-          t.decl.methods.get(g.goName) match
-            case Some(sig) if !(g.isProperty && sig.params.nonEmpty) => call(s"$recv.${g.goName}", sig, args, argTypes, g.result)
-            case _ if args.isEmpty && t.decl.fields.contains(g.goName) => fromGo(s"$recv.${g.goName}", t.decl.fields(g.goName), g.result)
-            case _ => fail(s"Go type ${t.facade.pkg}.${t.facade.name} has no exported method or field ${g.goName}")
+          val t = facadeType(owner.name, classTypeArgs)
+          val recv = s"rt.Cast[${t.stored}](${receiver.get})"
+          if isSetter then
+            assign(s"$recv.${g.goName}", t.decl.fields.getOrElse(g.goName, fail(s"Go type ${t.facade.pkg}.${t.facade.name} has no field ${g.goName}")))
+          else
+            t.decl.methods.get(g.goName) match
+              case Some(sig) if !(g.isProperty && sig.params.nonEmpty) => call(s"$recv.${g.goName}", sig, args, argTypes, g.result, bindings)
+              case _ if args.isEmpty && t.decl.fields.contains(g.goName) => fromGo(s"$recv.${g.goName}", t.decl.fields(g.goName), g.result)
+              case _ if t.decl.pointerMethods.contains(g.goName) =>
+                fail(s"method ${g.goName} of Go type ${t.facade.pkg}.${t.facade.name} has a pointer receiver: Scala holds " +
+                  "values of that type as copies, which it would change")
+              case _ => fail(s"Go type ${t.facade.pkg}.${t.facade.name} has no exported method or field ${g.goName}")
+      }
     }
 
-  private def call(fn: String, genericSig: GoSignature, args: List[String], argTypes: List[ScalaType], result: ScalaType): String =
-    val sig = if genericSig.generic then instantiate(genericSig, argTypes, result) else genericSig
-    val typedArgs = args.zip(argTypes)
-    val goArgs =
-      if !sig.variadic then
-        if args.size != sig.params.size then fail(s"the Go declaration has ${sig.params.size} parameters: $sig")
-        typedArgs.zip(sig.params).map { case ((a, s), t) => toGo(a, s, t) }
+  private def call(genericFn: String, genericSig: GoSignature, args: List[String], argTypes: List[ScalaType], result: ScalaType,
+      scalaTypeArgs: Map[String, ScalaType]): String =
+    val (fn, sig) =
+      if !genericSig.generic then (genericFn, genericSig)
       else
-        val fixed = sig.params.init
-        val elem = sig.params.last.asInstanceOf[GoType.Slice].elem
-        if args.size < fixed.size then fail(s"the Go declaration has at least ${fixed.size} parameters: $sig")
-        val fixedArgs = typedArgs.take(fixed.size).zip(fixed).map { case ((a, s), t) => toGo(a, s, t) }
-        typedArgs.drop(fixed.size) match
-          case List((a, s @ (_: Arr | Ref(SeqClass, _)))) => fixedArgs :+ (toGo(a, s, sig.params.last) + "...")
-          case rest                                       => fixedArgs ++ rest.map((a, s) => toGo(a, s, elem))
-    results(s"$fn(${goArgs.mkString(", ")})", sig.results, result)
+        val bindings = typeParamBindings(genericSig, argTypes, result, scalaTypeArgs)
+        val explicit = genericSig.typeParams.map((n, _) => typeString(bindings(n))).mkString("[", ", ", "]")
+        (s"$genericFn$explicit", genericSig.substitute(bindings))
+    if (sig.params ++ sig.results).exists(api.mentionsOpaque) then reflectiveCall(fn, sig, args, argTypes, result)
+    else
+      val typedArgs = args.zip(argTypes)
+      val goArgs =
+        if !sig.variadic then
+          if args.size != sig.params.size then fail(s"the Go declaration has ${sig.params.size} parameters: $sig")
+          typedArgs.zip(sig.params).map { case ((a, s), t) => toGo(a, s, t) }
+        else
+          val fixed = sig.params.init
+          val elem = sig.params.last.asInstanceOf[GoType.Slice].elem
+          if args.size < fixed.size then fail(s"the Go declaration has at least ${fixed.size} parameters: $sig")
+          val fixedArgs = typedArgs.take(fixed.size).zip(fixed).map { case ((a, s), t) => toGo(a, s, t) }
+          typedArgs.drop(fixed.size) match
+            case List((a, s @ (_: Arr | Ref(SeqClass, _)))) => fixedArgs :+ (toGo(a, s, sig.params.last) + "...")
+            case rest                                       => fixedArgs ++ rest.map((a, s) => toGo(a, s, elem))
+      results(s"$fn(${goArgs.mkString(", ")})", sig.results, result)
 
-  /** A generic Go function's signature as instantiated by a (monomorphic) facade: the Go types
-   *  that mention type parameters are those of the facade's Scala types. The call passes values
-   *  of those types, so Go infers the type arguments.
+  /** A call of a Go function or method whose parameters or results have types that Go code outside
+   *  their package cannot name (`json.Marshal(in, opts ...jsonopts.Options)`): through
+   *  reflection, which converts the arguments to them (`rt.CallReflect`). Their values are Go
+   *  values that Scala holds as they are; the other arguments are converted as usual.
    */
-  private def instantiate(sig: GoSignature, argTypes: List[ScalaType], result: ScalaType): GoSignature =
-    def mentionsTypeParam(g: GoType): Boolean = g match
-      case GoType.TypeParam(_)                => true
-      case GoType.Ptr(e)                      => mentionsTypeParam(e)
-      case GoType.Slice(e)                    => mentionsTypeParam(e)
-      case GoType.ArrayOf(_, e)               => mentionsTypeParam(e)
-      case GoType.MapOf(k, v)                 => mentionsTypeParam(k) || mentionsTypeParam(v)
-      case GoType.Chan(e, _)                  => mentionsTypeParam(e)
-      case GoType.Func(s)                     => (s.params ++ s.results).exists(mentionsTypeParam)
-      case _                                  => false
-    def fixed(g: GoType, s: => ScalaType): GoType = if mentionsTypeParam(g) then goTypeOf(s) else g
-    if sig.params.size != argTypes.size && !sig.variadic then
-      fail(s"the Go declaration has ${sig.params.size} parameters: $sig")
+  private def reflectiveCall(fn: String, sig: GoSignature, args: List[String], argTypes: List[ScalaType], result: ScalaType): String =
+    def asAny(a: String, s: ScalaType, t: GoType): String =
+      if api.mentionsOpaque(t) then a else s"any(${toGo(a, s, t)})"
+    val typedArgs = args.zip(argTypes)
+    val fixed = if sig.variadic then sig.params.init else sig.params
+    if args.size < fixed.size || (!sig.variadic && args.size != fixed.size) then fail(s"the Go declaration has ${sig.params.size} parameters: $sig")
+    val fixedArgs = typedArgs.take(fixed.size).zip(fixed).map { case ((a, s), t) => asAny(a, s, t) }
+    val spread =
+      if !sig.variadic then "nil"
+      else
+        val slice = sig.params.last.asInstanceOf[GoType.Slice]
+        typedArgs.drop(fixed.size) match
+          case List((a, s @ (_: Arr | Ref(SeqClass, _)))) =>
+            toGo(a, s, if api.mentionsOpaque(slice.elem) then GoType.Slice(GoType.EmptyInterface) else slice)
+          case rest => rest.map((a, s) => asAny(a, s, slice.elem)).mkString("[]any{", ", ", "}")
+    val call = s"rt.CallReflect($fn, []any{${fixedArgs.mkString(", ")}}, $spread)"
+    val rs = sig.results.map(r => if api.mentionsOpaque(r) then GoType.EmptyInterface else r)
+    val typed = rs match
+      case Nil                => call
+      case _ if rs.size <= 4  => s"rt.Results${rs.size}[${rs.map(typeString).mkString(", ")}]($call)"
+      case _                  => fail("a Go function with more than 4 results and types that cannot be named")
+    results(typed, rs, result)
+
+  /** The type arguments of a call of a generic Go function, given explicitly in the generated code:
+   *
+   *  - those of Scala type parameters standing for Go's (same names), from the call's Scala type
+   *    arguments (`slices.Max[GoInt]`: `E` is `int`);
+   *  - those whose constraint has a core type (`S ~[]E`): the core type (`[]int`);
+   *  - the others from the facade's Scala types (monomorphic facades of generic functions):
+   *    unified with the Go types of the parameters, data before funcs (a func converts its
+   *    arguments, Go data is shared: `Map(xs []T, f func(T) U)` with `GoSlice[GoInt]` and
+   *    `Long => GoString` is `Map[int, string]`), then of the results.
+   */
+  private def typeParamBindings(sig: GoSignature, argTypes: List[ScalaType], result: ScalaType,
+      scalaTypeArgs: Map[String, ScalaType]): Map[String, GoType] =
+    val bound = mutable.LinkedHashMap.empty[String, GoType]
+    for (n, _) <- sig.typeParams; s <- scalaTypeArgs.get(n) do bound(n) = goTypeOf(s)
+    def unify(g: GoType, t: GoType): Unit = (g, t) match
+      case (GoType.TypeParam(n), _)                     => if !bound.contains(n) then bound(n) = t
+      case (GoType.Ptr(a), GoType.Ptr(b))               => unify(a, b)
+      case (GoType.Slice(a), GoType.Slice(b))           => unify(a, b)
+      case (GoType.ArrayOf(_, a), GoType.ArrayOf(_, b)) => unify(a, b)
+      case (GoType.MapOf(k, v), GoType.MapOf(k2, v2))   => unify(k, k2); unify(v, v2)
+      case (GoType.Chan(a, _), GoType.Chan(b, _))       => unify(a, b)
+      case (GoType.Func(s), GoType.Func(s2))            => (s.params ++ s.results).zip(s2.params ++ s2.results).foreach(unify)
+      case (GoType.Generic(p, n, as), GoType.Generic(p2, n2, bs)) if p == p2 && n == n2 => as.zip(bs).foreach(unify)
+      case _                                            => ()
+    def goTypeOrNone(s: ScalaType): Option[GoType] = try Some(goTypeOf(s)) catch case _: Unconvertible => None
+    // Core types, as far as the parameters they mention are bound.
+    def cores(): Unit =
+      for case (n, GoType.Constraint(Some(core), _, _)) <- sig.typeParams if !bound.contains(n) do
+        val c = core.substitute(bound.toMap)
+        if !sig.typeParams.exists((m, _) => c.mentions(m)) then bound(n) = c
+    cores()
+    if sig.params.size != argTypes.size && !sig.variadic then fail(s"the Go declaration has ${sig.params.size} parameters: $sig")
     val params = sig.params.zipWithIndex.map { (g, i) =>
-      if sig.variadic && i == sig.params.size - 1 then
-        argTypes.drop(i) match
-          case List(Ref(SeqClass, List(e))) => fixed(g, Arr(e))
-          case List(a: Arr)                 => fixed(g, a)
-          case rest                         => fixed(g, Arr(rest.headOption.getOrElse(Ref(ClassName.Object, Nil))))
-      else fixed(g, argTypes(i))
+      val s =
+        if sig.variadic && i == sig.params.size - 1 then
+          argTypes.drop(i) match
+            case List(Ref(SeqClass, List(e))) => Arr(e)
+            case List(a: Arr)                 => a
+            case rest                         => Arr(rest.headOption.getOrElse(Ref(ClassName.Object, Nil)))
+        else argTypes(i)
+      (g, s)
     }
+    def isFunc(g: GoType) = g match
+      case GoType.Func(_) | NamedFunc(_) => true
+      case _                             => false
+    // A parameter bound to a type binds those its core type mentions (`S ~[]E` bound to `[]int`: `E` is `int`).
+    def coresBack(): Unit =
+      for case (n, GoType.Constraint(Some(core), _, _)) <- sig.typeParams; b <- bound.get(n) do unify(core, b)
+    for (g, s) <- params.filterNot((g, _) => isFunc(g)) do
+      goTypeOrNone(s).foreach(unify(g, _))
+      coresBack()
+    for (g, s) <- params.filter((g, _) => isFunc(g)); t <- goTypeOrNone(s) do unify(g, t)
     val values = if sig.results.lastOption.contains(GoType.Error) then sig.results.init else sig.results
     val resultTypes = result match
       case Ref(Arity("scala.Tuple", n), targs) if n == values.size && n > 1 => targs
-      case Ref(Arity("scala.Tuple", n), targs) if n == sig.results.size => targs
       case other                                                          => List(other)
-    val results = sig.results.zipWithIndex.map((g, i) => fixed(g, resultTypes.lift(i).getOrElse(fail(s"cannot instantiate $g"))))
-    GoSignature(params, results, sig.variadic, generic = false)
+    for (g, s) <- values.zip(resultTypes); t <- goTypeOrNone(s) do unify(g, t)
+    coresBack()
+    cores()
+    for (n, _) <- sig.typeParams if !bound.contains(n) do fail(s"cannot infer type argument $n of the generic Go function: $sig")
+    bound.toMap
 
   /** The Go type for a Scala type: for instantiating generic Go functions, and in exports. */
   def goTypeOf(s: ScalaType): GoType = s match
@@ -555,6 +714,7 @@ final class GoInterop(ctx: LinkContext):
     case Prim(p) if p.isNumeric                     => GoType.Basic(Hijacked.primitiveGoType(p))
     case Ref(n, _) if GoNumberTypes.contains(n)     => GoType.Basic(GoNumberTypes(n)._1)
     case Ref(ClassName.String | GoStringType, _)    => GoType.Basic("string")
+    case Ref(GoComplexType, _)                      => GoType.Basic("complex128")
     case Ref(ClassName.Object, _)                   => GoType.EmptyInterface
     case Ref(GoSliceType, List(e))                  => GoType.Slice(goTypeOf(e))
     case Ref(GoMapType, List(k, v))                 => GoType.MapOf(goTypeOf(k), goTypeOf(v))
@@ -562,16 +722,19 @@ final class GoInterop(ctx: LinkContext):
     case Ref(GoPtrType, List(e))                    => GoType.Ptr(goTypeOf(e))
     case Arr(e)                                     => GoType.Slice(goTypeOf(e))
     case Ref(Arity("scala.Function", _), targs)     =>
+      // Several results are a tuple, as in `funcToGo` and `funcFromGo`.
       val res = targs.last match
         case Prim(Type.Void) | Ref("scala.runtime.BoxedUnit", _) => Nil
+        case Ref(Arity("scala.Tuple", n), elems) if n > 1         => elems.map(goTypeOf)
         case r                                                   => List(goTypeOf(r))
       GoType.Func(GoSignature(targs.init.map(goTypeOf), res, variadic = false, generic = false))
     case Ref(cls, _) if ctx.exports.isExportedClass(cls) => GoType.Named(ScalaExportPkg, cls)
     case Ref(GoErrorClass, _)                       => GoType.Error
-    case Ref(cls, _) if program.isFacade(cls)       =>
-      val t = facadeType(cls)
-      val named = GoType.Named(t.facade.pkg, t.facade.name)
-      if t.isStruct then GoType.Ptr(named) else named
+    case Ref(cls, targs) if program.isFacade(cls)   =>
+      val t = facadeType(cls, targs)
+      if t.isStruct then GoType.Ptr(t.goType) else t.goType
+    case Prim(Type.Void) | Ref(UnitClass | BoxedUnitClass, _) => GoType.EmptyStruct
+    case ScalaType.Param(n)                         => fail(s"cannot instantiate a generic Go function with Scala type parameter $n")
     case other                                      => fail(s"cannot instantiate a generic Go function with Scala type $other")
 
   /** Converts the results of Go call `call` to the facade's result type `s`. A trailing `error`
@@ -616,9 +779,11 @@ final class GoInterop(ctx: LinkContext):
   // ---- Go types in Scala code -----------------------------------------------------------------
 
   /** `new C` for a facade class: the Go zero value. */
-  def zeroValue(cls: ClassName, pos: Position): String =
+  def zeroValue(cls: ClassName, pos: Position, typeArgs: List[(String, ScalaType)] = Nil): String =
     reporting(pos, s"new ${scalaName(cls)}") {
-      val t = facadeType(cls)
+      val bindings = typeArgs.toMap
+      val facade = program.facade(cls).flatMap(_.goFacade)
+      val t = facadeType(cls, facade.fold(Nil)(_.typeParams.map(n => bindings.getOrElse(n, fail(s"the type argument of $n is not known here")))))
       t.decl.kind match
         case GoTypeKind.Struct    => s"new(${t.name})"
         case GoTypeKind.Other     => s"any(*new(${t.name}))"
@@ -628,8 +793,9 @@ final class GoInterop(ctx: LinkContext):
   /** A type test against a facade. Facade references hold Go structs as pointers, but Go interfaces
    *  (and so `Any`) can hold struct values (`tea.KeyMsg` in a `tea.Msg`): both pass.
    */
-  def typeTest(e: String, cls: ClassName): String =
-    reporting(Position.NoPosition, s"type test against ${scalaName(cls)}") {
+  def typeTest(e: String, cls: ClassName, pos: Position = Position.NoPosition): String =
+    reporting(pos, s"type test against ${scalaName(cls)}") {
+      if isGenericFacade(cls) then fail("type tests against generic Go types are not supported (their type arguments are erased)")
       val t = facadeType(cls)
       if t.isStruct then s"rt.IsStruct[${t.name}]($e)" else s"rt.Is[${t.stored}]($e)"
     }
@@ -637,8 +803,12 @@ final class GoInterop(ctx: LinkContext):
   /** A cast to a facade; a struct value is copied to a new pointer (see `typeTest`). */
   def cast(e: String, cls: ClassName): String =
     reporting(Position.NoPosition, s"cast to ${scalaName(cls)}") {
-      val t = facadeType(cls)
-      if t.isStruct then s"rt.CastStruct[${t.name}]($e)" else s"rt.CastForeign[${t.stored}]($e)"
+      // Erasure casts values of type parameters to generic facades, whose type arguments are
+      // erased: unchecked.
+      if isGenericFacade(cls) then e
+      else
+        val t = facadeType(cls)
+        if t.isStruct then s"rt.CastStruct[${t.name}]($e)" else s"rt.CastForeign[${t.stored}]($e)"
     }
 
   // ---- Go interfaces implemented in Scala -------------------------------------------------------

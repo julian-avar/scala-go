@@ -8,6 +8,54 @@ import scala.collection.mutable
  *  types run and can be tested on the JVM too.
  */
 object GoNatives:
+  // ---- Complex numbers (scalago.go.GoComplex) -----------------------------------------------------
+
+  /** A Go `complex128` on the JVM. */
+  final case class JvmComplex(re: Double, im: Double):
+    /** As Go's `fmt` (`%v`) and `strconv.FormatComplex(z, 'g', -1, 128)`: `(1+2i)`. */
+    override def toString: String =
+      val i = formatG(im)
+      s"(${formatG(re)}${if i.startsWith("+") || i.startsWith("-") then "" else "+"}${i}i)"
+
+  /** Go's `strconv.FormatFloat(d, 'g', -1, 64)`: the shortest digits that round-trip, in `%e`
+   *  form (`1e+06`, `1.5e-07`) when the decimal exponent is below -4 or at least 6.
+   */
+  def formatG(d: Double): String =
+    if d.isNaN then "NaN"
+    else if d.isInfinite then (if d > 0 then "+Inf" else "-Inf")
+    else if d == 0 then (if 1 / d < 0 then "-0" else "0")
+    else
+      // Double.toString has the shortest round-tripping digits (JDK 19+).
+      val bd = java.math.BigDecimal(java.lang.Double.toString(math.abs(d))).stripTrailingZeros
+      val digits = bd.unscaledValue.toString
+      val exp = digits.length - 1 - bd.scale
+      val body =
+        if exp < -4 || exp >= 6 then
+          val mantissa = if digits.length == 1 then digits else s"${digits.head}.${digits.tail}"
+          val e = math.abs(exp)
+          s"${mantissa}e${if exp < 0 then "-" else "+"}${if e < 10 then s"0$e" else e.toString}"
+        else if exp >= 0 then
+          val whole = digits.padTo(exp + 1, '0')
+          val frac = digits.drop(exp + 1)
+          if frac.isEmpty then whole.take(exp + 1) else s"${whole.take(exp + 1)}.$frac"
+        else "0." + "0" * (-exp - 1) + digits
+      if d < 0 then s"-$body" else body
+
+  private def jvmComplex(z: AnyRef): JvmComplex = z.asInstanceOf[JvmComplex]
+
+  def complexMake(re: Double, im: Double): AnyRef = JvmComplex(re, im)
+  def complexReal(z: AnyRef): Double = jvmComplex(z).re
+  def complexImag(z: AnyRef): Double = jvmComplex(z).im
+  def complexAdd(z: AnyRef, w: AnyRef): AnyRef = JvmComplex(jvmComplex(z).re + jvmComplex(w).re, jvmComplex(z).im + jvmComplex(w).im)
+  def complexSub(z: AnyRef, w: AnyRef): AnyRef = JvmComplex(jvmComplex(z).re - jvmComplex(w).re, jvmComplex(z).im - jvmComplex(w).im)
+  def complexMul(z: AnyRef, w: AnyRef): AnyRef =
+    val (a, b, c, d) = (jvmComplex(z).re, jvmComplex(z).im, jvmComplex(w).re, jvmComplex(w).im)
+    JvmComplex(a * c - b * d, a * d + b * c)
+  def complexDiv(z: AnyRef, w: AnyRef): AnyRef =
+    val (a, b, c, d) = (jvmComplex(z).re, jvmComplex(z).im, jvmComplex(w).re, jvmComplex(w).im)
+    val n = c * c + d * d
+    JvmComplex((a * c + b * d) / n, (b * c - a * d) / n)
+
   // ---- Types ----------------------------------------------------------------------------------
 
   final class JvmGoType(val name: String, val elem: JvmGoType, val key: JvmGoType):
@@ -21,6 +69,7 @@ object GoNatives:
       case "float32"                                       => 0f
       case "float64"                                       => 0.0
       case "string"                                        => scalago.go.GoString.empty
+      case "struct{}"                                      => ()
       case _                                               => null
     override def toString: String = name
 

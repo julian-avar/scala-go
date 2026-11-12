@@ -10,7 +10,7 @@ import scala.collection.mutable
  */
 object Serialization:
   val Magic: Int = 0x53474f49 // "SGOI"
-  val FormatVersion: Int = 8
+  val FormatVersion: Int = 9
   val FileExtension: String = ".goir"
 
   final class IRFormatException(msg: String) extends IOException(msg)
@@ -171,17 +171,22 @@ object Serialization:
         bool(m.isStatic)
         bool(m.isPrivate)
         pos(m.pos)
-        option(m.goMember) { g => str(g.goName); list(g.params)(scalaType); scalaType(g.result); bool(g.isProperty) }
+        option(m.goMember) { g =>
+          str(g.goName); list(g.params)(scalaType); scalaType(g.result); bool(g.isProperty); list(g.typeParams)(str)
+        }
         option(m.goExport) { g => str(g.goName); list(g.params)(scalaType); scalaType(g.result); bool(g.returnsError) }
       }
       pos(c.pos)
-      option(c.goFacade) { f => str(f.pkg); str(f.name); list(f.typeAliases) { (g, s) => str(g); str(s) } }
+      option(c.goFacade) { f => str(f.pkg); str(f.name); list(f.typeAliases) { (g, s) => str(g); str(s) }; list(f.typeParams)(str) }
       option(c.goExport)(str)
 
     def scalaType(t: ScalaType): Unit = t match
       case ScalaType.Prim(p)         => { out.writeByte(0); tpe(p) }
       case ScalaType.Ref(name, args) => { out.writeByte(1); str(name); list(args)(scalaType) }
       case ScalaType.Arr(elem)       => { out.writeByte(2); scalaType(elem) }
+      case ScalaType.Param(name)     => { out.writeByte(3); str(name) }
+
+    def typeArgs(args: List[(String, ScalaType)]): Unit = list(args) { (n, t) => str(n); scalaType(t) }
 
     def trees(ts: List[Tree]): Unit = list(ts)(tree)
 
@@ -214,9 +219,9 @@ object Serialization:
         case CompareAndSet(f, e, u)           => { tag(Tags.CompareAndSet); tree(f); tree(e); tree(u) }
         case GetAndSet(f, v)                  => { tag(Tags.GetAndSet); tree(f); tree(v) }
         case GetAndAdd(f, d)                  => { tag(Tags.GetAndAdd); tree(f); tree(d) }
-        case New(cls, ctor, args)             => { tag(Tags.New); str(cls); method(ctor); trees(args) }
-        case Apply(r, rc, m, args, ty) =>
-          tag(Tags.Apply); tree(r); str(rc); method(m); trees(args); tpe(ty)
+        case n @ New(cls, ctor, args)         => { tag(Tags.New); str(cls); method(ctor); trees(args); typeArgs(n.typeArgs) }
+        case a @ Apply(r, rc, m, args, ty) =>
+          tag(Tags.Apply); tree(r); str(rc); method(m); trees(args); tpe(ty); typeArgs(a.typeArgs)
         case ApplyStatically(r, cls, m, args, ty) =>
           tag(Tags.ApplyStatically); tree(r); str(cls); method(m); trees(args); tpe(ty)
         case ApplyStatic(cls, m, args, ty) =>
@@ -277,17 +282,20 @@ object Serialization:
         val name = method()
         val params = list(ParamDef(str(), tpe()))
         MethodDef(name, params, option(tree()), bool(), bool(), pos(),
-          option(GoMember(str(), list(scalaType()), scalaType(), bool())),
+          option(GoMember(str(), list(scalaType()), scalaType(), bool(), list(str()))),
           option(GoExport(str(), list(scalaType()), scalaType(), bool())))
       }
-      ClassDef(name, kind, isAbstract, superClass, interfaces, fields, methods, pos(), option(GoFacade(str(), str(), list((str(), str())))),
+      ClassDef(name, kind, isAbstract, superClass, interfaces, fields, methods, pos(), option(GoFacade(str(), str(), list((str(), str())), list(str()))),
         option(str()))
 
     def scalaType(): ScalaType = in.readUnsignedByte() match
       case 0     => ScalaType.Prim(tpe())
       case 1     => ScalaType.Ref(str(), list(scalaType()))
       case 2     => ScalaType.Arr(scalaType())
+      case 3     => ScalaType.Param(str())
       case other => throw IRFormatException(s"unknown Scala type tag $other")
+
+    def typeArgs(): List[(String, ScalaType)] = list((str(), scalaType()))
 
     def trees(): List[Tree] = list(tree())
 
@@ -321,8 +329,8 @@ object Serialization:
         case Tags.CompareAndSet   => CompareAndSet(tree(), tree(), tree())(p)
         case Tags.GetAndSet       => GetAndSet(tree(), tree())(p)
         case Tags.GetAndAdd       => GetAndAdd(tree(), tree())(p)
-        case Tags.New             => New(str(), method(), trees())(p)
-        case Tags.Apply           => Apply(tree(), str(), method(), trees(), tpe())(p)
+        case Tags.New             => New(str(), method(), trees())(p, typeArgs())
+        case Tags.Apply           => Apply(tree(), str(), method(), trees(), tpe())(p, typeArgs())
         case Tags.ApplyStatically => ApplyStatically(tree(), str(), method(), trees(), tpe())(p)
         case Tags.ApplyStatic     => ApplyStatic(str(), method(), trees(), tpe())(p)
         case Tags.Unary           => Unary(UnaryOp.fromOrdinal(int()), tree())(p)

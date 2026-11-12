@@ -37,8 +37,11 @@ final case class ClassDef(
  *  @param typeAliases for a package: its type aliases that stand for Go types of the package
  *                    (`type Cmd = () => Msg`), as (Go name, Scala name). Unlike classes, they
  *                    have no IR of their own; recording them lets generated facades reuse them.
+ *  @param typeParams for a generic Go type (`atomic.Pointer[T]`): the facade class's type
+ *                    parameters, which stand for the Go type's, in order
  */
-final case class GoFacade(pkg: String, name: String, typeAliases: List[(String, String)] = Nil):
+final case class GoFacade(pkg: String, name: String, typeAliases: List[(String, String)] = Nil,
+    typeParams: List[String] = Nil):
   def isPackage: Boolean = name.isEmpty
 
 /** A field. `isVolatile` fields (`@volatile`, and lazy val states) are accessed atomically. */
@@ -67,8 +70,11 @@ final case class MethodDef(
  *  @param params     the Scala types of the parameters, before erasure
  *  @param result     the Scala result type, before erasure
  *  @param isProperty declared without a parameter list (`def X: T`): may be a Go field or variable
+ *  @param typeParams the member's type parameters (`def Max[E](xs: GoSlice[E]): E`), which stand
+ *                    for a generic Go function's: calls give their type arguments
  */
-final case class GoMember(goName: String, params: List[ScalaType], result: ScalaType, isProperty: Boolean)
+final case class GoMember(goName: String, params: List[ScalaType], result: ScalaType, isProperty: Boolean,
+    typeParams: List[String] = Nil)
 
 /** A method (of a top-level object or an exported class) or constructor exported to Go.
  *
@@ -89,8 +95,11 @@ enum ScalaType:
   /** A class or trait (binary name) or an opaque type (full name), with its type arguments. */
   case Ref(name: String, args: List[ScalaType])
   case Arr(elem: ScalaType)
+  /** A type parameter of a facade member or of its generic facade class, by name. */
+  case Param(name: String)
 
   override def toString: String = this match
+    case Param(name)     => name
     case Prim(t)         => t.toString
     case Ref(name, Nil)  => name
     case Ref(name, args) => args.mkString(s"$name[", ", ", "]")
@@ -213,13 +222,19 @@ object Tree:
 
   // ---- Calls ---------------------------------------------------------------------------------
 
-  /** Allocates an instance of `cls` and runs constructor `ctor` on it. */
-  final case class New(cls: ClassName, ctor: MethodName, args: List[Tree])(val pos: Position) extends Tree:
+  /** Allocates an instance of `cls` and runs constructor `ctor` on it. `typeArgs`: for a generic
+   *  Go facade class (`new atomic.Pointer[GoString]`), its type arguments, by type parameter.
+   */
+  final case class New(cls: ClassName, ctor: MethodName, args: List[Tree])(val pos: Position,
+      val typeArgs: List[(String, ScalaType)] = Nil) extends Tree:
     def tpe: Type = Type.Class(cls)
 
-  /** Virtual call. `declaringClass` is the class in which the compiler resolved `method`. */
+  /** Virtual call. `declaringClass` is the class in which the compiler resolved `method`.
+   *  `typeArgs`: for a member of a Go facade, the type arguments of its type parameters and of
+   *  those of its generic class (as the receiver's type gives them), by type parameter.
+   */
   final case class Apply(receiver: Tree, declaringClass: ClassName, method: MethodName, args: List[Tree], tpe: Type)(
-      val pos: Position
+      val pos: Position, val typeArgs: List[(String, ScalaType)] = Nil
   ) extends Tree
 
   /** Non-virtual call of the implementation in `cls`: super calls, private methods, constructor chaining. */
@@ -386,8 +401,8 @@ object Traversal:
       case CompareAndSet(f, e, u)             => CompareAndSet(t(f), t(e), t(u))(p)
       case GetAndSet(f, v)                    => GetAndSet(t(f), t(v))(p)
       case GetAndAdd(f, d)                    => GetAndAdd(t(f), t(d))(p)
-      case New(c, m, args)                    => New(c, m, ts(args))(p)
-      case Apply(r, c, m, args, tp)           => Apply(t(r), c, m, ts(args), tp)(p)
+      case n @ New(c, m, args)                => New(c, m, ts(args))(p, n.typeArgs)
+      case a @ Apply(r, c, m, args, tp)       => Apply(t(r), c, m, ts(args), tp)(p, a.typeArgs)
       case ApplyStatically(r, c, m, args, tp) => ApplyStatically(t(r), c, m, ts(args), tp)(p)
       case ApplyStatic(c, m, args, tp)        => ApplyStatic(c, m, ts(args), tp)(p)
       case Unary(op, a)                       => Unary(op, t(a))(p)
