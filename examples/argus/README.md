@@ -27,8 +27,8 @@ no SQLite, and its check passes that way too.
 
 ## Limitations
 
-- **No `argus.Bind[T]`:** it binds onto a Go struct type with `argus:"..."` tags, which Scala cannot
-  declare, and it is generic over that struct; it and `Bound.Value` are left out of the facade.
+- **No `argus.Bind[T]` onto a Scala class:** it binds onto a Go struct type with `argus:"..."`
+  tags, which Scala cannot declare (the generic facade, `Bind[T]` returning a `Bound[T]`, exists).
   Workaround: `ServiceConfig.from` reads each key with `GetString`, `GetInt`, `GetDuration`,
   `GetStringSlice`.
 - **Go values need converting:** a `time.Duration` is a facade value, not a number; it becomes a
@@ -39,7 +39,8 @@ no SQLite, and its check passes that way too.
   (`.Audit()`).
 - **`GoData.toScala` gives Go's shapes:** maps become `Map`s sorted by key, lists `Vector`s, YAML
   integers `Long`s, decimals `Double`s.
-- **Left out of the generated facade:** `CacheStats.Path` (a Go array).
+- **Left out of the generated facade:** `Source.UnmarshalJSON` (a pointer method of a non-struct
+  type).
 - **Runs only as Go:** facade members throw on the JVM.
 
 All limitations: [docs/_docs/user/limitations.md](../../docs/_docs/user/limitations.md).

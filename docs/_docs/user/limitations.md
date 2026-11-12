@@ -100,19 +100,32 @@ by an end-to-end test (`tests/cases/limits-*`) that expects it to fail.
   gin's `ShouldBindJSON`, argus's `Bind[T]`, database scanners) cannot fill a Scala class. Bind
   into `any` and convert with [`GoData.toScala`](../interop/go-data.md#scala-data-for-go-code), or
   parse with a Scala library ([gin example](../examples/gin.md)).
-- **Generic Go code:** generated facades leave out generic Go types, and generic functions whose
-  constraints have type sets (`~int | string`, `comparable`, most of `slices`, `maps`, `cmp`). A
-  hand-written facade can declare a generic function once per instantiation (`slices.Max` for
-  `[]int`, see [Calling Go](../interop/facades.md#generic-functions)). Generic types cannot be
-  declared.
+- **Generic Go code** ([Generics](../interop/facades.md#generics)):
+  - Scala does not check Go's constraints: `slices.Max` of a `GoSlice[Any]` links, then fails
+    `go build` ([known bug](../contributing/roadmap.md#known-bugs)).
+  - A type argument that no parameter determines must be given (`reflect.TypeFor[GoInt]()`);
+    omitted, it is a compile error.
+  - `GoSlice.of(...)` in an argument of a generic member needs its element type
+    (`slices.Max(GoSlice.of[GoInt](...))`), otherwise its `GoType` is ambiguous.
+  - Type tests against generic facade types are link errors, and casts to them are unchecked:
+    their type arguments are erased.
+  - A struct facade as a type argument stands for the pointer type: `atomic.Pointer[bytes.Buffer]`
+    is Go's `atomic.Pointer[*bytes.Buffer]`.
+- **Values of types Scala cannot name** (unexported, or of `internal` packages:
+  `binary.BigEndian`, `json/v2` options) are typed `Any` or as the interface they implement with
+  the most methods; reach their other interfaces with a cast
+  (`binary.BigEndian.asInstanceOf[binary.AppendByteOrder]`). Calls taking them go through Go's
+  reflection: slower, and an argument of the wrong type is a `ClassCastException` at run time,
+  not a compile error. Their fields are read-only.
 - **Go data shapes left out of generated facades:**
-  - unnamed struct and interface types (gin's `Context.Done()` returns `<-chan struct{}`);
-  - arrays and complex numbers;
-  - unexported types in exported APIs (gin's `Context.Errors`), types of `internal` packages;
+  - unnamed struct and interface types other than `struct{}`;
+  - arrays inside Go data (`[][32]byte`), `complex64` inside Go data, `unsafe.Pointer` (not
+    planned);
+  - methods with pointer receivers of non-struct types (`net.IP.UnmarshalText`);
   - funcs inside Go slices and maps (struct fields of func type are generated), variadic func
     types;
   - Go funcs with more than 3 parameters returned to Scala;
-  - constants beyond `Long`.
+  - integer constants beyond `uint64`.
 
   Each is a `// not generated:` comment in the generated source. Declare the member in a
   hand-written facade where the [conversions](../interop/facades.md#conversions) can express it.
@@ -135,9 +148,11 @@ by an end-to-end test (`tests/cases/limits-*`) that expects it to fail.
   directly, and stack traces through C calls, are untested.
 - **Go versions:** Go modules can require a newer Go than 1.27. Go's default `GOTOOLCHAIN=auto`
   downloads it.
-- **`scalago-gostd`** covers part of the standard library. Generate facades for the other
-  packages (`net/http`, `os/exec`, `regexp`, ...) with `goFacadePackages`.
-  [Go standard library](../libraries/gostd.md).
+- **`scalago-gostd`** has the whole standard library, but leaves out about 40 of its 16,700
+  members (the shapes above). It is generated from Linux/amd64's API: on other platforms, a
+  member they lack (in `syscall`, parts of `os` and `net`) is a Go compile error where it is
+  used. `import scalago.gostd.*` hides Scala's `io`, `math`, `reflect` and `runtime`.
+  [Go standard library](../libraries/gostd.md#limitations).
 - **Exports** (Go calling Scala): no exported traits, `val`s or fields, secondary constructors,
   tuple results, overloads with the same Go name or generic methods; one Scala library per Go
   binary. Most are compile or link errors; `@GoExport` on a `val` or field is ignored, and

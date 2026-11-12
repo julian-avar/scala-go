@@ -17,9 +17,8 @@ curl -H 'Authorization: Bearer s3cret' -d '{"title": "write docs", "tags": ["wor
 
 `check` ends with `all requests answered as expected`.
 
-Go modules (`goRequires`): `github.com/gin-gonic/gin@v1.12.0`. Facades are generated for `net`,
-`net/http` (neither is in `scalago-gostd`) and gin; `context` comes from `scalago-gostd`. The first
-build needs network access.
+Go modules (`goRequires`): `github.com/gin-gonic/gin@v1.12.0`. Facades are generated for gin;
+`net`, `net/http` and `context` come from `scalago-gostd`. The first build needs network access.
 
 ## Limitations
 
@@ -35,10 +34,11 @@ build needs network access.
   uses an immutable `TreeMap` behind `synchronized`; `java.util.concurrent.ConcurrentHashMap` works
   too.
 - **Left out of the generated facades** (`// not generated:` comments in
-  `out/examples/gin/goFacadeSources.dest`): `Context.Errors` (an unexported type), `Context.Done()`
-  (a channel of `struct{}`), `gin.DebugPrintFunc` (a variadic func type), `gin.DebugPrintRouteFunc`
-  (a func with more than 3 parameters), `HandlersChain`'s conversion (funcs inside Go data); in
-  `net/http`, `NoBody`, the context keys, and fields holding funcs (`Server.TLSNextProto`).
+  `out/examples/gin/goFacadeSources.dest`): `gin.DebugPrintFunc` (a variadic func type),
+  `gin.DebugPrintRouteFunc` (a func with more than 3 parameters), `HandlersChain`'s conversion
+  (funcs inside Go data), the setter of `Context.Errors` (of an unexported type). For
+  `net/http`, see `scalago-gostd`'s
+  [limitations](../../docs/_docs/libraries/gostd.md#limitations).
 - **Runs only as Go:** facade members throw on the JVM.
 
 All limitations: [docs/_docs/user/limitations.md](../../docs/_docs/user/limitations.md).

@@ -69,8 +69,8 @@ Facades follow the library's Go API closely, and Go values behave as in Go:
 
 Scala cannot declare Go struct types, so there are no struct tags to bind JSON into. Bind into
 `any` and convert with [`GoData`](go-data.md#scala-data-for-go-code), or parse the raw body
-with a Scala JSON library. In [gin](https://github.com/gin-gonic/gin) (facades of `net/http`
-and `github.com/gin-gonic/gin@v1.12.0`):
+with a Scala JSON library. In [gin](https://github.com/gin-gonic/gin) (facades of
+`github.com/gin-gonic/gin@v1.12.0`; `net/http` from `scalago-gostd`):
 
 ```scala sc:nocompile
 router.GET("/ping", c => c.JSON(http.StatusOK, gin.H("message" -> "pong")))  // handlers are lambdas

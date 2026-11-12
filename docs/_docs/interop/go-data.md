@@ -14,6 +14,7 @@ are converted at the boundary instead: a `String` is transcoded, an `Array[Strin
 | `GoMap[K, V]` | `map[K]V` |
 | `GoChan[T]`   | `chan T`  |
 | `GoPtr[T]`    | `*T`      |
+| `GoComplex`   | `complex128` |
 | `GoError`     | `error`   |
 
 They also run on the JVM with the same semantics, so code using them can be tested there.
@@ -101,6 +102,19 @@ for v <- ch do println(v)                  // Go's for v := range ch
 In gears code, use the cancellable `awaitSend` and `awaitReceive` of `scalago.gears` (see
 [Concurrency](../user/concurrency.md)).
 
+## Complex numbers
+
+```scala
+import scalago.go.*
+
+val z = GoComplex(1, 2)        // complex(1, 2)
+z * z                          // (-3+4i), as Go's fmt formats it
+(z / GoComplex(0, 1)).real     // 2.0
+```
+
+`+`, `-`, `*`, `/`, `real`, `imag`, and `==` on values. `math/cmplx` (in
+[scalago-gostd](../libraries/gostd.md)) has the rest.
+
 ## Element types
 
 Elements are read and written in a **canonical** Scala view, decided by the Go element type:
@@ -112,6 +126,8 @@ Elements are read and written in a **canonical** Scala view, decided by the Go e
 | `int16`, `uint16`, `int8`, `uint8`          | `Short`, `Char`, `Byte` (or `GoByte`)         |
 | `float32`, `float64`, `bool`                | `Float`, `Double`, `Boolean`                  |
 | `string`                                    | `GoString`                                    |
+| `complex128`                                | `GoComplex`                                   |
+| `struct{}`                                  | `Unit`                                        |
 | a struct                                    | its facade                                    |
 | anything else                               | the Go value: a facade, `GoSlice`, ..., `Any` |
 
@@ -126,8 +142,9 @@ that names the right one.
 - No `select` over several channels.
 - Unsynchronized concurrent writes to a `GoMap` end the process with Go's fatal error
   `concurrent map writes`, which no `catch` intercepts.
-- Go arrays, complex numbers and funcs inside Go data have no Scala view but `Any`: pass them on
-  to Go, but not use them from Scala.
+- Arrays inside Go data (`[][32]byte`), `complex64` and funcs inside Go data have no Scala view
+  but `Any`: pass them on to Go, but not use them from Scala. Facades see an array parameter or
+  result as a `GoSlice` (of a copy).
 - Named slice and map types (`type H map[string]any`) are facade classes, not `GoSlice`s or
   `GoMap`s. Their elements cannot be read from Scala.
 - `GoData` makes maps, not structs: Go code sees a case class's fields under their Scala names,

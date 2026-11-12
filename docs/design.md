@@ -126,7 +126,7 @@ In `linker/src/scalago/linker/`:
 | Emission     | `ClassEmitter`, `FunctionEmitter`, `LinkContext`, `Mangling`, `LineDirectives` | [Object model](#object-model), [Control flow](#control-flow) |
 | Go interop   | `GoInterop`, `GoApi`         | [Go interop](#go-interop)                          |
 | Exports      | `Exports`                    | [Exports](#exports-and-library-builds)             |
-| Facades      | `FacadeGen`, `FacadeIndex`   | [Generated facades](#generated-facades)            |
+| Facades      | `FacadeGen`, `FacadeIndex`, `FacadeUsage` | [Generated facades](#generated-facades) |
 
 - **Runtime objects.** javalib reaches the Go runtime through `scalago.runtime` objects whose
   methods throw on the JVM and are natives when linked: `Threads`, `AtomicArrays`, `Regexes`,
@@ -347,10 +347,24 @@ object url:
   underlying type. A named slice or map type's composite literal is such a conversion from
   varargs: `def H(entries: (String, Any)*): H` makes `gin.H("message" -> "pong")` gin's
   `gin.H{"message": "pong"}`.
-- **Generic Go functions** are called through monomorphic facades (`def Max(xs: GoSlice[GoInt]):
-  GoInt` for `slices.Max`). Go types mentioning type parameters are taken from the facade's
-  Scala types; the call passes values of those types, so Go infers the type arguments. Each
-  instantiation needs its own facade member (`@GoName` allows several).
+- **Generics.** Facade members and classes may be generic (`def Max[E](x: GoSlice[E]): E`,
+  `class Pointer[T]`); their signatures record type parameters as `ScalaType.Param`. Erasure
+  drops call sites' type arguments, so the plugin's `goTypeArgs` phase (before `firstTransform`;
+  placed among the later transforms it changed their grouping, and erasure left some calls
+  unapplied) attaches them to the `Apply` trees as a sticky attachment, and `genGoIR` writes them
+  into the IR (`Apply.typeArgs`, `New.typeArgs`, by type parameter name; `Traversal.transform`
+  keeps them). The linker substitutes them, unboxes and boxes values of type-parameter types, and
+  instantiates the Go function explicitly (`gp_slices.Max[[]int, int](x)`): Go type parameters
+  bind to the Scala type arguments of the same name, then to core types (`S ~[]E`), then by
+  unifying the facade's Scala types with the Go declaration, data before funcs, so monomorphic
+  facades (`def Max(xs: GoSlice[GoInt]): GoInt`) still work. Go checks constraints.
+- **Types Go code outside their package cannot name** (unexported, `internal`): `goapi` reports
+  them as opaque, with the interfaces they implement (of their package and its imports). Scala
+  holds their values as they are (`Any` or that interface); calls with such parameters or results
+  go through `rt.CallReflect`, which converts arguments with `reflect`.
+- **`goapi` loads referenced types**: besides the requested packages' APIs, the declarations of
+  the exported types of other packages that they use, transitively, so the linker converts
+  `time.Duration` parameters without a facade of `time`.
 - **Output ordering.** Scala's stdout is buffered, and flushed before each Go call and after each
   Go-to-Scala callback, so it stays ordered with what Go code writes.
 - **Imports** use aliases (`gp_url "net/url"`), so they cannot clash with generated names or
@@ -371,7 +385,11 @@ object; its types become classes and traits.
 | interface without methods             | alias of `Any` (`type Msg = Any`)                       |
 | other named non-struct type           | a class, plus its conversion (`def Color(value: String): Color`) |
 | named slice or map type               | also its composite literal (`def H(entries: (String, Any)*): H`, `def HandlersChain(elems: HandlerFunc*)`) |
-| generic function with an interface constraint (`Matches[K fmt.Stringer](k K)`) | the constraint as the type (`k: fmt.Stringer`); Go infers it as the type argument |
+| generic function (`Max[S ~[]E, E cmp.Ordered](x S) E`) | a generic method; type parameters with core types are those types (`def Max[E](x: GoSlice[E]): E`) |
+| generic function whose type parameters all have interface constraints and are used by parameters (`Matches[K fmt.Stringer](k K)`) | the constraints as the types (`k: fmt.Stringer`) |
+| generic type                          | a generic class, trait, or function alias (`type Seq[V] = (V => Boolean) => Unit`) |
+| unexported or `internal` type         | the interface it implements with the most methods, or `Any` |
+| array `[n]T`, `struct{}`, `complex128` | `GoSlice[T']` of a copy, `Unit`, `GoComplex`            |
 | slices and maps inside Go data        | canonical views (`GoSlice[GoString]`, `GoMap[GoString, GoInt]`), so slices are shared |
 
 - **Aliases** let Scala lambdas and values pass as they are. Aliases of function types are
@@ -384,10 +402,11 @@ object; its types become classes and traits.
   it has (`class Buffer extends io.Writer, io.Reader, fmt.Stringer, ...`).
 - **Transitive types.** Types of other packages that generated members use are generated too
   (`time.Duration` for `tea.Tick`, `io.Reader` for `tea.WithInput`); their functions, variables
-  and constants need the package in the list. `goapi` reruns until no package is missing.
-- **Left out**, with a comment saying why: generics constrained by type sets (`~int | string`,
-  `comparable`), unnamed structs, arrays, funcs inside Go data, complex numbers, constants beyond
-  `Long`, types of `internal` packages (which the output module cannot import).
+  and constants need the package in the list. `goapi` prints the types the requested packages
+  use; FacadeGen reruns it until no package is missing.
+- **Left out**, with a comment saying why: unnamed structs, funcs and arrays inside Go data,
+  `unsafe.Pointer`, pointer methods of non-struct types, variadic func types, constants beyond
+  `uint64`.
 
 **Dependencies' facades are reused**, as ScalablyTyped reuses converted libraries: a Go type has
 one Scala type, not one per generated set, so values flow between libraries.
@@ -409,12 +428,20 @@ one Scala type, not one per generated set, so values flow between libraries.
   name a dependency already uses is an error (the sets need different Scala packages).
 
 Generated facades are checked at link time like handwritten ones, only where used, so unused
-members cost nothing. `scalago-gostd` (`gostd/`) has facades of 21 standard library packages,
-plus the types of `io/fs`, `reflect` and `syscall` they use: about 1,700 members.
+members cost nothing. `scalago-gostd` (`gostd/`) has facades of the whole standard library
+(`go list std` but `internal`, `vendor`, `unsafe`; about 180 packages, 16,700 members), named as
+Go import aliases where names collide (`mathrand`, `randv2`). `gostd.usage` checks all of them:
+`FacadeUsage` writes a program using every facade member of a package (read from the IR, with
+`null` arguments, in a branch that never runs), which is linked and built.
 
 | Test or example           | Covers                                                      |
 |---------------------------|-------------------------------------------------------------|
 | `interop-gostd`           | `scalago-gostd`                                             |
+| `interop-gostd-all`       | packages beyond the most used ones; arrays, `struct{}`, `uint64` constants, names of colliding packages, `complex128`, values of unexported and `internal` types |
+| `interop-gostd-generics`  | generic functions and types of the standard library: `slices`, `maps`, `iter.Seq` both ways, `atomic.Pointer[T]`, `sql.Null[T]`, explicit type arguments |
+| `interop-generics`        | hand-written generic and monomorphic facades of generic functions and types |
+| `interop-complex`         | `GoComplex`, on the JVM and Go |
+| `gostd.usage` (`mill gostd.usage.goBuild`) | every member of `scalago-gostd` links and compiles |
 | `interop-facadegen-elm`   | a local module in bubbletea's style; the rules above        |
 | `interop-web`             | a module in gin's style: embedded structs, promoted methods, variadic named func types, composite literals, handlers on goroutines, JSON with `GoData`, callbacks with error results |
 | `interop-facadegen-reuse` | two generated sets (`facades-<package>.txt` compiled as dependencies of `facades.txt`) passing values to each other and to `scalago-gostd` |
@@ -434,6 +461,7 @@ the Go element type alone, so erasure loses nothing:
 | `int16`, `uint16`, `int8`, `uint8`          | `Short`, `Char`, `Byte` (or `GoByte`)     |
 | `float32`, `float64`, `bool`                | `Float`, `Double`, `Boolean`              |
 | `string`                                    | `GoString`                                |
+| `struct{}`                                  | `Unit`                                    |
 | struct values                               | the facade (a pointer to a copy)          |
 | anything else                               | the Go value: facades, `GoSlice`, ..., `Any` |
 
@@ -464,8 +492,8 @@ data and plain Go data:
 - Struct tags have no Scala counterpart, so JSON request bodies are bound into `*any`
   (`GoPtr.alloc[Any]`) and read with `GoData.toScala`, or parsed by a Scala JSON library.
 
-Not supported: generic Go *types*, `GoType` instances for facade types, `GoSlice`/`GoMap` facades
-for *named* slice and map types, `select` over channels, unnamed struct and interface types,
+Not supported: `GoType` instances for facade types, `GoSlice`/`GoMap` facades for *named* slice
+and map types, `select` over channels, unnamed struct and interface types other than `struct{}`,
 variadic callbacks, Go funcs with more than 3 parameters returned to Scala.
 
 ### Go strings
@@ -1021,6 +1049,8 @@ These limitations follow from the design and are not planned to change:
   quantifiers.
 - **Strings are UTF-16**, as on the JVM, so passing them to Go transcodes (`GoString` avoids it).
 - **One Scala library per Go binary** ([Exports](#exports-and-library-builds)).
+- **`unsafe.Pointer`** has no Scala counterpart: facades leave out the Go APIs that take or
+  return it (`atomic.LoadPointer`, `reflect.Value.UnsafePointer`).
 - **Arrays of references do not know their element type.** `toArray(new Array[String](0))`,
   `Arrays.copyOf` and `ClassTag[String].newArray` return arrays whose `getClass` is `Object[]`;
   a non-empty reference array holding only `()` is an `Array[Unit]` to type tests (which the

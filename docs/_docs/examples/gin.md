@@ -7,8 +7,9 @@ title: gin
 A JSON API for todos on [gin](https://github.com/gin-gonic/gin)
 ([source](https://github.com/julian-avar/scala-go/tree/main/examples/gin)): routes with path and
 query parameters, middleware, a route group with a token check, JSON responses from Scala data and
-request bodies bound from JSON. Facades of `net`, `net/http` and gin are
-[generated](../interop/generated-facades.md).
+request bodies bound from JSON. Facades of gin are
+[generated](../interop/generated-facades.md); `net` and `net/http` come from
+[`scalago-gostd`](../libraries/gostd.md).
 
 ```scala sc:nocompile
 val api = router.Group("/api", authorized(token))

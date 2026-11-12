@@ -40,7 +40,6 @@ build needs network access.
   it from nanoseconds, as Go's conversion does: `time.Duration(200_000_000L)`.
 - **Left out of the generated facades** (`// not generated:` comments in
   `out/examples/gotui/goFacadeSources.dest`), none needed here: `tea.BatchMsg`'s conversion (a
-  slice of funcs), `spinner.NewModel` (a variadic func type; `spinner.New` is the same function),
-  `lipgloss.WhitespaceOption`'s conversion (a func of an unexported type).
+  slice of funcs), `spinner.NewModel` (a variadic func type; `spinner.New` is the same function).
 
 All limitations: [docs/_docs/user/limitations.md](../../docs/_docs/user/limitations.md).

@@ -68,7 +68,7 @@ final case class Counter(n: Int) extends tea.Model:   // a Go interface, impleme
 | `javalib/`           | JDK classes in Scala (emitted as `java.*`) and Scala-library overrides  |
 | `library/`           | User-facing APIs: Go facades and exports, `GoString`, `GoSlice`, ...    |
 | `gears/`             | gears on goroutines (`scalago-gears`): an override and Go helpers       |
-| `gostd/`             | Generated facades of Go standard library packages (`scalago-gostd`)     |
+| `gostd/`             | Generated facades of the Go standard library (`scalago-gostd`); `mill gostd.usage.goBuild` checks every member |
 | `mill-build/src/`    | `ScalaGoModule`/`ScalaGoLibraryModule` and `TastyIR`, published as `mill-scalago` |
 | [`examples/basics/`](examples/basics/README.md) | A program built with `ScalaGoModule`: `mill examples.basics.goRun Ada Grace` |
 | [`examples/ecosystem/`](examples/ecosystem/README.md) | Popular Scala libraries compiled from TASTy (`mill examples.ecosystem.check`: JVM and Go agree) |

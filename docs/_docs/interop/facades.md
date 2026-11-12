@@ -118,19 +118,38 @@ val (b, err) = strconv.ParseBool("maybe")
 if err != null then println(err.Error())
 ```
 
-## Generic functions
+## Generics
 
-Declare a generic Go function once per instantiation, with concrete types. Go infers the type
-arguments from them. Generic Go types cannot be declared.
+Declare a generic Go function as a generic member, with the Go type parameters' names; a type
+parameter whose constraint has a core type (`S ~[]E`) is that type. Each call instantiates it
+with its type arguments, as Scala gives or infers them: canonical views, such as `GoInt` for
+`int` and `GoString` for `string`. A generic Go type is a generic class or trait.
 
 ```scala
 import scalago.go.*
 
 @GoImport("slices")
 object slices:
-  def Max(xs: GoSlice[GoInt]): GoInt = native          // slices.Max[[]int, int]
-  @GoName("Max") def MaxFloat(xs: GoSlice[Double]): Double = native
+  def Max[E](x: GoSlice[E]): E = native                   // Max[S ~[]E, E cmp.Ordered](x S) E
+  def Index[E](s: GoSlice[E], v: E): Long = native
+
+@GoImport("sync/atomic")
+object atomic:
+  class Pointer[T]:                                       // type Pointer[T any] struct
+    def Load(): GoPtr[T] = native
+    def Store(p: GoPtr[T]): Unit = native
+
+slices.Max(GoSlice.of[GoInt](GoInt(3), GoInt(7)))         // slices.Max[[]int, int]: 7
+val p = new atomic.Pointer[GoString]                      // new(atomic.Pointer[string])
 ```
+
+Go checks the constraints when it compiles the generated code: `slices.Max[Any]` compiles in
+Scala, not in Go. Give the type arguments that no parameter determines
+(`reflect.TypeFor[GoInt]()`): the plugin rejects those Scala would infer as `Any` or `Nothing`. A monomorphic member also works, one per instantiation
+(`@GoName("Max") def maxFloat(x: GoSlice[Double]): Double`); Go's type arguments then come from
+its Scala types. Write `GoSlice.of[GoInt](...)` in arguments of generic members: with the element
+type unknown, Scala cannot choose `GoSlice.of`'s Go type. Type tests against generic facades are
+not supported. [Specification](../spec/interop.md#generic-functions).
 
 ## Conversions to named types
 

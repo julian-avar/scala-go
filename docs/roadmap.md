@@ -66,10 +66,9 @@ the linker to fail.
 | Constant arguments to natives make Go reject constant expressions: `Integer.sum(Int.MaxValue, 1)`, `Long.sum` (overflow), `Integer.divideUnsigned(1, 0)`, `Long.remainderUnsigned(1L, 0L)` (division by zero), `Character.isISOControl(-1)`, `Float.intBitsToFloat(0xff800000)`, `Double.longBitsToDouble(0x8000000000000000L)` (constant overflows `uint32`/`uint64`) | Natives emitted as Go expressions: convert through variables, not constants |
 | A string literal containing `math.` (`println("math.abs")`) adds an unused `import "math"` to `support.go` | `Linker.goFile`: scan code, not literals |
 | A class named `Entry` in the empty package collides with the linker's `entry.go` (Go rejects file names that differ only in case); `support.go` is reserved the same way | `Linker`: reserve the names |
-| A facade of a pointer-receiver method on a non-struct Go type links, then fails `go build` | `GoInterop`: reject at link time, or copy to an addressable variable |
-| A generic facade whose Scala types disagree with Go's inference (`f: Long => GoString` for `func(T) U` with `T = int`) links, then fails `go vet` | `GoInterop`: a link error |
 | A Scala subclass of `BigInteger` or `BigDecimal` links, then fails `go build` (`cannot use this (variable of type *S_…) as *rt.BigInteger`) | Linker: a link error naming the class |
 | Two methods exported under one Go name (`@GoExport("Twice")` on overloads) link, then fail `go build` (`Export_Twice redeclared`) | `Exports`: a link error |
+| A generic facade instantiated with a type argument outside the Go constraint (`slices.Max` of a `GoSlice[Any]`: `any` is not `cmp.Ordered`) links, then fails `go build` (`does not satisfy`); pinned by `known-bugs-interop-go-errors` | `GoInterop.typeParamBindings`: check type sets, `comparable` and interface constraints, a link error |
 
 #### Language
 
@@ -135,7 +134,6 @@ the linker to fail.
 | Bug | Fix in |
 |-----|--------|
 | A `GoSlice`/`GoMap` passed for a defined Go slice or map type (`type Names []string`) is a link error (`cannot pass Scala type … as Go type …`), though the spec converts it | `GoInterop.toGoNormalized`: the Go-data case before `GoType.Named` |
-| A Scala number passed for a `time.Duration` parameter is a link error (`unknown Go type gp_time.Duration`) unless some facade imports `time` | `GoInterop`: import the named type's package |
 | A Scala `String` is an instance of a Go interface it does not implement (`("s": Any).isInstanceOf[fmt.Stringer]` is `true`; JVM and Go code: `false`) | `rt` type tests on `*rt.String` |
 | `GoType.of[Any].name` is `interface {}` on Go, `any` on the JVM (also inside composite types) | `GoType` natives: Go's `any` spelling |
 
@@ -209,11 +207,11 @@ Not planned: ScalaTest (reflection throughout, `java.awt`), and cask, http4s-emb
 | Item | Missing | Size |
 |------|---------|------|
 | Go structs from Scala | Go sees Scala classes only as interfaces. No Scala declaration yields a Go struct with fields and tags, which `encoding/json`, gin binding and database scanners read | M–L |
-| Generics | Generic Go *types*; functions constrained by type sets (most of `slices`, `maps`, `cmp`) are left out of generated facades; `GoType` instances for facade types | M |
+| Generics | Constraints in Scala (bounds, or a check at link time: see the known bug); type tests against generic facade types and checked casts to them (the type arguments are erased; casts are unchecked); `GoType` instances for facade types | M |
 | `select` | Over several Go channels, from Scala and from gears | S–M |
-| Data shapes | `GoSlice`/`GoMap` facades of named slice and map types, unnamed struct and interface types, funcs in Go slices and maps, arrays, complex numbers, variadic callbacks, returned Go funcs with more than 3 parameters | M |
+| Data shapes | `GoSlice`/`GoMap` facades of named slice and map types, unnamed struct and interface types, funcs in Go slices and maps, arrays and `complex64` inside Go data, variadic callbacks, returned Go funcs with more than 3 parameters, pointer methods of non-struct types (through a `GoPtr`), assigning fields of types Scala code cannot name (through reflection) | M |
 | Exports | Go implementing Scala traits, vals and fields, secondary constructors, tuple results, overloads sharing a Go name, generic methods | M |
-| `scalago-gostd` | 21 packages. Add `net/http`, `os/exec`, `regexp`, `crypto/*`, `log/slog`, `database/sql`, `encoding/csv`, `slices`, `maps` | S, after generics |
+| `scalago-gostd` | The whole standard library; about 40 of 16,700 members left out: pointer methods of non-struct types, funcs inside Go data, variadic func types (see Data shapes), `unsafe.Pointer` (not planned). Generated from Linux/amd64's API: generate per platform, or from the union of platforms | S |
 | cgo | Test facades of cgo packages (SQLite) and stack traces after C calls | S |
 
 ## M6: Performance
