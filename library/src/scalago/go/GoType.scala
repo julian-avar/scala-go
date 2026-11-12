@@ -49,4 +49,4 @@ object GoType:
     /** The runtime representation, for the natives. */
     private[go] def underlying: AnyRef = t
     /** The Go type, as Go writes it (`[]int32`, `map[string]int`). */
-    def name: String = t.toString
+    def name: String = GoNatives.typeName(t)

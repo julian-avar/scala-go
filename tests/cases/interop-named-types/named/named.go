@@ -43,8 +43,14 @@ type Tags []string
 
 func (t Tags) Joined() string { return strings.Join(t, "|") }
 
+// CountTags takes the defined slice type.
+func CountTags(t Tags) int { return len(t) }
+
 // Attrs is a defined map type.
 type Attrs map[string]int
+
+// SizeAttrs takes the defined map type.
+func SizeAttrs(a Attrs) int { return len(a) }
 
 func (a Attrs) Sorted() string {
 	keys := make([]string, 0, len(a))

@@ -85,7 +85,7 @@ direction. "—" marks a direction that does not occur.
 | `Array[P]` | `[]G` | shares the array's memory when `P`'s Go type is `G` (`Array[Long]` and `[]int64`), else a new slice of converted elements; `null` is a nil slice | likewise shared, else a new array of converted elements |
 | `Seq[E]` | `[]G` | a new slice of converted elements | — |
 | `Array[(K, V)]`, `Seq[(K, V)]` | `map[K]V` | a new map | — |
-| `GoSlice[E]`, `GoMap[K, V]`, `GoChan[E]`, `GoPtr[E]`, `E` (`K`, `V`) the canonical views of `G`'s element types | a slice, map, channel or pointer type | the value, shared; converted to a defined type with the same underlying type or to a directional channel type (Go: [Assignability][go-assignability]). **Deviation (bug):** a `GoSlice` or `GoMap` for a defined slice or map type is a link error ([Known bugs](../contributing/roadmap.md#known-bugs)) | the value, shared |
+| `GoSlice[E]`, `GoMap[K, V]`, `GoChan[E]`, `GoPtr[E]`, `E` (`K`, `V`) the canonical views of `G`'s element types | a slice, map, channel or pointer type | the value, shared; converted to a defined type with the same underlying type or to a directional channel type (Go: [Assignability][go-assignability]). | the value, shared |
 | `GoSlice[E]` | an array type `[n]G` | a new array of the slice's first `n` elements; a shorter slice panics | a slice of a copy of the array |
 | a function type | a func type, or a defined one | see [Functions](#functions) | a `GoFunction0`–`GoFunction3` |
 | `T*` (last parameter) | `...G` | literal arguments one by one; an `Array` or `Seq` passed as `xs*` is a slice passed with `...` | — |
@@ -133,7 +133,7 @@ A Go value held by Scala code (in an `Any` or a facade type) behaves as follows:
 
 | Operation | Behavior |
 |-----------|----------|
-| `isInstanceOf[F]`, type patterns | a Go type assertion to `F`'s Go type (Go: [Type assertions][go-assert]); for a struct facade, both `T` and `*T` pass. **Deviation (bug):** a Scala `String` is an instance of every Go interface ([Known bugs](../contributing/roadmap.md#known-bugs)) |
+| `isInstanceOf[F]`, type patterns | a Go type assertion to `F`'s Go type (Go: [Type assertions][go-assert]); for a struct facade, both `T` and `*T` pass. A Scala `String` is not an instance of any Go interface, as Go code sees a Go string |
 | `asInstanceOf[F]` | as above; `null` passes; a `T` struct value is copied to a new `*T` |
 | boxes | a Go value is a Scala box exactly when its dynamic type is `bool`, `uint16`, `int8`, `int16`, `int32`, `int64`, `float32` or `float64`. Go `int`, `uint8`, `uint32`, ... are Go values, not numbers; `GoData.toScala` converts them |
 | `==`, `equals` | Go's `==` when the dynamic types are identical and comparable; identity for maps, slices (same array and length), funcs, channels and pointers; `false` for different types |
@@ -176,10 +176,9 @@ as that interface (`k: fmt.Stringer` for `K fmt.Stringer`), which satisfies the 
 Generic facade members need a parameter list. A type argument `Nothing` or `Null`, or one Scala
 inferred for a type parameter no value parameter uses, is a compile error.
 
-Go checks type arguments against constraints when it compiles the generated code (Go:
-[Satisfying a type constraint][go-satisfy]). **Deviation (bug):** the linker does not, so
-`slices.Max[Any]` is a Go compile error, not a link error
-([Known bugs](../contributing/roadmap.md#known-bugs)).
+The linker checks type arguments against Go's constraints (Go: [Satisfying a type constraint][go-satisfy]):
+a type outside a type set, `comparable` or an interface's methods is a link error, as `slices.Max[Any]`
+is. Type sets ignore `~`: a defined type passes a term of its underlying type.
 
 ## Types Scala code cannot name
 

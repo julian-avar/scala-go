@@ -14,6 +14,7 @@ object Main:
     println(Seq(GoType.of[Int].name, GoType.of[Long].name, GoType.of[GoInt].name, GoType.of[GoByte].name, GoType.of[Char].name,
       GoType.of[GoString].name, GoType.of[GoSlice[GoString]].name, GoType.of[GoMap[GoString, GoSlice[Int]]].name,
       GoType.of[GoChan[Double]].name, GoType.of[GoPtr[Boolean]].name).mkString(" "))
+    println(Seq(GoType.of[Any].name, GoType.of[GoMap[GoString, Any]].name, GoType.of[GoSlice[Any]].name).mkString(" "))
 
     // Slices: length and capacity; append reuses the array while the capacity allows.
     val s = GoSlice.make[Int](2, 4)

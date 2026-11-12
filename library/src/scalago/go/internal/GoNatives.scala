@@ -81,6 +81,8 @@ object GoNatives:
   def chanType(elem: AnyRef): AnyRef = JvmGoType(s"chan $elem", jvmType(elem), null)
   def ptrType(elem: AnyRef): AnyRef = JvmGoType(s"*$elem", jvmType(elem), null)
 
+  def typeName(t: AnyRef): String = t.toString
+
   def isNil(x: AnyRef): Boolean = x == null
 
   // ---- Slices: a segment of a shared array, as in Go ---------------------------------------------

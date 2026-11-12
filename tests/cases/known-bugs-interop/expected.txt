@@ -1,3 +1,0 @@
-String isInstanceOf[fmt.Stringer]: true
-String matches fmt.Stringer: true
-GoType names: interface {} map[string]interface {}
