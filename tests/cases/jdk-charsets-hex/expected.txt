@@ -45,6 +45,12 @@ c0 80 -> fffd,fffd
 e0 80 80 -> fffd,fffd,fffd
 f4 90 80 80 -> fffd,fffd,fffd,fffd
 f8 88 80 80 80 -> fffd,fffd,fffd,fffd,fffd
+ed a0 80 -> fffd
+ed bf bf 41 -> fffd,41
+ed a0 41 -> fffd,41
+ed a0 -> fffd
+ed 9f bf -> d7ff
+REPORT ed a0 80: java.nio.charset.MalformedInputException: Input length = 3
 == streaming
 61 c3 b1 (OVERFLOW) | e2 82 ac (OVERFLOW) | f0 9f 98 80 (OVERFLOW) | 21 (UNDERFLOW)
 true/1 true/1 true/1 true/2 true/2 true/2 true/2 true/4 end true -> 78,20ac,d83d,de00

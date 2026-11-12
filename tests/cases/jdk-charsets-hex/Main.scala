@@ -61,10 +61,13 @@ object Main:
       attempt(s"${cs.name} $action")(codes(dec.decode(ByteBuffer.wrap(bytes))))
     val custom = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPLACE).replaceWith("?")
     println(s"replaceWith ${custom.decode(ByteBuffer.wrap(Array[Byte](0x41, 0xff.toByte, 0x42)))}")
-    // Overlong encodings and code points above U+10FFFF are malformed (encoded surrogates: known-bugs-jdk).
-    for bad <- Seq(Array(0xc0, 0x80), Array(0xe0, 0x80, 0x80), Array(0xf4, 0x90, 0x80, 0x80), Array(0xf8, 0x88, 0x80, 0x80, 0x80)) do
+    // Overlong encodings, code points above U+10FFFF and encoded surrogates (one malformed unit,
+    // whole or truncated) are malformed; U+D7FF, just below the surrogates, is not.
+    for bad <- Seq(Array(0xc0, 0x80), Array(0xe0, 0x80, 0x80), Array(0xf4, 0x90, 0x80, 0x80), Array(0xf8, 0x88, 0x80, 0x80, 0x80),
+        Array(0xed, 0xa0, 0x80), Array(0xed, 0xbf, 0xbf, 0x41), Array(0xed, 0xa0, 0x41), Array(0xed, 0xa0), Array(0xed, 0x9f, 0xbf)) do
       val dec = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPLACE)
       println(s"${bad.map(Integer.toHexString).mkString(" ")} -> ${codes(dec.decode(ByteBuffer.wrap(bad.map(_.toByte))))}")
+    attempt("REPORT ed a0 80")(StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(Array(0xed, 0xa0, 0x80).map(_.toByte))))
 
   def streaming(): Unit =
     println("== streaming")

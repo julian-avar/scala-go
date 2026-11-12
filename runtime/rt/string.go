@@ -76,15 +76,26 @@ func (s *String) String() string { return s.GoString() }
 // Chars exposes the UTF-16 code units (read-only).
 func (s *String) Chars() []uint16 { return s.chars }
 
+// The bounds checks of String's methods throw StringIndexOutOfBoundsException with the messages
+// of the JDK's Preconditions (an index, a range from begin to end, or one from offset and size).
+
 func (s *String) checkIndex(i int32) {
 	if i < 0 || int(i) >= len(s.chars) {
-		ThrowKind(StringIndexOutOfBounds, "index "+itoa(i)+", length "+itoa(int32(len(s.chars))))
+		ThrowKind(StringIndexOutOfBounds, "Index "+itoa(i)+" out of bounds for length "+itoa(int32(len(s.chars))))
 	}
 }
 
-func (s *String) checkRange(begin, end int32) {
-	if begin < 0 || end > int32(len(s.chars)) || begin > end {
-		ThrowKind(StringIndexOutOfBounds, "begin "+itoa(begin)+", end "+itoa(end)+", length "+itoa(int32(len(s.chars))))
+func (s *String) checkRange(begin, end int32) { checkStringRange(begin, end, len(s.chars)) }
+
+func checkStringRange(begin, end int32, length int) {
+	if begin < 0 || begin > end || int(end) > length {
+		ThrowKind(StringIndexOutOfBounds, "Range ["+itoa(begin)+", "+itoa(end)+") out of bounds for length "+itoa(int32(length)))
+	}
+}
+
+func checkStringRangeSize(offset, size int32, length int) {
+	if offset < 0 || size < 0 || int(offset)+int(size) > length {
+		ThrowKind(StringIndexOutOfBounds, "Range ["+itoa(offset)+", "+itoa(offset)+" + "+itoa(size)+") out of bounds for length "+itoa(int32(length)))
 	}
 }
 
@@ -97,9 +108,7 @@ func NewStringFromChars(a *Array[uint16]) *String {
 }
 
 func NewStringFromCharRange(a *Array[uint16], offset, count int32) *String {
-	if offset < 0 || count < 0 || int(offset+count) > len(a.Data) {
-		ThrowKind(StringIndexOutOfBounds, "offset "+itoa(offset)+", count "+itoa(count)+", length "+itoa(int32(len(a.Data))))
-	}
+	checkStringRangeSize(offset, count, len(a.Data))
 	return newString(append([]uint16(nil), a.Data[offset:offset+count]...))
 }
 
@@ -197,10 +206,21 @@ func StringCompareToIgnoreCase(s *String, o *String) int32 {
 	return StringCompareTo(StringToLowerCase(StringToUpperCase(s)), StringToLowerCase(StringToUpperCase(o)))
 }
 
+// StringIndexOfChar and StringLastIndexOfChar search for a code point: one char, or the surrogate
+// pair of a supplementary code point. Other values (negative, beyond U+10FFFF) are never found.
 func StringIndexOfChar(s *String, c int32, from int32) int32 {
 	from = max(from, 0)
 	if c >= 0x10000 {
-		return StringIndexOf(s, Str(string(rune(c))), from)
+		if c > unicode.MaxRune {
+			return -1
+		}
+		hi, lo := utf16.EncodeRune(rune(c))
+		for i := int(from); i+1 < len(s.chars); i++ {
+			if rune(s.chars[i]) == hi && rune(s.chars[i+1]) == lo {
+				return int32(i)
+			}
+		}
+		return -1
 	}
 	for i := int(from); i < len(s.chars); i++ {
 		if int32(s.chars[i]) == c {
@@ -211,6 +231,18 @@ func StringIndexOfChar(s *String, c int32, from int32) int32 {
 }
 
 func StringLastIndexOfChar(s *String, c int32, from int32) int32 {
+	if c >= 0x10000 {
+		if c > unicode.MaxRune {
+			return -1
+		}
+		hi, lo := utf16.EncodeRune(rune(c))
+		for i := min(int(from), len(s.chars)-2); i >= 0; i-- {
+			if rune(s.chars[i]) == hi && rune(s.chars[i+1]) == lo {
+				return int32(i)
+			}
+		}
+		return -1
+	}
 	for i := min(int(from), len(s.chars)-1); i >= 0; i-- {
 		if int32(s.chars[i]) == c {
 			return int32(i)
@@ -220,8 +252,8 @@ func StringLastIndexOfChar(s *String, c int32, from int32) int32 {
 }
 
 func StringIndexOf(s *String, sub *String, from int32) int32 {
-	from = max(from, 0)
 	n, m := len(s.chars), len(sub.chars)
+	from = min(max(from, 0), int32(n)) // past the end, only the empty string is found (at the end)
 outer:
 	for i := int(from); i+m <= n; i++ {
 		for j := 0; j < m; j++ {
@@ -402,9 +434,28 @@ func StringTrim(s *String) *String {
 	return StringSubstringRange(s, int32(begin), int32(end))
 }
 
-func StringStrip(s *String) *String { return Str(strings.TrimFunc(s.GoString(), unicode.IsSpace)) }
+// StringStrip and StringIsBlank use Character.isWhitespace, as the JDK does: unlike Go's
+// unicode.IsSpace, it excludes the no-break spaces (U+00A0, U+2007, U+202F) and U+0085. No
+// supplementary code point is white space, so they test chars.
+func StringStrip(s *String) *String {
+	begin, end := 0, len(s.chars)
+	for begin < end && CharIsWhitespace(int32(s.chars[begin])) {
+		begin++
+	}
+	for end > begin && CharIsWhitespace(int32(s.chars[end-1])) {
+		end--
+	}
+	return StringSubstringRange(s, int32(begin), int32(end))
+}
 
-func StringIsBlank(s *String) bool { return len(StringStrip(s).chars) == 0 }
+func StringIsBlank(s *String) bool {
+	for _, c := range s.chars {
+		if !CharIsWhitespace(int32(c)) {
+			return false
+		}
+	}
+	return true
+}
 
 func StringReplaceChar(s *String, old, new uint16) *String {
 	chars := append([]uint16(nil), s.chars...)
@@ -436,19 +487,36 @@ func StringRepeat(s *String, n int32) *String {
 }
 
 var (
-	internMu    sync.Mutex
-	internTable = map[string]*String{}
+	internMu       sync.Mutex
+	internTable    map[string]*String // keyed by the chars' bytes, built on first use
+	internLiterals []*String
 )
 
+// RegisterStringLiterals is called by a program that uses intern(), with its string literals:
+// intern returns them for equal strings, as the JVM interns literals.
+func RegisterStringLiterals(literals ...*String) { internLiterals = literals }
+
 func StringIntern(s *String) *String {
-	key := string(utf16.Decode(s.chars))
 	internMu.Lock()
 	defer internMu.Unlock()
-	if t, ok := internTable[key]; ok && stringEq(t, s) {
+	if internTable == nil {
+		internTable = make(map[string]*String, len(internLiterals))
+		for _, l := range internLiterals {
+			internTable[charsKey(l.chars)] = l
+		}
+	}
+	key := charsKey(s.chars)
+	if t, ok := internTable[key]; ok {
 		return t
 	}
 	internTable[key] = s
 	return s
+}
+
+// charsKey views UTF-16 code units as a string of their bytes, without copying: the chars of a
+// String never change.
+func charsKey(chars []uint16) string {
+	return unsafe.String((*byte)(unsafe.Pointer(unsafe.SliceData(chars))), 2*len(chars))
 }
 
 // StringSplit implements split(regex): patterns are Java regular expressions, run by Go's
@@ -516,33 +584,28 @@ func splitOnChar(s *String, c uint16, limit int32) *Array[any] {
 	return &Array[any]{Data: parts}
 }
 
+// splitWith is Pattern.split: the parts between the matches Java finds (see findAll).
 func splitWith(re *regexp.Regexp, s *String, limit int32) *Array[any] {
 	str := s.GoString()
-	if len(str) == 0 {
-		return &Array[any]{Data: []any{s}}
-	}
 	var parts []string
 	start := 0
-	for _, m := range re.FindAllStringIndex(str, -1) {
+	for _, m := range findAll(re, str) {
 		if limit > 0 && int32(len(parts)) == limit-1 {
 			break
 		}
 		if m[1] == 0 { // zero-width match at the beginning
 			continue
 		}
-		if m[0] == m[1] && m[0] >= len(str) {
-			break
-		}
 		parts = append(parts, str[start:m[0]])
 		start = m[1]
 	}
+	if parts == nil {
+		return &Array[any]{Data: []any{s}} // no match: the string itself, as in the JDK
+	}
 	parts = append(parts, str[start:])
 	if limit == 0 {
-		for len(parts) > 1 && parts[len(parts)-1] == "" {
+		for len(parts) > 0 && parts[len(parts)-1] == "" {
 			parts = parts[:len(parts)-1]
-		}
-		if len(parts) == 1 && parts[0] == "" {
-			parts = nil
 		}
 	}
 	out := make([]any, len(parts))
@@ -558,8 +621,8 @@ var (
 )
 
 // compileRegex compiles a Java regular expression with Go's regexp package (RE2 syntax, which
-// covers the common Java syntax). Features RE2 lacks (lookaround, backreferences, possessive
-// quantifiers) throw UnsupportedOperationException.
+// covers the common Java syntax). An invalid pattern throws PatternSyntaxException; features RE2
+// lacks (lookaround, backreferences, possessive quantifiers) throw UnsupportedOperationException.
 func compileRegex(pattern string) *regexp.Regexp {
 	regexMu.Lock()
 	defer regexMu.Unlock()
@@ -568,60 +631,28 @@ func compileRegex(pattern string) *regexp.Regexp {
 	}
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		ThrowKind(UnsupportedOperation, "unsupported regular expression "+pattern+": "+err.Error())
+		throwRegexError(pattern, err)
 	}
 	regexCache[pattern] = re
 	return re
 }
 
-// StringMatches implements matches(regex): the whole string must match.
+// StringMatches implements matches(regex): the whole string must match. The pattern is compiled
+// alone first, so that the anchors added around it cannot make an invalid one valid (`a)|(b`).
 func StringMatches(s *String, regex *String) bool {
-	re := compileRegex("^(?:" + regex.GoString() + ")$")
-	return re.MatchString(s.GoString())
+	p := regex.GoString()
+	compileRegex(p)
+	return compileRegex("^(?:" + p + ")$").MatchString(s.GoString())
 }
 
-// StringReplaceAll implements replaceAll(regex, replacement) ($1 and \$ in the replacement, as in Java).
+// StringReplaceAll implements replaceAll(regex, replacement) (see replaceMatches).
 func StringReplaceAll(s *String, regex *String, replacement *String) *String {
-	return Str(compileRegex(regex.GoString()).ReplaceAllString(s.GoString(), javaReplacement(replacement.GoString())))
+	return replaceMatches(compileRegex(regex.GoString()), s, replacement, true)
 }
 
 // StringReplaceFirst implements replaceFirst(regex, replacement).
 func StringReplaceFirst(s *String, regex *String, replacement *String) *String {
-	re := compileRegex(regex.GoString())
-	str := s.GoString()
-	m := re.FindStringSubmatchIndex(str)
-	if m == nil {
-		return s
-	}
-	var out []byte
-	out = re.ExpandString(out, javaReplacement(replacement.GoString()), str, m)
-	return Str(str[:m[0]] + string(out) + str[m[1]:])
-}
-
-// javaReplacement converts Java's replacement syntax ($1, \$) to Go's (${1}, $$).
-func javaReplacement(r string) string {
-	var b strings.Builder
-	for i := 0; i < len(r); i++ {
-		switch c := r[i]; {
-		case c == '\\' && i+1 < len(r):
-			i++
-			if r[i] == '$' {
-				b.WriteString("$$")
-			} else {
-				b.WriteByte(r[i])
-			}
-		case c == '$':
-			j := i + 1
-			for j < len(r) && r[j] >= '0' && r[j] <= '9' {
-				j++
-			}
-			b.WriteString("${" + r[i+1:j] + "}")
-			i = j - 1
-		default:
-			b.WriteByte(c)
-		}
-	}
-	return b.String()
+	return replaceMatches(compileRegex(regex.GoString()), s, replacement, false)
 }
 
 // ---- Static methods -----------------------------------------------------------------------
@@ -650,15 +681,20 @@ func ConcatAll(parts ...any) *String {
 
 func StringGetChars(s *String, srcBegin, srcEnd int32, dst *Array[uint16], dstBegin int32) {
 	s.checkRange(srcBegin, srcEnd)
+	checkStringRangeSize(dstBegin, srcEnd-srcBegin, len(dst.Data))
 	copy(dst.Data[dstBegin:], s.chars[srcBegin:srcEnd])
 }
 
 // ---- Charsets ------------------------------------------------------------------------------------
 //
 // Charsets are given by name: a *String, or a java.nio.charset.Charset (javalib's), whose
-// toString is its name. UTF-8, ISO-8859-1 and US-ASCII are supported.
+// toString is its name. UTF-8, ISO-8859-1 and US-ASCII are supported; another name throws
+// UnsupportedEncodingException, as an unknown one does in the JDK.
 
 func charsetOf(charset any) string {
+	if IsNull(charset) {
+		ThrowKind(NullPointer, "")
+	}
 	name := strings.ToUpper(strings.ReplaceAll(ToGoString(charset), "_", "-"))
 	switch name {
 	case "UTF-8", "UTF8":
@@ -668,7 +704,7 @@ func charsetOf(charset any) string {
 	case "US-ASCII", "ASCII":
 		return "US-ASCII"
 	}
-	ThrowKind(UnsupportedOperation, "unsupported charset: "+ToGoString(charset))
+	ThrowKind(UnsupportedEncoding, ToGoString(charset))
 	return ""
 }
 
@@ -679,9 +715,7 @@ func NewStringFromBytes(a *Array[int8], charset any) *String {
 
 // NewStringFromByteRange implements new String(bytes, offset, length, charset).
 func NewStringFromByteRange(a *Array[int8], offset, length int32, charset any) *String {
-	if offset < 0 || length < 0 || int(offset)+int(length) > len(a.Data) {
-		ThrowKind(StringIndexOutOfBounds, "offset "+itoa(offset)+", count "+itoa(length)+", length "+itoa(int32(len(a.Data))))
-	}
+	checkStringRangeSize(offset, length, len(a.Data))
 	return newStringFromBytes(Reinterpret[int8, byte](a.Data[offset:offset+length]), charset)
 }
 
@@ -705,7 +739,8 @@ func newStringFromBytes(bytes []byte, charset any) *String {
 }
 
 // decodeMalformedUTF8 decodes UTF-8 as the JDK does: each maximal prefix of a valid sequence
-// (rather than each byte, as Go does) becomes one U+FFFD.
+// (rather than each byte, as Go does) becomes one U+FFFD, and so does an encoded surrogate
+// (ED A0..BF 80..BF), which Go's DecodeRune rejects.
 func decodeMalformedUTF8(bytes []byte) []uint16 {
 	chars := make([]uint16, 0, len(bytes))
 	for i := 0; i < len(bytes); {
@@ -728,8 +763,6 @@ func decodeMalformedUTF8(bytes []byte) []uint16 {
 		switch b {
 		case 0xe0:
 			lo = 0xa0
-		case 0xed:
-			hi = 0x9f
 		case 0xf0:
 			lo = 0x90
 		case 0xf4:

@@ -89,9 +89,14 @@ object Linker:
     "IndexOutOfBounds"       -> "java.lang.IndexOutOfBoundsException",
     "IO"                     -> "java.io.IOException",
     "NoSuchMethod"           -> "java.lang.NoSuchMethodError",
-    "NoSuchField"            -> "java.lang.NoSuchFieldError"
+    "NoSuchField"            -> "java.lang.NoSuchFieldError",
+    "UnsupportedEncoding"    -> "java.io.UnsupportedEncodingException"
   )
   private val MessageConstructor = MethodName(MethodName.ConstructorSimpleName, List(Type.String), Type.Void)
+  /** The runtime also throws `PatternSyntaxException(description, regex, index)` (`rt.MakePatternSyntaxException`). */
+  private val PatternSyntaxException: ClassName = "java.util.regex.PatternSyntaxException"
+  private val PatternSyntaxConstructor =
+    MethodName(MethodName.ConstructorSimpleName, List(Type.String, Type.String, Type.Int), Type.Void)
 
   /** Links the program and writes its Go module; returns the warnings. */
   def link(classpath: Seq[Path], outputDir: Path, config: Config = Config()): List[String] =
@@ -128,6 +133,9 @@ object Linker:
     for (_, cls) <- exceptionClasses do
       analyzer.instantiate(cls)
       analyzer.reach(cls, MessageConstructor)
+    if program.findMethod(PatternSyntaxException, PatternSyntaxConstructor).isDefined then
+      analyzer.instantiate(PatternSyntaxException)
+      analyzer.reach(PatternSyntaxException, PatternSyntaxConstructor)
     analyzer.run()
     if errors.all.nonEmpty then throw LinkingException(errors.all)
 
@@ -239,6 +247,11 @@ object Linker:
         sb ++= s"\t\tcase rt.$kind:\n"
         sb ++= s"\t\t\treturn ${Mangling.newInstance(cls, MessageConstructor)}(message)\n"
       sb ++= "\t\t}\n\t\treturn nil\n\t}\n}\n\n"
+    if ctx.analyzer.instantiated.contains(PatternSyntaxException) then
+      sb ++= "func init() {\n"
+      sb ++= "\trt.MakePatternSyntaxException = func(description, regex *rt.String, index int32) any {\n"
+      sb ++= s"\t\treturn ${Mangling.newInstance(PatternSyntaxException, PatternSyntaxConstructor)}(description, regex, index)\n"
+      sb ++= "\t}\n}\n\n"
     if entry.isEmpty then return sb.toString // a library: no entry point
     sb ++= "// Main runs the Scala program's entry point with the command-line arguments.\n"
     sb ++= "// Like the JVM, it then waits for the non-daemon threads the program started.\n"
@@ -263,6 +276,14 @@ object Linker:
         line(s"\t$v = $init")
       line(")")
       line()
+      // intern() returns the literals for equal strings.
+      if ctx.analyzer.usedNatives.contains(Natives.StringIntern) then
+        line("func init() {")
+        line("\trt.RegisterStringLiterals(")
+        for vs <- ctx.stringLiterals.values.grouped(16) do line(s"\t\t${vs.mkString(", ")},")
+        line("\t)")
+        line("}")
+        line()
 
     if ctx.classLiterals.nonEmpty then
       line("var (")

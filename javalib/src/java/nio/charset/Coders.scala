@@ -2,7 +2,7 @@ package java.nio.charset
 
 // The coders of the standard charsets, on arrays (see CharsetDecoder.decodeArray and
 // CharsetEncoder.encodeArray). Malformed UTF-8 is handled as by the JDK: each maximal prefix of a
-// valid sequence is one malformed unit.
+// valid sequence is one malformed unit, and so is an encoded surrogate.
 
 private[charset] final class UTF8Decoder(cs: Charset) extends CharsetDecoder(cs, 1.0f, 1.0f):
   private[java] def decodeArray(in: Array[Byte], inEnd: Int, out: Array[Char], outEnd: Int, endOfInput: Boolean): Int =
@@ -27,7 +27,7 @@ private[charset] final class UTF8Decoder(cs: Charset) extends CharsetDecoder(cs,
           else if lead >= 0xf0 && lead <= 0xf4 then 4
           else 1
         val lo = if lead == 0xe0 then 0xa0 else if lead == 0xf0 then 0x90 else 0x80
-        val hi = if lead == 0xed then 0x9f else if lead == 0xf4 then 0x8f else 0xbf
+        val hi = if lead == 0xf4 then 0x8f else 0xbf
         if length == 1 then
           val r = malformed(1, out, outEnd)
           if r >= 0 then return r
@@ -46,15 +46,19 @@ private[charset] final class UTF8Decoder(cs: Charset) extends CharsetDecoder(cs,
               case _ =>
                 ((lead & 0x07) << 18) | ((in(inPos + 1) & 0x3f) << 12) | ((in(inPos + 2) & 0x3f) << 6) |
                   (in(inPos + 3) & 0x3f)
-            if cp >= 0x10000 then
-              if outPos + 2 > outEnd then return Coding.Overflow
-              out(outPos) = (0xd7c0 + (cp >> 10)).toChar // high surrogate
-              out(outPos + 1) = (0xdc00 | (cp & 0x3ff)).toChar
-              outPos += 2
+            if length == 3 && Character.isSurrogate(cp.toChar) then // an encoded surrogate (ED A0..BF xx)
+              val r = malformed(3, out, outEnd)
+              if r >= 0 then return r
             else
-              out(outPos) = cp.toChar
-              outPos += 1
-            inPos += length
+              if cp >= 0x10000 then
+                if outPos + 2 > outEnd then return Coding.Overflow
+                out(outPos) = (0xd7c0 + (cp >> 10)).toChar // high surrogate
+                out(outPos + 1) = (0xdc00 | (cp & 0x3ff)).toChar
+                outPos += 2
+              else
+                out(outPos) = cp.toChar
+                outPos += 1
+              inPos += length
           else if ok && !endOfInput then return Coding.Underflow // incomplete: wait for more input
           else
             val r = malformed(valid, out, outEnd)

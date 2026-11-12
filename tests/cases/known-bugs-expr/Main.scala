@@ -50,7 +50,3 @@ object Main:
     attempt("\"s\" asInstanceOf NeverInstantiated")(str.asInstanceOf[NeverInstantiated] != null)
     attempt("Stone() asInstanceOf NeverImplemented")(anyOf(Stone()).asInstanceOf[NeverImplemented] != null)
     attempt("Stone() asInstanceOf NeverInstantiated")(anyOf(Stone()).asInstanceOf[NeverInstantiated].hashCode == 0)
-
-    // intern does not return the literal. JVM: true
-    val built = new StringBuilder("lit").append("eral").toString
-    attempt("built.intern eq \"literal\"")(built.intern() eq "literal")

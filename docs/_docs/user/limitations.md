@@ -42,9 +42,10 @@ scala-go does not implement is a link error naming it, never a silent difference
   `%t`, `%a`, and `BigDecimal` with `%f`, with an `IllegalArgumentException` that names the
   JDK's exception. Output differences: [Differences](differences.md#text).
 - **Regular expressions** are Go's RE2: no lookaround, backreferences, possessive quantifiers or
-  atomic groups. Such a pattern throws `UnsupportedOperationException` when compiled.
+  atomic groups. Such a pattern throws `UnsupportedOperationException` when compiled; an
+  invalid one throws `PatternSyntaxException` with Go's description and no index.
 - **Charsets:** UTF-8, ISO-8859-1 and US-ASCII only; `Charset.isSupported` is `false` for others,
-  and using one throws `UnsupportedOperationException`.
+  and using one throws `UnsupportedEncodingException` or `UnsupportedCharsetException`.
 - **Libraries with Java code**, Scala 2 libraries and libraries built on runtime reflection do not
   link: today cats-effect, ZIO, fs2-io, circe, zio-json, scribe, scopt, requests-scala, munit,
   utest. Use Go libraries in place of Java ones. [Scala libraries](../libraries/scala.md).
@@ -60,8 +61,6 @@ scala-go does not implement is a link error naming it, never a silent difference
 - **cats-effect and ZIO** do not link. Use gears or `scala.concurrent` ([Concurrency](concurrency.md)).
 - **Parallel streams** run sequentially; `IntStream.parallel()` and the other primitive streams'
   do not link.
-- **`StringBuffer` is not synchronized** ([known bug](../contributing/roadmap.md#known-bugs)):
-  guard a shared one with a lock, or give each thread its own `StringBuilder`.
 
 ## Go interop
 

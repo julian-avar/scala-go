@@ -52,7 +52,5 @@ object Main:
     // ClassCastException messages are Go's. JVM: true
     attempt("cast message names both classes")(try { any(Cat()).asInstanceOf[Dog]; "no" } catch case e: ClassCastException => e.getMessage.contains("Cat cannot be cast to class Dog"))
 
-    // String index errors have older JDKs' messages. JVM: "begin 2, end 1, length 3" is
-    // "Range [2, 1) out of bounds for length 3"; parseInt adds " under radix 16"
-    attempt("substring(2, 1) message")(try "abc".substring(2, 1) catch case e: StringIndexOutOfBoundsException => e.getMessage)
+    // parseInt's message is an older JDK's. JVM: adds " under radix 16"
     attempt("parseInt(\"zz\", 16) message")(try Integer.parseInt("zz", 16) catch case e: NumberFormatException => e.getMessage)

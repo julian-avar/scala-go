@@ -248,9 +248,7 @@ and by gc's messages and become Java exceptions:
 - **Deviation (bug):** a negative array index throws `RuntimeException("runtime error: index out
   of range [-1]")`, not `ArrayIndexOutOfBoundsException`.
 - **Deviation:** `NullPointerException`s have no message (the JVM's name the `null` expression).
-- **Deviation (bug):** `String` index errors have JDK 8's messages (`"abc".charAt(5)`:
-  `index 5, length 3`; JDK 25: `Index 5 out of bounds for length 3`), and `Integer.parseInt(s,
-  radix)` omits the JDK's `under radix 16` suffix.
+- **Deviation (bug):** `Integer.parseInt(s, radix)` omits the JDK's `under radix 16` suffix.
 - Go fatal errors (stack or heap exhaustion, Go's own fatal conditions) are not exceptions: the
   process ends with exit status 2 without running `catch` or `finally`
   ([Runtime: stack](runtime.md#stack)).

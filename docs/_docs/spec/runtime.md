@@ -206,9 +206,8 @@ that reaches an unimplemented reflective API fails to link, naming the chain of 
   (`-1`, JDK `ffffffff`); `BigInteger` arguments print a Go struct
   ([Silent wrong output](../contributing/roadmap.md#silent-wrong-output)).
 - Charsets: UTF-8 (default), ISO-8859-1 and US-ASCII, with the JDK's malformed-input handling;
-  `Charset.isSupported` is `false` for others. **Deviation (bug):** using another throws
-  `UnsupportedOperationException` (JVM: `UnsupportedEncodingException` or
-  `UnsupportedCharsetException`).
+  `Charset.isSupported` is `false` for others, and using one throws
+  `UnsupportedEncodingException` (by name) or `UnsupportedCharsetException`, as in the JDK.
 - `Character` classification and case mapping use Go's Unicode tables (Unicode 16.0 with Go 1.27,
   as in JDK 25). **Deviation:** they follow the Go release, not the targeted JDK.
 - Regular expressions run on Go's RE2: no lookaround, backreferences or possessive quantifiers.

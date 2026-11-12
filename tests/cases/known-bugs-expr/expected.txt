@@ -10,4 +10,3 @@ Array(Array(1, 2), Array(3, 4)).transpose: throws java.lang.NullPointerException
 "s" asInstanceOf NeverInstantiated: true
 Stone() asInstanceOf NeverImplemented: true
 Stone() asInstanceOf NeverInstantiated: false
-built.intern eq "literal": false

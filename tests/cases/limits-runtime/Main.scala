@@ -63,11 +63,9 @@ object Main:
     // JVM: throws UnsatisfiedLinkError
     attempt("@native method")(nativeMethod())
 
-    // Exception messages. JVM: the helpful NullPointerException message, and
-    // "Index 5 out of bounds for length 3" (JDK 21)
+    // Exception messages. JVM: the helpful NullPointerException message
     val nullString: String = null
     attempt("NPE message")(nullString.length)
-    attempt("charAt(5)")("abc".charAt(5))
 
     // JVM system properties are unset. JVM: false, false
     attempt("java.version is null")(System.getProperty("java.version") == null)
