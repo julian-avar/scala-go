@@ -175,8 +175,8 @@ object Main:
     t.start()
     t.join()
     attempt("frames below a thread's body")(frames(0))
-    // JVM: java.lang.ExceptionInInitializerError, FailingInit$.<clinit> (see known-bugs for the
-    // missing ExceptionInInitializerError).
+    // JVM: java.lang.ExceptionInInitializerError, FailingInit$.<clinit> (see known-bugs-misc for
+    // the missing ExceptionInInitializerError).
     try FailingInit.value
     catch case e: Throwable =>
       val root = if e.getCause != null then e.getCause else e

@@ -123,11 +123,12 @@ and runs the binary. Both outputs must equal `expected.txt`. Optional files chan
 | `library.txt`       | links the case as a library, used by the Go program in `consumer/`      |
 | `<dir>/go.mod`      | a subdirectory with a `go.mod` is a local Go module                     |
 
-Cases are grouped by prefix after the documentation they check: `lang-*` and `expr-*`/`data-*`
-([Language](docs/_docs/spec/language.md), [Data](docs/_docs/spec/data.md)), `scala-*` (the
-Scala library), `jdk-*` (javalib), `runtime-*` ([Runtime](docs/_docs/spec/runtime.md)) and
-`interop-*` ([Go interop](docs/_docs/spec/interop.md)); the older cases are named after a
-feature.
+Cases are named `<area>-<topic>`, the area after the documentation they check: `lang-*` and
+`expr-*`/`data-*` ([Language](docs/_docs/spec/language.md), [Data](docs/_docs/spec/data.md)),
+`scala-*` (the Scala library, and gears), `jdk-*` (javalib), `runtime-*`
+([Runtime](docs/_docs/spec/runtime.md)) and `interop-*` ([Go interop](docs/_docs/spec/interop.md)).
+A `-basics` case is a small first test of a topic whose full case has the bare name
+(`lang-traits-basics`, `lang-traits`).
 
 Cases named `limits-*` and `known-bugs*` pin what does not work: each limitation in
 [Limitations](docs/_docs/user/limitations.md) and the not-planned list in
@@ -138,7 +139,7 @@ check to a case that runs on the JVM and Go, and update the documentation.
 
 | Variable                    | Effect                                                          |
 |-----------------------------|-----------------------------------------------------------------|
-| `SCALAGO_TEST_ONLY`         | runs only the named cases: `SCALAGO_TEST_ONLY=regex,traits`     |
+| `SCALAGO_TEST_ONLY`         | runs only the named cases: `SCALAGO_TEST_ONLY=scala-regex,lang-traits` |
 | `SCALAGO_TEST_PARALLELISM`  | how many cases run at once (they run concurrently)              |
 | `SCALAGO_KEEP_WORK=1`       | keeps the work directory of passing cases too; failing ones are always kept, under `/tmp/scalago-<case>-*` |
 | `SCALAGO_TEST_GOCACHE_GB`   | size cap of the tests' Go build cache, `~/.cache/scalago-tests/go-build` (default 10). At start, entries unused for a day are pruned, then the least recently used beyond the cap |

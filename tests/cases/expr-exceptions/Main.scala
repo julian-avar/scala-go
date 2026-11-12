@@ -4,9 +4,9 @@ import scala.util.control.{Breaks, ControlThrowable, NonFatal}
 // Exceptions (docs/_docs/spec/language.md, "Exceptions"): try/catch/finally ordering, nesting,
 // rethrow, finally after return and break, exceptions replacing outcomes, guards, NonFatal,
 // custom exceptions, getMessage/getCause/addSuppressed, the run-time errors Go detects. Not
-// here: `try throw e finally return x` (known-bugs-finally-return), `try throw e finally
+// here: `try throw e finally return x` (known-bugs-expr-finally-return), `try throw e finally
 // throw e2` (known-bugs-expr-finally-throw), negative array indices and NonFatal of
-// StackOverflowError (known-bugs), NullPointerException messages (limits-runtime).
+// StackOverflowError (known-bugs-misc), NullPointerException messages (limits-runtime).
 class AppException(val code: Int, msg: String, cause: Throwable = null) extends Exception(msg, cause)
 class ValidationException(field: String) extends AppException(400, s"invalid $field")
 case class Problem(what: String) extends RuntimeException(what)

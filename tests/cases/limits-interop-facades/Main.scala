@@ -1,9 +1,9 @@
 import scalago.go.*
 
 // Limitations of Go interop (docs/_docs/user/limitations.md, "Go interop"): Go types that a
-// hand-written facade cannot express (generated facades leave out more: limits-facadegen). Each
-// use is a link error. When one starts to link, this case fails: move the use to go-interop, and
-// update the docs.
+// hand-written facade cannot express (generated facades leave out more:
+// limits-interop-facadegen). Each use is a link error. When one starts to link, this case fails:
+// move the use to interop-facades, and update the docs.
 
 @GoImport("sync/atomic")
 object atomic:

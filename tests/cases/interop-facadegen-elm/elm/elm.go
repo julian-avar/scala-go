@@ -1,5 +1,5 @@
-// Package elm is bubbletea's architecture in miniature, for the go-facadegen test case: Go APIs
-// in the style of popular Go libraries, used from Scala through generated facades.
+// Package elm is bubbletea's architecture in miniature, for the interop-facadegen-elm test case: Go
+// APIs in the style of popular Go libraries, used from Scala through generated facades.
 package elm
 
 import (

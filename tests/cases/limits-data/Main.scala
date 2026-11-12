@@ -4,7 +4,7 @@
 // JVM does. When one changes, this case fails: move the line to a case that runs on the JVM too
 // (if it now matches), and update the docs. Pinned elsewhere: the class of Array[String] and of
 // copies (limits-runtime), identity of boxes and lambda toString (limits-runtime), String.format
-// (limits-text).
+// (limits-jdk-text).
 case class Point(x: Int)
 class Animal
 class Dog extends Animal

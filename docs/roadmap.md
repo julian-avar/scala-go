@@ -52,8 +52,9 @@ makes its case fail: move the check to a case run on both the JVM and Go.
 ### Known bugs
 
 All **S**. The `known-bugs*` case that pins each bug is named after its area: `known-bugs-lang`,
-`-expr`, `-runtime`, `-jdk`, `-scala-lib`, `-interop`, and the original `known-bugs`. Cases whose
-name ends in `-go-errors`, `-links` or the like expect `go vet`/`go build` or the linker to fail.
+`-expr`, `-runtime`, `-jdk`, `-scala-lib`, `-interop`, and `-misc` (bugs of several areas, found
+first). Cases whose name ends in `-go-errors`, `-links` or the like expect `go vet`/`go build` or
+the linker to fail.
 
 #### Code the Go compiler rejects
 

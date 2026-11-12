@@ -2,7 +2,7 @@
 // indices, substring, compareTo and hashCode work on code units, with surrogate pairs and unpaired
 // surrogates as on the JVM; conversions to UTF-8 replace unpaired surrogates and invalid input.
 // Unpaired surrogates are never printed (the console shows them as `?`); their code units are.
-// Not here: lastIndexOf of a supplementary code point and indexOf(0x110000) (known-bugs).
+// Not here: lastIndexOf of a supplementary code point and indexOf(0x110000) (known-bugs-misc).
 object Main:
   def p(what: String)(body: => Any): Unit = println(s"$what: ${String.valueOf(body)}")
   def units(s: String): String = s.map(c => f"${c.toInt}%04x").mkString(" ")

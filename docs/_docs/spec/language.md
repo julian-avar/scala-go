@@ -76,7 +76,7 @@ compiler checks and erases types exactly as for the JVM; the back end sees erase
 initializers in linearization order, then the class body statement by statement. A field read
 before its initializer runs has its default value (`0`, `false`, `null`). A trait reading an
 abstract `val` that a subclass defines sees `0`; a superclass calling an overridden `def` that
-returns a subclass `val` sees `null`. Verified by `tests/cases/initialization-order`.
+returns a subclass `val` sees `null`. Verified by `tests/cases/lang-initialization-order`.
 
 **Objects (modules).** An `object` is constructed on first access, not at program start.
 
@@ -158,7 +158,8 @@ i + inc()                    // JVM: 1; scala-go: 2
 | `==`, `<`, ... on floating | IEEE: `NaN != NaN`, `-0.0 == 0.0` | Go's comparison operators, which are IEEE 754's (Go: [Comparison operators][go-compare]) |
 | `Double.equals`, `compare` | by bits: `NaN` equals `NaN`, `-0.0` does not equal `0.0`; `-0.0 < 0.0 < NaN` | natives on the bits (`math.Float64bits`) |
 
-The `numerics-runtime` test case checks the run-time cases (operands the compiler cannot fold).
+The `expr-arithmetic-runtime` test case checks the run-time cases (operands the compiler cannot
+fold).
 
 **Deviation (bug):** `a * b + c` on `Float`/`Double` may use a fused multiply-add (one rounding
 instead of two) on arm64, and on amd64 with `GOAMD64=v3` or higher; results can differ from the

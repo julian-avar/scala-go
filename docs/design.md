@@ -412,12 +412,12 @@ Generated facades are checked at link time like handwritten ones, only where use
 members cost nothing. `scalago-gostd` (`gostd/`) has facades of 21 standard library packages,
 plus the types of `io/fs`, `reflect` and `syscall` they use: about 1,700 members.
 
-| Test or example    | Covers                                                             |
-|--------------------|--------------------------------------------------------------------|
-| `go-std`           | `scalago-gostd`                                                    |
-| `go-facadegen`     | a local module in bubbletea's style; the rules above               |
-| `go-web`           | a module in gin's style: embedded structs, promoted methods, variadic named func types, composite literals, handlers on goroutines, JSON with `GoData`, callbacks with error results |
-| `go-facade-reuse`  | two generated sets (`facades-<package>.txt` compiled as dependencies of `facades.txt`) passing values to each other and to `scalago-gostd` |
+| Test or example           | Covers                                                      |
+|---------------------------|-------------------------------------------------------------|
+| `interop-gostd`           | `scalago-gostd`                                             |
+| `interop-facadegen-elm`   | a local module in bubbletea's style; the rules above        |
+| `interop-web`             | a module in gin's style: embedded structs, promoted methods, variadic named func types, composite literals, handlers on goroutines, JSON with `GoData`, callbacks with error results |
+| `interop-facadegen-reuse` | two generated sets (`facades-<package>.txt` compiled as dependencies of `facades.txt`) passing values to each other and to `scalago-gostd` |
 | `examples/gotui/`, `gin/`, `argus/` | bubbletea, bubbles and lipgloss; a JSON API on gin; configuration reloaded by argus (`mill examples.<name>.check`) |
 
 ### Go data in Scala
@@ -445,7 +445,7 @@ the Go element type alone, so erasure loses nothing:
   `GoByte` and the other Go numeric types are opaque over Scala numbers, so they only matter
   here and in facades.
 - Every operation has a JVM implementation with Go's semantics (`GoNatives`), so code using Go
-  data without facades runs on the JVM too. The `go-data` test checks both agree.
+  data without facades runs on the JVM too. The `interop-go-data-basics` test checks both agree.
 
 **Plain data.** Go code that inspects values by reflection (`encoding/json`, templates,
 configuration libraries) cannot see inside Scala objects: a case class in an `any` is a pointer
@@ -922,7 +922,7 @@ JMM gives racy programs some guarantees and Go does not: a racy read of a refere
 interface or slice header in Go) can see a torn value and crash. `final` fields get no
 publication guarantee either. Share objects through `synchronized`, volatiles, atomics,
 `Thread.start`/`join` or Go channels, all happens-before edges, and check with Go's race
-detector (`go build -race`), under which the `concurrency` test runs.
+detector (`go build -race`), under which the `runtime-concurrency` test runs.
 
 ## gears
 
@@ -943,8 +943,8 @@ the same code runs on goroutines.
   `withGoContext(ctx)(body)` cancels `body` when a Go `context.Context` is done, which exported
   code uses to honour its Go callers' contexts.
 
-The `gears` test runs the same program on JVM virtual threads and on goroutines (also under the
-race detector); `gears-go-context` cancels gears code with a Go deadline.
+The `scala-gears` test runs the same program on JVM virtual threads and on goroutines (also under
+the race detector); `interop-gears-context` cancels gears code with a Go deadline.
 
 ## Semantics handled explicitly
 

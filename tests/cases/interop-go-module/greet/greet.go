@@ -1,4 +1,4 @@
-// Package greet is a local Go module used by the go-module test case.
+// Package greet is a local Go module used by the interop-go-module test case.
 package greet
 
 import (

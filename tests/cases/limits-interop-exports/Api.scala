@@ -1,8 +1,8 @@
 import scalago.go.*
 
 // Limitations of exports (docs/_docs/interop/exports.md, "Limitations"): the plugin rejects these.
-// When one is supported, this case fails: export it in go-library (with a Go consumer that uses
-// it), and update the docs. Tuple results: limits-exports-tuples.
+// When one is supported, this case fails: export it in interop-exports (with a Go consumer that
+// uses it), and update the docs. Tuple results: limits-interop-exports-tuples.
 object Api:
   @GoExport def identity[T](x: T): T = x
 

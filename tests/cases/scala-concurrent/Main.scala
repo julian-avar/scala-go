@@ -6,7 +6,7 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}
 
-/** scala.concurrent beyond the `futures` case: Promise completion methods, andThen, delegate,
+/** scala.concurrent beyond the `scala-futures` case: Promise completion methods, andThen, delegate,
   * never and unit, wrapped fatal exceptions, Channel, SyncVar, Deadline and
   * ExecutionContext.execute. */
 object Main:

@@ -5,7 +5,7 @@ import (
 	"unicode"
 )
 
-// The end-to-end case tests/cases/bigdecimal compares BigDecimal with the JVM's; these tests
+// The end-to-end case tests/cases/jdk-bigdecimal compares BigDecimal with the JVM's; these tests
 // cover the runtime's own assumptions.
 
 // unicodeDigit relies on decimal digits coming in runs of ten, from zero to nine.

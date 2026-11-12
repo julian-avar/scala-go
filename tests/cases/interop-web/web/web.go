@@ -1,5 +1,5 @@
-// Package web is gin's API in miniature, for the go-web test case: an engine embedding a router
-// group (promoted methods), handlers of a variadic named func type, a context with pointer
+// Package web is gin's API in miniature, for the interop-web test case: an engine embedding a
+// router group (promoted methods), handlers of a variadic named func type, a context with pointer
 // receivers, named map and slice types (H, HandlersChain, Params), JSON through encoding/json,
 // handlers running on goroutines, and callbacks with error results.
 package web

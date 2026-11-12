@@ -3,7 +3,7 @@ import scala.collection.mutable
 // Equality and hashing (docs/_docs/spec/language.md, "Equality and hashing"): ==, equals, eq,
 // ##, hashCode of boxes, strings, case classes, tuples and collections; cooperative equality of
 // boxed numbers. Not here: the documented deviations (boxed Int/Long == boxed Float, boxed
-// primitive == BigInt, null String operands, identity of boxes), pinned in known-bugs and
+// primitive == BigInt, null String operands, identity of boxes), pinned in known-bugs-misc and
 // limits-runtime.
 case class P(x: Int, y: String)
 case class D(v: Double)

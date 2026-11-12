@@ -20,7 +20,7 @@ object Main:
 
     // scala.math.BigDecimal(Double), and BigDecimal == Double, call new java.math.BigDecimal(String,
     // MathContext); the generated MathContext lacks the goBits method that native calls. (The
-    // bigdecimal case, which uses MathContext itself, is not affected.) JVM: 1.5, true
+    // jdk-bigdecimal case, which uses MathContext itself, is not affected.) JVM: 1.5, true
     attempt("BigDecimal(1.5)")(BigDecimal(d(1.5)))
     attempt("BigDecimal(\"1.5\") == 1.5")(BigDecimal("1.5") == d(1.5))
 

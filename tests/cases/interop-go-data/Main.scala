@@ -1,7 +1,7 @@
 import scalago.go.*
 
-// Go data semantics that go-data does not cover (docs/_docs/spec/interop.md, "Go data";
-// docs/_docs/interop/go-data.md): the same results on the JVM and as Go.
+// Go data semantics that interop-go-data-basics does not cover (docs/_docs/spec/interop.md,
+// "Go data"; docs/_docs/interop/go-data.md): the same results on the JVM and as Go.
 object Main:
   def attempt(what: String)(body: => Any): Unit =
     val result =

@@ -4,7 +4,7 @@ import java.util.Arrays
 // references, default values, bounds checks, multi-dimensional and jagged arrays, clone,
 // System.arraycopy (overlapping, ArrayStoreException between primitive types), covariance,
 // java.util.Arrays on primitive arrays, varargs and patterns. Not here: the element type of
-// arrays of references (limits-runtime, limits-data), negative indices (known-bugs).
+// arrays of references (limits-runtime, limits-data), negative indices (known-bugs-misc).
 case class Pt(x: Int, y: Int)
 
 object Main:

@@ -1,5 +1,5 @@
-// Package kit is used by the interop-facadegen test case: Go API shapes that go-facadegen does
-// not use (docs/_docs/interop/generated-facades.md, "How Go types map").
+// Package kit is used by the interop-facadegen test case: Go API shapes that
+// interop-facadegen-elm does not use (docs/_docs/interop/generated-facades.md, "How Go types map").
 package kit
 
 import (

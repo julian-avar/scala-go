@@ -6,7 +6,7 @@ import java.util.function.{BiFunction, BinaryOperator, Consumer, DoubleUnaryOper
 // closures in loops, currying, eta-expansion, placeholders, arities 0 to 22, andThen/compose,
 // tupled/curried, partial functions, SAM conversion to Scala and Java interfaces, by-name
 // parameters. Not here: reading a captured var in the same expression as a call that changes it
-// (known-bugs), lambda toString (limits-runtime).
+// (known-bugs-misc), lambda toString (limits-runtime).
 trait Visitor:
   def visit(n: Int): String
 trait Reducer[A]:

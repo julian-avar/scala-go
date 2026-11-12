@@ -1,4 +1,4 @@
-// Package deadline makes Go contexts for the gears-go-context test case.
+// Package deadline makes Go contexts for the interop-gears-context test case.
 package deadline
 
 import (

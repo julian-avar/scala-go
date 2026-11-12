@@ -1,5 +1,6 @@
 // Enums, ADTs and opaque types (docs/_docs/spec/language.md, "Scala 3 reference features";
-// data.md "Enums and opaque types"). Enums extending java.lang.Enum are in tests/cases/enumeration.
+// data.md "Enums and opaque types"). Enums extending java.lang.Enum are in
+// tests/cases/lang-enums-java.
 enum Color:
   case Red, Green, Blue
   def isWarm: Boolean = this == Red

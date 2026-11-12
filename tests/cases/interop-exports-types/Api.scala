@@ -1,6 +1,6 @@
 import scalago.go.*
 
-// Exported Scala code with the types that go-library does not use (docs/_docs/spec/interop.md,
+// Exported Scala code with the types that interop-exports does not use (docs/_docs/spec/interop.md,
 // "Exports"; docs/_docs/interop/exports.md): primitives, GoString, arrays, Go data, facades,
 // GoError, functions in both directions, exported class hierarchies, initialization on first use
 // and output flushing.
