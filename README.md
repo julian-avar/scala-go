@@ -137,6 +137,12 @@ They expect the failure (an error file, or `expected.txt` holding today's Go out
 JVM's in comments). A change that lifts a limitation or fixes a bug makes its case fail: move the
 check to a case that runs on the JVM and Go, and update the documentation.
 
+Each case is also a module of the build, `tests.cases[<name>]`, compiled as the test compiles it
+(the user library, gears, scalago-gostd, the plugin, and the facades of its `facades*.txt`), so
+that editors know the cases' classpath; `mill 'tests.cases[<name>].goRun'` runs one as Go. Cases
+with a `compile-errors.txt` are not modules (`mill __.compile` must pass). These modules only
+mirror the test's setup: `linker.test` compiles the cases itself.
+
 | Variable                    | Effect                                                          |
 |-----------------------------|-----------------------------------------------------------------|
 | `SCALAGO_TEST_ONLY`         | runs only the named cases: `SCALAGO_TEST_ONLY=scala-regex,lang-traits` |

@@ -1,7 +1,9 @@
 //| mill-jvm-version: system
 //| mill-version: 1.3.1
+//| bspScriptIgnore: ["tests/cases/**"]
 package build
 
+import mill.api.BuildCtx
 import mill.*
 import mill.scalalib.*
 import mill.scalalib.publish.*
@@ -13,7 +15,7 @@ object Versions {
   /** The plugin hooks compiler internals, so it is built against one exact compiler version.
    *  User code compiled with the plugin must use this same Scala version.
    */
-  val scala = UserScalaGoModule.ScalaVersion
+  val scala: String = UserScalaGoModule.ScalaVersion
   /** Mill's own Scala version: the Mill plugin is compiled with it. */
   val millScala = "3.9.0"
   val mill = "1.3.1"
@@ -22,13 +24,13 @@ object Versions {
 }
 
 trait ScalaGoModule extends ScalaModule {
-  def scalaVersion = Versions.scala
-  def scalacOptions = Seq("-deprecation", "-feature", "-Wunused:all")
+  def scalaVersion: T[String] = Versions.scala
+  def scalacOptions: T[Seq[String]] = Seq("-deprecation", "-feature", "-Wunused:all")
 }
 
 trait Published extends PublishModule {
-  def publishVersion = UserScalaGoModule.Version
-  def pomSettings = PomSettings(
+  def publishVersion: T[String] = UserScalaGoModule.Version
+  def pomSettings: T[PomSettings] = PomSettings(
     description = "scala-go: compile Scala 3 to Go",
     organization = UserScalaGoModule.Organization,
     url = "https://github.com/julian-avar/scala-go",
@@ -56,11 +58,11 @@ object plugin extends ScalaGoModule with Published {
   // Tied to one compiler version: published with the full Scala version as suffix.
   def artifactSuffix = s"_${scalaVersion()}"
   // The IR classes are compiled into the plugin jar, so that `-Xplugin:<jar>` is self-contained.
-  def sources = Task.Sources(moduleDir / "src", moduleDir / os.up / "ir" / "src")
-  def compileMvnDeps = Seq(mvn"org.scala-lang::scala3-compiler:${Versions.scala}")
+  def sources: T[Seq[PathRef]] = Task.Sources(moduleDir / "src", moduleDir / os.up / "ir" / "src")
+  def compileMvnDeps: T[Seq[Dep]] = Seq(mvn"org.scala-lang::scala3-compiler:${Versions.scala}")
 
   /** Value for `-Xplugin:`. */
-  def pluginClasspath = Task { jar().path.toString }
+  def pluginClasspath: Task.Simple[String] = Task { jar().path.toString }
 }
 
 /** Java standard library classes (and replacements for the Java classes of the Scala library),
@@ -74,7 +76,7 @@ object javalib extends WithPlugin with Published {
    *  document sources that redefine JDK packages): an empty documentation jar, which Maven
    *  Central requires.
    */
-  def docJar = Task {
+  def docJar: T[PathRef] = Task {
     val jar = Task.dest / "out.jar"
     val out = new java.util.jar.JarOutputStream(java.nio.file.Files.newOutputStream(jar.toNIO), new java.util.jar.Manifest())
     out.close()
@@ -85,7 +87,7 @@ object javalib extends WithPlugin with Published {
   // (and the Scala library's overrides in scalago.scalalib); the plugin emits them as java.lang /
   // scala.* in the IR. Static methods of JDK classes are methods of Scala objects, called through
   // static forwarders.
-  def scalacOptions = Task {
+  def scalacOptions: T[Seq[String]] = Task {
     Seq("-feature", "-P:scala-go:rename:scalago.javalib.hijacked.lang:java.lang", "-P:scala-go:rename:scalago.javalib:java", "-P:scala-go:rename:scalago.scalalib:scala",
       "-P:scala-go:static-forwarders") ++ pluginOptions()
   }
@@ -93,13 +95,13 @@ object javalib extends WithPlugin with Published {
   // previous run lose against the JDK's classes of the same names.
   def zincIncrementalCompilation = false
 
-  def bufferTemplates = Task.Source(moduleDir / "templates")
+  def bufferTemplates: Task.Simple[PathRef] = Task.Source(moduleDir / "templates")
 
   /** scala.runtime.function.JProcedure0..22: Java interfaces in the Scala library; and the
    *  java.nio buffers of each element type but bytes, from `templates/` (`CharBuffer` itself is
    *  written by hand, but its implementations are generated).
    */
-  def generatedSources = Task {
+  def generatedSources: T[Seq[PathRef]] = Task {
     val templates = bufferTemplates().path
     val typed = os.read(templates / "TypedBuffer.scala.template")
     val impls = os.read(templates / "BufferImpls.scala.template")
@@ -147,7 +149,7 @@ object javalib extends WithPlugin with Published {
  */
 object library extends WithPlugin with Published {
   def artifactName = "scalago-library"
-  def scalacOptions = Task { super.scalacOptions() ++ pluginOptions() }
+  def scalacOptions: T[Seq[String]] = Task { super.scalacOptions() ++ pluginOptions() }
 }
 
 /** IR for the Scala standard library, compiled from the TASTy files it ships (Scala 3.8+). */
@@ -155,23 +157,23 @@ object stdlib extends ScalaGoModule with Published {
   def artifactName = "scalago-scalalib-ir"
   def artifactSuffix = s"_${scalaVersion()}"
   /** The published jar contains only the `.goir` files. */
-  def resources = Task { Seq(ir()) }
+  def resources: T[Seq[PathRef]] = Task { Seq(ir()) }
 
-  def libraryJar = Task {
+  def libraryJar: Task.Simple[PathRef] = Task {
     defaultResolver()
       .classpath(Seq(mvn"org.scala-lang:scala-library:${Versions.scala}"))
       .find(_.path.last.startsWith("scala-library"))
       .get
   }
 
-  def compilerClasspath = Task {
+  def compilerClasspath: Task.Simple[Seq[PathRef]] = Task {
     defaultResolver().classpath(Seq(mvn"org.scala-lang::scala3-compiler:${Versions.scala}"))
   }
 
   /** Directory of `.goir` files (see `TastyIR`). `scala.quoted` (macros only) is skipped: the
    *  compiler cannot recompile it from TASTy.
    */
-  def ir = Task {
+  def ir: Task.Simple[PathRef] = Task {
     val out = Task.dest / "ir"
     TastyIR.compile(libraryJar().path, Nil, out, Task.dest / "work", compilerClasspath().map(_.path), plugin.jar().path,
       skip = _.segments.contains("quoted"))
@@ -188,16 +190,16 @@ object stdlib extends ScalaGoModule with Published {
 object gears extends WithPlugin with Published {
   def artifactName = "scalago-gears"
   def gearsDep = mvn"ch.epfl.lamp::gears:${Versions.gears}"
-  def mvnDeps = Seq(gearsDep)
-  def moduleDeps = Seq(library)
-  def scalacOptions = Task { super.scalacOptions() ++ pluginOptions() ++ Seq("-P:scala-go:rename:scalago.gearsrt:gears.async") }
+  def mvnDeps: T[Seq[Dep]] = Seq(gearsDep)
+  def moduleDeps: Seq[PublishModule] = Seq(library)
+  def scalacOptions: T[Seq[String]] = Task { super.scalacOptions() ++ pluginOptions() ++ Seq("-P:scala-go:rename:scalago.gearsrt:gears.async") }
 
-  def gearsJar = Task {
+  def gearsJar: Task.Simple[PathRef] = Task {
     defaultResolver().classpath(Seq(gearsDep)).find(_.path.last.startsWith("gears_3")).get
   }
 
   /** gears' IR, compiled from its TASTy (for the tests; ScalaGoModule does this for users). */
-  def gearsIR = Task {
+  def gearsIR: Task.Simple[PathRef] = Task {
     val out = Task.dest / "ir"
     TastyIR.compile(gearsJar().path, Seq(stdlib.libraryJar().path), out, Task.dest / "work",
       stdlib.compilerClasspath().map(_.path), plugin.jar().path)
@@ -211,19 +213,19 @@ object gears extends WithPlugin with Published {
  */
 object gostd extends WithPlugin with Published {
   def artifactName = "scalago-gostd"
-  def moduleDeps = Seq(library)
+  def moduleDeps: Seq[PublishModule] = Seq(library)
   // Generated code: unused-parameter warnings would be noise.
-  def scalacOptions = Task { Seq("-deprecation", "-feature") ++ pluginOptions() }
+  def scalacOptions: T[Seq[String]] = Task { Seq("-deprecation", "-feature") ++ pluginOptions() }
 
   /** The Go that the facades are generated from: a new release has new API, so it is an input. */
-  def goVersion = Task.Input {
+  def goVersion: Task.Simple[String] = Task.Input {
     os.proc("go", "version").call(env = Task.env).out.text().trim
   }
 
   /** Every package of the standard library that other modules can import (`go list std` without
    *  `internal` and `vendor` packages, and `unsafe`, whose pointers Scala cannot hold).
    */
-  def goPackages = Task {
+  def goPackages: Task.Simple[Seq[String]] = Task {
     goVersion()
     os.proc("go", "list", "std").call(env = Task.env).out.lines()
       .filter(p => p != "unsafe" && !p.split('/').exists(e => e == "internal" || e == "vendor"))
@@ -232,7 +234,7 @@ object gostd extends WithPlugin with Published {
   /** The objects of the packages whose names other packages share, as Go import aliases name them.
    *  `encoding/json` keeps `json`.
    */
-  def goPackageNames = Map(
+  def goPackageNames: Map[String, String] = Map(
     "crypto/rand" -> "cryptorand",
     "math/rand" -> "mathrand",
     "math/rand/v2" -> "randv2",
@@ -245,7 +247,7 @@ object gostd extends WithPlugin with Published {
     "runtime/pprof" -> "runtimepprof"
   )
 
-  def generatedSources = Task {
+  def generatedSources: T[Seq[PathRef]] = Task {
     // Task.env is the environment of the `mill` command (a Mill daemon outlives its shell).
     val packages = goPackages().map(p => goPackageNames.get(p).fold(p)(name => s"$p=$name"))
     os.proc(
@@ -259,9 +261,9 @@ object gostd extends WithPlugin with Published {
    *  (`mill gostd.usage.goBuild`) checks that the linker accepts them all and Go compiles the result.
    */
   object usage extends InBuildScalaGoModule {
-    override def moduleDeps = Seq(library, gostd)
-    def sources = Task.Sources()
-    def generatedSources = Task {
+    override def moduleDeps: Seq[JavaModule] = Seq(library, gostd)
+    def sources: T[Seq[PathRef]] = Task.Sources()
+    def generatedSources: T[Seq[PathRef]] = Task {
       os.proc(
         "java", "-cp", linker.runClasspath().map(_.path).mkString(java.io.File.pathSeparator),
         "scalago.linker.FacadeUsage", "--classpath", gostd.compile().classes.path, "--package", "scalago.gostd",
@@ -275,12 +277,12 @@ object gostd extends WithPlugin with Published {
 /** Whole-program linker: reads `.goir` files from a classpath and emits a Go module. */
 object linker extends ScalaGoModule with Published {
   def artifactName = "scalago-linker"
-  def moduleDeps = Seq(ir)
+  def moduleDeps: Seq[PublishModule] = Seq(ir)
 
-  def goRuntimeDir = Task.Source(moduleDir / os.up / "runtime" / "rt")
+  def goRuntimeDir: Task.Simple[PathRef] = Task.Source(moduleDir / os.up / "runtime" / "rt")
 
   /** Bundles the Go runtime sources as resources under `scalago/rt/`, plus an index file. */
-  def goRuntimeResources = Task {
+  def goRuntimeResources: Task.Simple[PathRef] = Task {
     val dest = Task.dest / "scalago" / "rt"
     os.makeDir.all(dest)
     val files = os.list(goRuntimeDir().path)
@@ -293,17 +295,17 @@ object linker extends ScalaGoModule with Published {
     PathRef(Task.dest)
   }
 
-  def goApiHelper = Task.Source(moduleDir / os.up / "runtime" / "goapi" / "main.go")
+  def goApiHelper: Task.Simple[PathRef] = Task.Source(moduleDir / os.up / "runtime" / "goapi" / "main.go")
 
-  def resources = Task { super.resources() :+ goRuntimeResources() }
+  def resources: T[Seq[PathRef]] = Task { super.resources() :+ goRuntimeResources() }
 
   object test extends ScalaTests with TestModule.Munit {
-    def mvnDeps = Seq(
+    def mvnDeps: T[Seq[Dep]] = Seq(
       mvn"org.scalameta::munit:${Versions.munit}",
       mvn"org.scala-lang::scala3-compiler:${Versions.scala}"
     )
-    def testCasesDir = Task.Source(moduleDir / os.up / os.up / "tests" / "cases")
-    def forkEnv = Task {
+    def testCasesDir: Task.Simple[PathRef] = Task.Source(moduleDir / os.up / os.up / "tests" / "cases")
+    def forkEnv: T[Map[String, String]] = Task {
       super.forkEnv() ++ Map(
         "SCALAGO_PLUGIN_CP" -> plugin.pluginClasspath(),
         "SCALAGO_LIBRARY_IR" -> Seq(javalib.compile().classes.path, stdlib.ir().path).mkString(java.io.File.pathSeparator),
@@ -325,11 +327,11 @@ object linker extends ScalaGoModule with Published {
  *  build also uses it directly (see `examples`).
  */
 object millplugin extends ScalaModule with Published {
-  def scalaVersion = Versions.millScala
+  def scalaVersion: T[String] = Versions.millScala
   def artifactName = "mill-scalago"
   def artifactSuffix = "_mill1_3"
-  def sources = Task.Sources(moduleDir / os.up / "mill-build" / "src")
-  def compileMvnDeps = Seq(mvn"com.lihaoyi::mill-libs:${Versions.mill}")
+  def sources: T[Seq[PathRef]] = Task.Sources(moduleDir / os.up / "mill-build" / "src")
+  def compileMvnDeps: T[Seq[Dep]] = Seq(mvn"com.lihaoyi::mill-libs:${Versions.mill}")
 }
 
 /** The documentation site: the pages of `docs/_docs` (with `docs/sidebar.yml`) and the API of
@@ -338,14 +340,14 @@ object millplugin extends ScalaModule with Published {
  *  a page (`docs/_docs/user/build.md`): its API would bring in all of Mill's.
  */
 object docs extends ScalaGoModule with UnidocModule {
-  def moduleDeps = Seq(library, gears, gostd)
+  def moduleDeps: Seq[JavaModule] = Seq(library, gears, gostd)
   def unidocDocumentTitle = "scala-go"
   def unidocVersion = Some(UserScalaGoModule.Version)
 
-  def siteSources = Task.Source(moduleDir)
+  def siteSources: Task.Simple[PathRef] = Task.Source(moduleDir)
 
   /** Scaladoc's site root: `docs/`, with the contributor documents (design, roadmap) as pages. */
-  def siteRoot = Task {
+  def siteRoot: Task.Simple[PathRef] = Task {
     val root = Task.dest / "root"
     for (name <- Seq("_docs", "_assets", "sidebar.yml", "api-overview.md") if os.exists(siteSources().path / name))
       os.copy(siteSources().path / name, root / name, createFolders = true)
@@ -358,7 +360,7 @@ object docs extends ScalaGoModule with UnidocModule {
     PathRef(root)
   }
 
-  def unidocOptions = Task {
+  def unidocOptions: T[Seq[String]] = Task {
     val root = siteRoot().path
     Seq(
       "-siteroot", root.toString,
@@ -379,7 +381,7 @@ object docs extends ScalaGoModule with UnidocModule {
   /** The site, in this task's directory (`out/docs/site.dest`); published to GitHub Pages by
    *  `.github/workflows/docs.yml`.
    */
-  def site = Task {
+  def site: Task.Simple[PathRef] = Task {
     siteRoot() // the options only name its directory: rebuild when its contents change
     val out = unidocCommon(local = true)().path
     // Scaladoc 3.9.0's ux.js loads pages it links to with jQuery's `$.get`, but Scaladoc no
@@ -404,10 +406,10 @@ object docs extends ScalaGoModule with UnidocModule {
 
 /** A ScalaGoModule that uses this build's modules instead of published artifacts. */
 trait InBuildScalaGoModule extends UserScalaGoModule {
-  def scalaGoPlugin = plugin.jar()
-  def scalaGoLinkerClasspath = linker.runClasspath()
-  def scalaGoLibraryIR = Task { Seq(javalib.compile().classes, stdlib.ir()) }
-  def scalaGoLibraryDeps = Task { Seq.empty[Dep] }
+  def scalaGoPlugin: T[PathRef] = plugin.jar()
+  def scalaGoLinkerClasspath: T[Seq[PathRef]] = linker.runClasspath()
+  def scalaGoLibraryIR: T[Seq[PathRef]] = Task { Seq(javalib.compile().classes, stdlib.ir()) }
+  def scalaGoLibraryDeps: T[Seq[Dep]] = Task { Seq.empty[Dep] }
   def moduleDeps: Seq[JavaModule] = Seq(library)
 }
 
@@ -422,12 +424,12 @@ object bench extends InBuildScalaGoModule
 object examples extends Module {
   /** A program built with ScalaGoModule: `mill examples.basics.goRun [names...]`. */
   object basics extends InBuildScalaGoModule {
-    override def moduleDeps = Seq(library, gears)
+    override def moduleDeps: Seq[JavaModule] = Seq(library, gears)
     // gears comes as a plain Scala dependency: ScalaGoModule compiles it from TASTy.
-    def mvnDeps = Seq(gears.gearsDep)
-    def goLocalModules = Task.Sources(moduleDir / "go" / "textstats")
+    def mvnDeps: T[Seq[Dep]] = Seq(gears.gearsDep)
+    def goLocalModules: T[Seq[PathRef]] = Task.Sources(moduleDir / "go" / "textstats")
     // Facades generated from Go packages: a standard library package, and the local module.
-    def goFacadePackages = Seq("strconv", "example.com/textstats")
+    def goFacadePackages: T[Seq[String]] = Seq("strconv", "example.com/textstats")
   }
 
   /** Popular Scala 3 libraries, compiled from TASTy like any dependency (none has a scala-go
@@ -435,7 +437,7 @@ object examples extends Module {
    *  that both print the same.
    */
   object ecosystem extends InBuildScalaGoModule {
-    def mvnDeps = Seq(
+    def mvnDeps: T[Seq[Dep]] = Seq(
       mvn"org.typelevel::cats-core:2.13.0",
       mvn"com.lihaoyi::upickle:4.4.1",
       mvn"com.lihaoyi::fastparse:3.1.1",
@@ -444,7 +446,7 @@ object examples extends Module {
       mvn"com.lihaoyi::os-lib:0.11.4"
     )
 
-    def check() = Task.Command {
+    def check(): Task.Command[Unit] = Task.Command {
       val javaExe = os.Path(sys.props("java.home")) / "bin" / "java"
       val classpath = runClasspath().map(_.path).filter(os.exists(_)).mkString(java.io.File.pathSeparator)
       val jvm = os.proc(javaExe, "-cp", classpath, finalMainClass()).call().out.text()
@@ -461,13 +463,13 @@ object examples extends Module {
    *  scalago-gostd for the standard library's types (`io.Reader`, `time.Duration`).
    */
   object gotui extends InBuildScalaGoModule {
-    override def moduleDeps = Seq(library, gostd)
-    def goRequires = Seq(
+    override def moduleDeps: Seq[JavaModule] = Seq(library, gostd)
+    def goRequires: T[Seq[String]] = Seq(
       "github.com/charmbracelet/bubbletea@v1.3.10",
       "github.com/charmbracelet/lipgloss@v1.1.0",
       "github.com/charmbracelet/bubbles@v1.0.0"
     )
-    def goFacadePackages = Seq(
+    def goFacadePackages: T[Seq[String]] = Seq(
       "github.com/charmbracelet/bubbletea",
       "github.com/charmbracelet/lipgloss",
       "github.com/charmbracelet/bubbles/textinput",
@@ -475,7 +477,7 @@ object examples extends Module {
       "github.com/charmbracelet/bubbles/key"
     )
 
-    def check() = Task.Command {
+    def check(): Task.Command[Unit] = Task.Command {
       val expected = Seq("2 todos, 1 done, saved 3 times", "[ ] buy milk", "[x] walk the dog").mkString("", "\n", "\n")
       val output = os.proc(goBuild().path, "--demo").call().out.text()
       if (output != expected) throw new Exception(s"unexpected output:\n$output")
@@ -488,11 +490,11 @@ object examples extends Module {
    *  responses.
    */
   object gin extends InBuildScalaGoModule {
-    override def moduleDeps = Seq(library, gostd)
-    def goRequires = Seq("github.com/gin-gonic/gin@v1.12.0")
-    def goFacadePackages = Seq("github.com/gin-gonic/gin")
+    override def moduleDeps: Seq[JavaModule] = Seq(library, gostd)
+    def goRequires: T[Seq[String]] = Seq("github.com/gin-gonic/gin@v1.12.0")
+    def goFacadePackages: T[Seq[String]] = Seq("github.com/gin-gonic/gin")
 
-    def check() = Task.Command {
+    def check(): Task.Command[Unit] = Task.Command {
       val output = os.proc(goBuild().path, "--self-test").call().out.text()
       print(output)
       if (!output.linesIterator.contains("all requests answered as expected")) throw new Exception("the self-test failed")
@@ -504,14 +506,83 @@ object examples extends Module {
    *  checks that each change is seen.
    */
   object argus extends InBuildScalaGoModule {
-    override def moduleDeps = Seq(library, gostd)
-    def goRequires = Seq("github.com/agilira/argus@v1.7.5")
-    def goFacadePackages = Seq("github.com/agilira/argus")
+    override def moduleDeps: Seq[JavaModule] = Seq(library, gostd)
+    def goRequires: T[Seq[String]] = Seq("github.com/agilira/argus@v1.7.5")
+    def goFacadePackages: T[Seq[String]] = Seq("github.com/agilira/argus")
 
-    def check() = Task.Command {
+    def check(): Task.Command[Unit] = Task.Command {
       val output = os.proc(goBuild().path, "--self-test").call().out.text()
       print(output)
       if (!output.linesIterator.contains("all changes seen as expected")) throw new Exception("the self-test failed")
     }
+  }
+}
+
+/** The end-to-end test cases (`tests/cases/<name>`, run by `linker.test`), each a module set up as
+ *  the tests compile it, so that editors (through BSP) know their classpath: the user library,
+ *  gears, scalago-gostd, and the facades generated from the case's `facades*.txt`. Also
+ *  `mill tests.cases[<name>].goRun` (without the case's `stdin.txt` and `env.txt`).
+ *
+ *  Cases that must fail to compile (`compile-errors.txt`) are left out, so that `mill __.compile`
+ *  passes. The `//| bspScriptIgnore` header keeps Mill from also taking the cases' files for
+ *  single-file scripts.
+ */
+object tests extends Module {
+  def casesDir: os.Path = BuildCtx.workspaceRoot / "tests" / "cases"
+
+  def caseNames: Seq[String] = BuildCtx.watchValue {
+    os.list(casesDir).filter(d => os.isDir(d) && !os.exists(d / "compile-errors.txt")).map(_.last).sorted
+  }
+
+  /** The Go packages listed in a `facades*.txt` file (none if it does not exist). */
+  def facadeList(file: os.Path): Seq[String] =
+    if (os.exists(file)) os.read.lines(file).map(_.trim).filter(_.nonEmpty) else Seq.empty
+
+  object cases extends Cross[TestCase](caseNames)
+
+  trait TestCase extends InBuildScalaGoModule with Cross.Module[String] {
+    def caseDir: os.Path = casesDir / crossValue
+
+    override def moduleDeps: Seq[JavaModule] = Seq(library, gears, gostd) ++ facadeSets.crossModules
+
+    /** The case's `.scala` files (its subdirectories hold Go only). */
+    def sources: T[Seq[PathRef]] = Task.Sources(caseDir)
+
+    /** Subdirectories with a `go.mod` are local Go modules. */
+    def goModuleDirs: Seq[os.Path] = BuildCtx.watchValue(os.list(caseDir).filter(d => os.exists(d / "go.mod")))
+    def goLocalModules: T[Seq[PathRef]] = Task.Input { goModuleDirs.map(PathRef(_)) }
+
+    def facadesFile: Task.Simple[PathRef] = Task.Source(caseDir / "facades.txt")
+    def goFacadePackages: T[Seq[String]] = Task { facadeList(facadesFile().path) }
+
+    /** `facades-<name>.txt`: a set of facades in package `<name>`, compiled first, in name order,
+     *  each a dependency of the next ones and of the case.
+     */
+    def facadeSetNames: Seq[String] = BuildCtx.watchValue {
+      os.list(caseDir).map(_.last).collect { case s"facades-$name.txt" => name }.sorted
+    }
+    object facadeSets extends Cross[FacadeSet](facadeSetNames)
+    trait FacadeSet extends InBuildScalaGoModule with Cross.Module[String] {
+      override def moduleDeps: Seq[JavaModule] =
+        Seq(library, gears, gostd) ++ facadeSets.crossModules.filter(_.crossValue < crossValue)
+      def sources: T[Seq[PathRef]] = Task.Sources()
+      def setFile: Task.Simple[PathRef] = Task.Source(caseDir / s"facades-$crossValue.txt")
+      def goFacadesPackage: T[String] = crossValue
+      def goFacadePackages: T[Seq[String]] = Task { facadeList(setFile().path) }
+      def goLocalModules: T[Seq[PathRef]] = TestCase.this.goLocalModules
+    }
+
+    /** The entry point: `Main`, or the one `main.txt` names. */
+    def mainTxt: Task.Simple[PathRef] = Task.Source(caseDir / "main.txt")
+    def mainClass: T[Option[String]] = Task {
+      Some(if (os.exists(mainTxt().path)) os.read(mainTxt().path).trim else "Main")
+    }
+
+    def libraryTxt: Task.Simple[PathRef] = Task.Source(caseDir / "library.txt")
+    def goLibrary: T[Boolean] = Task { os.exists(libraryTxt().path) }
+    def scalaGoMainObject: T[String] = Task { if (goLibrary()) "" else super.scalaGoMainObject() }
+
+    def missingApisTxt: Task.Simple[PathRef] = Task.Source(caseDir / "missing-apis.txt")
+    def goMissingApis: T[String] = Task { if (os.exists(missingApisTxt().path)) "throw" else "error" }
   }
 }
