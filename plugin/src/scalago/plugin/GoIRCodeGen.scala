@@ -89,7 +89,11 @@ final class GoIRCodeGen(options: GoIRCodeGen.Options)(using genCtx: Context):
     val interfaces = sym.info.parents.map(_.classSymbol).filter(_.is(Trait)).map(className)
 
     val members = (impl.constr :: impl.body).filterNot(t => isIgnoredMember(t.symbol))
-    val fields = members.collect { case vd: ValDef if !vd.symbol.is(Method) => genField(vd) }
+    val fields = members.collect { case vd: ValDef if !vd.symbol.is(Method) =>
+      if isExported(vd.symbol) then
+        report.error("scala-go: vals and fields cannot be exported to Go; export a method that returns them (`@GoExport def`)", vd.srcPos)
+      genField(vd)
+    }
     val exportedType = goExportedType(td)
     val methods = members.collect { case dd: DefDef => genMethod(dd).copy(goExport = goExport(dd, exportedType)) }
 

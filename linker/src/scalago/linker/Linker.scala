@@ -108,6 +108,7 @@ object Linker:
         program.vtable(mainModule).get(MainMethod).exists(o => program.findMethod(o, MainMethod).exists(!_.isAbstract))
     val entry =
       if config.library then
+        Exports.check(program, errors)
         Exports.addRoots(program, analyzer)
         if Exports.functions(program).isEmpty && Exports.classes(program).isEmpty then
           throw LinkingException(List("nothing to link into a library: no definition is marked @GoExport"))

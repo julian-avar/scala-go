@@ -1,2 +1,0 @@
-main.go:11:25: undefined: scalagolib.Answer
-main.go:11:35: p.X undefined (type scalagolib.Point has no field or method X)

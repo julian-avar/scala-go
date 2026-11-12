@@ -1,1 +1,1 @@
-Api.scala:6:17: exported function Api.pair: cannot instantiate a generic Go function with Scala type scala.Tuple2[Int, java.lang.String]
+Api.scala:6:17: exported Api.pair: tuple results are not supported

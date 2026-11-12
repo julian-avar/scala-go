@@ -57,8 +57,6 @@ fail. A fix makes its case fail: move the check to a case run on both the JVM an
 
 | Bug | Fix in |
 |-----|--------|
-| A Scala subclass of `BigInteger` or `BigDecimal` links, then fails `go build` (`cannot use this (variable of type *S_…) as *rt.BigInteger`) | Linker: a link error naming the class |
-| Overloads exported under one Go name (`@GoExport("Twice")`) link, then fail `go build` (`Export_Twice redeclared`) | `Exports`: a link error |
 | A generic facade instantiated outside its Go constraint (`slices.Max` of a `GoSlice[Any]`: `any` is not `cmp.Ordered`) links, then fails `go build` (`does not satisfy`) | `GoInterop.typeParamBindings`: check type sets, `comparable` and interface constraints; a link error |
 
 #### Language
@@ -81,8 +79,6 @@ fail. A fix makes its case fail: move the check to a case run on both the JVM an
 | `getSimpleName` of a local class is `""`; of an operator-named class, the text after the last `$` (`List(1).getClass.getSimpleName` is `colon`; JVM: `$colon$colon`) | `rt.ClassGetSimpleName` |
 | `Array(Array(1, 2), Array(3, 4)).transpose` throws `NullPointerException` (reference arrays do not know their element type) | `ClassTag` arrays of arrays |
 | A negative array index throws `RuntimeException`, not `ArrayIndexOutOfBoundsException` | `rt.Caught`: gc's message for negative indices has no length |
-| `@GoExport` on a `val` or constructor field is ignored, without an error | Plugin: reject, as for traits |
-| An export's tuple result is rejected with a misleading message (`cannot instantiate a generic Go function with Scala type scala.Tuple2[…]`) | `Exports`: say tuple results are not supported |
 
 #### Runtime and threads
 

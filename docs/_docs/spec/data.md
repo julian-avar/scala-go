@@ -154,8 +154,7 @@ Scala.js); their methods are Go functions:
 
 - Calls on references typed by a supertype of these (`Any`, `Comparable`, `CharSequence`,
   `Number`) go through Go type switches.
-- **Deviation:** `BigInteger` and `BigDecimal` cannot be subclassed. **Deviation (bug):** a
-  subclass is not a link error; the generated code does not compile.
+- **Deviation:** `BigInteger` and `BigDecimal` cannot be subclassed: a subclass is a link error.
 - `scala.math.BigInt` and `scala.math.BigDecimal` are the Scala library's wrappers around them.
 - Static members of `Math`, `StrictMath`, `System`, `Character`, `Integer` and the other boxes,
   `java.util.Arrays` (primitive arrays), `Objects`, `java.lang.reflect.Array`,

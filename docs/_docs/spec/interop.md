@@ -309,10 +309,8 @@ module's root package:
   literals.
 - A Go package that the library imports through a facade cannot import the library (Go:
   [Import declarations][go-import]).
-- Exported traits, secondary constructors and generic methods are compile errors; tuple results
-  are link errors. **Deviation (bug):** `@GoExport` on a field or `val` is ignored, and overloads
-  exported under one Go name give Go code that does not compile
-  ([Known bugs](../contributing/roadmap.md#known-bugs)).
+- Exported traits, vals and fields, secondary constructors and generic methods are compile errors;
+  tuple results and overloads exported under one Go name are link errors.
 
 ## Goroutines and threads
 
