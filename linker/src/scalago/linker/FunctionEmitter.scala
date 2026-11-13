@@ -610,8 +610,10 @@ final class FunctionEmitter(ctx: LinkContext, owner: ClassDef, method: MethodDef
       marks += out.size
     val end = out.size
     var callsLater = false
+    var spilledLater = false // what comes before a spilled operand must be evaluated before it
     for i <- trees.indices.reverse do
-      if (marks(i) < end && !isPure(trees(i))) || (callsLater && isUnordered(trees(i))) then
+      if ((marks(i) < end || spilledLater) && !isPure(trees(i))) || (callsLater && isUnordered(trees(i))) then
+        spilledLater = true
         val temp = freshTemp()
         val t = goType(trees(i))
         val p = if trees(i).pos.line > 0 then trees(i).pos else pos
