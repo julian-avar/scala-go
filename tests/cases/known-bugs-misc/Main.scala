@@ -58,10 +58,6 @@ object Main:
     val minusOne = -1
     attempt("ints(-1)")(ints(minusOne))
 
-    // JVM: 0 and -1
-    attempt("\"\\uD83D\\uDE00\".lastIndexOf(0x1F600)")("\uD83D\uDE00".lastIndexOf(0x1F600))
-    attempt("\"\\uFFFD\".indexOf(0x110000)")("\uFFFD".indexOf(0x110000))
-
     // JVM: false (StackOverflowError is a VirtualMachineError)
     attempt("NonFatal(StackOverflowError())")(NonFatal(StackOverflowError()))
 

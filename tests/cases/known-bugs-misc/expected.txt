@@ -10,8 +10,6 @@ map eq map: throws java.lang.RuntimeException: runtime error: comparing uncompar
 "a".asInstanceOf[Integer]: java.lang.String
 i + inc(): 2
 ints(-1): throws java.lang.RuntimeException: runtime error: index out of range [-1]
-"\uD83D\uDE00".lastIndexOf(0x1F600): -1
-"\uFFFD".indexOf(0x110000): 0
 NonFatal(StackOverflowError()): true
 initializing Failing
 Failing.value: throws java.lang.IllegalStateException: init failed

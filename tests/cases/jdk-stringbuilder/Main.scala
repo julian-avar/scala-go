@@ -1,20 +1,13 @@
 import java.lang.{StringBuilder as JStringBuilder}
 
 // java.lang.StringBuilder and StringBuffer: appending each type, inserting, deleting, replacing,
-// reversing (surrogate pairs stay in order), length and capacity, searching, and the exceptions
-// of out-of-range indices.
+// reversing (surrogate pairs stay in order), length and capacity, searching, the exceptions of
+// out-of-range indices, and a StringBuffer shared by threads.
 object Main:
   def attempt(label: String)(body: => Any): Unit =
     val r =
       try String.valueOf(body)
       catch case e: Exception => s"${e.getClass.getName}: ${e.getMessage}"
-    println(s"$label: $r")
-
-  /** Only the exception's class: the messages of index errors differ (see known-bugs-jdk). */
-  def attemptType(label: String)(body: => Any): Unit =
-    val r =
-      try String.valueOf(body)
-      catch case e: Exception => e.getClass.getName
     println(s"$label: $r")
 
   def main(args: Array[String]): Unit =
@@ -25,6 +18,7 @@ object Main:
     searching()
     buffers()
     errors()
+    sharedBuffer()
 
   def appending(): Unit =
     println("== append")
@@ -119,18 +113,44 @@ object Main:
   def errors(): Unit =
     println("== errors")
     def sb = new JStringBuilder("abc")
-    attemptType("charAt(3)")(sb.charAt(3))
-    attemptType("charAt(-1)")(sb.charAt(-1))
-    attemptType("setCharAt(5)")(sb.setCharAt(5, 'x'))
-    attemptType("insert(4)")(sb.insert(4, "x"))
-    attemptType("insert(-1)")(sb.insert(-1, "x"))
-    attemptType("delete(2, 1)")(sb.delete(2, 1))
-    attemptType("delete(-1, 1)")(sb.delete(-1, 1))
-    attemptType("deleteCharAt(3)")(sb.deleteCharAt(3))
-    attemptType("replace(4, 5)")(sb.replace(4, 5, "x"))
-    attemptType("replace(2, 1)")(sb.replace(2, 1, "x"))
-    attemptType("substring(2, 5)")(sb.substring(2, 5))
-    attemptType("substring(4)")(sb.substring(4))
+    attempt("charAt(3)")(sb.charAt(3))
+    attempt("charAt(-1)")(sb.charAt(-1))
+    attempt("setCharAt(5)")(sb.setCharAt(5, 'x'))
+    attempt("insert(4)")(sb.insert(4, "x"))
+    attempt("insert(-1)")(sb.insert(-1, "x"))
+    attempt("delete(2, 1)")(sb.delete(2, 1))
+    attempt("delete(-1, 1)")(sb.delete(-1, 1))
+    attempt("delete(4, 5)")(sb.delete(4, 5))
+    attempt("deleteCharAt(3)")(sb.deleteCharAt(3))
+    attempt("replace(4, 5)")(sb.replace(4, 5, "x"))
+    attempt("replace(2, 1)")(sb.replace(2, 1, "x"))
+    attempt("substring(2, 5)")(sb.substring(2, 5))
+    attempt("substring(4)")(sb.substring(4))
+    attempt("subSequence(2, 5)")(sb.subSequence(2, 5))
+    attempt("getChars(1, 5)")(sb.getChars(1, 5, new Array[Char](10), 0))
     attempt("setLength(-1)")(sb.setLength(-1))
     attempt("new StringBuilder(-1)")(new JStringBuilder(-1))
-    attemptType("StringBuffer charAt(9)")(new StringBuffer("abc").charAt(9))
+    attempt("StringBuffer charAt(9)")(new StringBuffer("abc").charAt(9))
+    // Ranges of the appended text, which is "null" for a null CharSequence.
+    attempt("append(cs, 2, 1)")(sb.append("xyz": CharSequence, 2, 1))
+    attempt("append(cs, 0, 5)")(sb.append("xyz": CharSequence, 0, 5))
+    attempt("append(null cs, 1, 3)")(sb.append(null: CharSequence, 1, 3))
+    attempt("append(null cs, 0, 5)")(sb.append(null: CharSequence, 0, 5))
+    attempt("append(chars, 1, 5)")(sb.append(Array('a', 'b'), 1, 5))
+    attempt("append(chars, -1, 1)")(sb.append(Array('a', 'b'), -1, 1))
+    attempt("append(chars, 1, -1)")(sb.append(Array('a', 'b'), 1, -1))
+    attempt("appendCodePoint(-1)")(sb.appendCodePoint(-1))
+    attempt("appendCodePoint(0x110000)")(sb.appendCodePoint(0x110000))
+    attempt("appendCodePoint(0x10FFFF)")(sb.appendCodePoint(0x10FFFF).length)
+
+  /** StringBuffer is synchronized: appends from many threads are all kept (and race.txt runs
+   *  this under Go's race detector).
+   */
+  def sharedBuffer(): Unit =
+    println("== StringBuffer from many threads")
+    val b = new StringBuffer()
+    val threads = (0 until 4).map(i => new Thread(() => for _ <- 0 until 500 do b.append(s"$i ")))
+    threads.foreach(_.start())
+    threads.foreach(_.join())
+    val counts = b.toString.split(' ').groupBy(identity).view.mapValues(_.length).toList.sorted
+    println(s"${b.length} $counts")

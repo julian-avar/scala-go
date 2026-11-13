@@ -41,8 +41,8 @@ object Main:
     attempt("possessive")("aa".matches("a*+"))
     attempt("atomic group")("aa".matches("(?>a*)"))
 
-    // Charsets: UTF-8, ISO-8859-1 and US-ASCII only; others throw UnsupportedOperationException
-    // (not UnsupportedEncodingException). JVM: 2, true, true, 1
+    // Charsets: UTF-8, ISO-8859-1 and US-ASCII only; others throw UnsupportedEncodingException.
+    // JVM: 2, true, true, 1
     attempt("UTF-16 bytes")("a".getBytes("UTF-16LE").length)
     attempt("windows-1252 supported")(java.nio.charset.Charset.isSupported("windows-1252"))
     attempt("UTF-16 supported")(java.nio.charset.Charset.isSupported("UTF-16"))

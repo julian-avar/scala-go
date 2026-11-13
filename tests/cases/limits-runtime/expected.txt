@@ -13,6 +13,5 @@ same boxed NaN == itself: false
 lambda toString: <function1>
 @native method: throws java.lang.RuntimeException: native method stub
 NPE message: throws java.lang.NullPointerException
-charAt(5): throws java.lang.StringIndexOutOfBoundsException: index 5, length 3
 java.version is null: true
 java.specification.version is null: true

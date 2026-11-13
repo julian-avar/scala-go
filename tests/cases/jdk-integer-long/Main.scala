@@ -10,7 +10,7 @@ object Main:
       catch case e: Exception => s"${e.getClass.getName}: ${e.getMessage}"
     println(s"$label: $r")
 
-  /** Only the exception's class: some messages differ (see known-bugs-jdk). */
+  /** Only the exception's class: not the message. */
   def attemptType(label: String)(body: => Any): Unit =
     val r =
       try String.valueOf(body)

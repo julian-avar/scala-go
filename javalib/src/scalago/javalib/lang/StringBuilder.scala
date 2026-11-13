@@ -20,12 +20,24 @@ final class StringBuilder private (private var value: Array[Char], private var c
   def length(): Int = count
   def capacity(): Int = value.length
 
+  // Bounds checks with the messages of the JDK's Preconditions.
+  private def checkIndex(index: Int): Unit =
+    if index < 0 || index >= count then
+      throw new java.lang.StringIndexOutOfBoundsException("Index " + index + " out of bounds for length " + count)
+
+  private def outOfRange(start: Int, end: Int, length: Int): String =
+    "Range [" + start + ", " + end + ") out of bounds for length " + length
+
+  private def checkRange(start: Int, end: Int, length: Int): Unit =
+    if start < 0 || start > end || end > length then
+      throw new java.lang.StringIndexOutOfBoundsException(outOfRange(start, end, length))
+
   def charAt(index: Int): Char =
-    if index < 0 || index >= count then throw new java.lang.StringIndexOutOfBoundsException("index " + index + ",length " + count)
+    checkIndex(index)
     value(index)
 
   def setCharAt(index: Int, ch: Char): Unit =
-    if index < 0 || index >= count then throw new java.lang.StringIndexOutOfBoundsException("index " + index + ",length " + count)
+    checkIndex(index)
     value(index) = ch
 
   def ensureCapacity(minimumCapacity: Int): Unit =
@@ -60,15 +72,20 @@ final class StringBuilder private (private var value: Array[Char], private var c
   def append(sb: StringBuffer): StringBuilder = appendChars(String.valueOf(sb))
   def append(s: CharSequence): StringBuilder = appendChars(String.valueOf(s))
   def append(s: CharSequence, start: Int, end: Int): StringBuilder =
-    if s == null then appendChars("null".substring(start, end))
-    else
-      var i = start
-      while i < end do
-        append(s.charAt(i))
-        i += 1
-      this
+    val cs = if s == null then "null".asInstanceOf[CharSequence] else s
+    if start < 0 || start > end || end > cs.length() then
+      throw new java.lang.IndexOutOfBoundsException(outOfRange(start, end, cs.length()))
+    ensureCapacity(count + end - start)
+    var i = start
+    while i < end do
+      value(count) = cs.charAt(i)
+      count += 1
+      i += 1
+    this
   def append(str: Array[Char]): StringBuilder = append(str, 0, str.length)
   def append(str: Array[Char], offset: Int, len: Int): StringBuilder =
+    if offset < 0 || len < 0 || offset + len > str.length then
+      throw new java.lang.IndexOutOfBoundsException(outOfRange(offset, offset + len, str.length))
     ensureCapacity(count + len)
     java.lang.System.arraycopy(str, offset, value, count, len)
     count += len
@@ -84,6 +101,8 @@ final class StringBuilder private (private var value: Array[Char], private var c
   def append(f: scala.Float): StringBuilder = appendChars(String.valueOf(f))
   def append(d: scala.Double): StringBuilder = appendChars(String.valueOf(d))
   def appendCodePoint(codePoint: Int): StringBuilder =
+    if codePoint < 0 || codePoint > 0x10ffff then
+      throw new java.lang.IllegalArgumentException("Not a valid Unicode code point: 0x" + Integer.toHexString(codePoint).toUpperCase())
     if codePoint < 0x10000 then append(codePoint.toChar)
     else
       val c = codePoint - 0x10000
@@ -91,7 +110,7 @@ final class StringBuilder private (private var value: Array[Char], private var c
       append((0xdc00 + (c & 0x3ff)).toChar)
 
   def insert(offset: Int, str: String): StringBuilder =
-    if offset < 0 || offset > count then throw new java.lang.StringIndexOutOfBoundsException("offset " + offset + ", length " + count)
+    checkRange(offset, count, count)
     val s = if str == null then "null" else str
     val n = s.length()
     ensureCapacity(count + n)
@@ -112,13 +131,13 @@ final class StringBuilder private (private var value: Array[Char], private var c
 
   def delete(start: Int, end: Int): StringBuilder =
     val e = scala.math.min(end, count)
-    if start < 0 || start > e then throw new java.lang.StringIndexOutOfBoundsException("start " + start + ", end " + end + ", length " + count)
+    checkRange(start, e, count)
     java.lang.System.arraycopy(value, e, value, start, count - e)
     count -= e - start
     this
 
   def deleteCharAt(index: Int): StringBuilder =
-    if index < 0 || index >= count then throw new java.lang.StringIndexOutOfBoundsException("index " + index + ",length " + count)
+    checkIndex(index)
     delete(index, index + 1)
 
   def replace(start: Int, end: Int, str: String): StringBuilder =
@@ -149,8 +168,7 @@ final class StringBuilder private (private var value: Array[Char], private var c
 
   def substring(start: Int): String = substring(start, count)
   def substring(start: Int, end: Int): String =
-    if start < 0 || end > count || start > end then
-      throw new java.lang.StringIndexOutOfBoundsException("start " + start + ", end " + end + ", length " + count)
+    checkRange(start, end, count)
     new String(value, start, end - start)
   // A java.lang.String is a CharSequence at run time (the compiler only sees the JDK's String here).
   def subSequence(start: Int, end: Int): CharSequence = substring(start, end).asInstanceOf[CharSequence]
@@ -161,13 +179,12 @@ final class StringBuilder private (private var value: Array[Char], private var c
   def lastIndexOf(str: String, fromIndex: Int): Int = toString().lastIndexOf(str, fromIndex)
 
   override def getChars(srcBegin: Int, srcEnd: Int, dst: Array[Char], dstBegin: Int): Unit =
-    if srcBegin < 0 || srcEnd > count || srcBegin > srcEnd then
-      throw new java.lang.StringIndexOutOfBoundsException("start " + srcBegin + ", end " + srcEnd + ", length " + count)
+    checkRange(srcBegin, srcEnd, count)
     java.lang.System.arraycopy(value, srcBegin, dst, dstBegin, srcEnd - srcBegin)
 
   def compareTo(another: StringBuilder): Int = toString().compareTo(another.toString())
 
-/** StringBuffer is StringBuilder without the (here meaningless) synchronization. */
+/** StringBuffer is a StringBuilder whose methods hold the buffer's monitor, as in the JDK. */
 final class StringBuffer(private val builder: StringBuilder)
     extends Object
     with CharSequence
@@ -177,34 +194,34 @@ final class StringBuffer(private val builder: StringBuilder)
   def this(capacity: Int) = this(new StringBuilder(capacity))
   def this(str: String) = this(new StringBuilder(str))
   def this(seq: CharSequence) = this(new StringBuilder(seq))
-  def length(): Int = builder.length()
-  def capacity(): Int = builder.capacity()
-  def charAt(index: Int): Char = builder.charAt(index)
-  def setCharAt(index: Int, ch: Char): Unit = builder.setCharAt(index, ch)
-  def setLength(newLength: Int): Unit = builder.setLength(newLength)
-  def subSequence(start: Int, end: Int): CharSequence = builder.subSequence(start, end)
-  def substring(start: Int): String = builder.substring(start)
-  def substring(start: Int, end: Int): String = builder.substring(start, end)
-  def indexOf(str: String): Int = builder.indexOf(str)
-  def lastIndexOf(str: String): Int = builder.lastIndexOf(str)
-  def append(s: String): StringBuffer = { builder.append(s); this }
-  def append(s: CharSequence): StringBuffer = { builder.append(s); this }
-  def append(s: CharSequence, start: Int, end: Int): StringBuffer = { builder.append(s, start, end); this }
-  def append(str: Array[Char]): StringBuffer = { builder.append(str); this }
-  def append(str: Array[Char], offset: Int, len: Int): StringBuffer = { builder.append(str, offset, len); this }
-  def append(obj: Object): StringBuffer = { builder.append(obj); this }
-  def append(sb: StringBuffer): StringBuffer = { builder.append(sb); this }
-  def append(b: scala.Boolean): StringBuffer = { builder.append(b); this }
-  def append(c: Char): StringBuffer = { builder.append(c); this }
-  def append(i: Int): StringBuffer = { builder.append(i); this }
-  def append(l: scala.Long): StringBuffer = { builder.append(l); this }
-  def append(f: scala.Float): StringBuffer = { builder.append(f); this }
-  def append(d: scala.Double): StringBuffer = { builder.append(d); this }
-  def insert(offset: Int, str: String): StringBuffer = { builder.insert(offset, str); this }
-  def delete(start: Int, end: Int): StringBuffer = { builder.delete(start, end); this }
-  def deleteCharAt(index: Int): StringBuffer = { builder.deleteCharAt(index); this }
-  def replace(start: Int, end: Int, str: String): StringBuffer = { builder.replace(start, end, str); this }
-  def reverse(): StringBuffer = { builder.reverse(); this }
+  def length(): Int = synchronized { builder.length() }
+  def capacity(): Int = synchronized { builder.capacity() }
+  def charAt(index: Int): Char = synchronized { builder.charAt(index) }
+  def setCharAt(index: Int, ch: Char): Unit = synchronized { builder.setCharAt(index, ch) }
+  def setLength(newLength: Int): Unit = synchronized { builder.setLength(newLength) }
+  def subSequence(start: Int, end: Int): CharSequence = synchronized { builder.subSequence(start, end) }
+  def substring(start: Int): String = synchronized { builder.substring(start) }
+  def substring(start: Int, end: Int): String = synchronized { builder.substring(start, end) }
+  def indexOf(str: String): Int = synchronized { builder.indexOf(str) }
+  def lastIndexOf(str: String): Int = synchronized { builder.lastIndexOf(str) }
+  def append(s: String): StringBuffer = synchronized { builder.append(s); this }
+  def append(s: CharSequence): StringBuffer = synchronized { builder.append(s); this }
+  def append(s: CharSequence, start: Int, end: Int): StringBuffer = synchronized { builder.append(s, start, end); this }
+  def append(str: Array[Char]): StringBuffer = synchronized { builder.append(str); this }
+  def append(str: Array[Char], offset: Int, len: Int): StringBuffer = synchronized { builder.append(str, offset, len); this }
+  def append(obj: Object): StringBuffer = synchronized { builder.append(obj); this }
+  def append(sb: StringBuffer): StringBuffer = synchronized { builder.append(sb); this }
+  def append(b: scala.Boolean): StringBuffer = synchronized { builder.append(b); this }
+  def append(c: Char): StringBuffer = synchronized { builder.append(c); this }
+  def append(i: Int): StringBuffer = synchronized { builder.append(i); this }
+  def append(l: scala.Long): StringBuffer = synchronized { builder.append(l); this }
+  def append(f: scala.Float): StringBuffer = synchronized { builder.append(f); this }
+  def append(d: scala.Double): StringBuffer = synchronized { builder.append(d); this }
+  def insert(offset: Int, str: String): StringBuffer = synchronized { builder.insert(offset, str); this }
+  def delete(start: Int, end: Int): StringBuffer = synchronized { builder.delete(start, end); this }
+  def deleteCharAt(index: Int): StringBuffer = synchronized { builder.deleteCharAt(index); this }
+  def replace(start: Int, end: Int, str: String): StringBuffer = synchronized { builder.replace(start, end, str); this }
+  def reverse(): StringBuffer = synchronized { builder.reverse(); this }
   override def getChars(srcBegin: Int, srcEnd: Int, dst: Array[Char], dstBegin: Int): Unit =
-    builder.getChars(srcBegin, srcEnd, dst, dstBegin)
-  override def toString(): String = builder.toString()
+    synchronized { builder.getChars(srcBegin, srcEnd, dst, dstBegin) }
+  override def toString(): String = synchronized { builder.toString() }

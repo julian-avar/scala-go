@@ -13,3 +13,7 @@ Some(List())
 1a,2b,3c
 true
 tel: 1234-555
+0-0 1-4 4-4 5-5
+<>b<aaa><>c<>
+one! two!
+java.util.regex.PatternSyntaxException (

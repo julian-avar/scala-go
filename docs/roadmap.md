@@ -93,14 +93,7 @@ fail. A fix makes its case fail: move the check to a case run on both the JVM an
 
 | Bug | Fix in |
 |-----|--------|
-| `" ".isBlank` is `true` (JVM: `false`); `"abc".indexOf("", 20)` is -1 (JVM: 3); `intern()` of a computed string is not `eq` to the equal literal | javalib `String` |
-| `lastIndexOf` of a supplementary code point is -1; `indexOf(0x110000)` finds U+FFFD | `rt` string search natives |
-| `"aaa".replaceAll("a*", "X")` is `X` (JVM: `XX`); a replacement naming a missing group (`$2`) is ignored (JVM: `IndexOutOfBoundsException`); an invalid pattern (`"("`) throws `UnsupportedOperationException` (JVM: `PatternSyntaxException`) | javalib `regex` on Go's `regexp` |
-| A surrogate's UTF-8 bytes (`ED A0 80`) decode to three U+FFFD (JVM: one), in `new String` and in `CharsetDecoder` | `rt` UTF-8 decoder |
-| `StringBuilder.append(cs, 2, 1)` does nothing (JVM: `IndexOutOfBoundsException`); `appendCodePoint(-1)` appends U+FFFF (JVM: `IllegalArgumentException`); `append(chars, 1, 5)` throws `ArrayIndexOutOfBoundsException`, not `IndexOutOfBoundsException` | javalib `StringBuilder` |
-| `StringBuffer` is not synchronized: concurrent appends lose characters or throw. Not pinned (the result is random) | javalib `StringBuffer` |
-| Exception messages are JDK 8's or Go's: index errors (`index 5, length 3`; JVM: `Index 5 out of bounds for length 3`), `Thread.sleep(-1)`, `Thread.Builder.priority` | javalib: JDK 17+'s messages |
-| String charsets other than the supported three throw `UnsupportedOperationException`, not `UnsupportedEncodingException`/`UnsupportedCharsetException` | javalib charsets |
+| Exception messages are JDK 8's or Go's: `Thread.sleep(-1)`, `Thread.Builder.priority` | javalib: JDK 17+'s messages |
 
 ### Silent wrong output
 

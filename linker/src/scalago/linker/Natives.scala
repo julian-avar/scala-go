@@ -160,6 +160,8 @@ object Natives:
   instanceFn(S, "toCharArray()[C", "rt.StringToCharArray")
   instance(S, "toString()Ljava.lang.String;")((r, _) => r)
   instanceFn(S, "intern()Ljava.lang.String;", "rt.StringIntern")
+  /** When reachable, the linker gives the runtime the program's string literals (Linker.supportFile). */
+  val StringIntern: (ClassName, MethodName) = (S, parseMethod("intern()Ljava.lang.String;"))
   instanceFn(S, "repeat(I)Ljava.lang.String;", "rt.StringRepeat")
   instanceFn(S, "split(Ljava.lang.String;)[Ljava.lang.String;", "rt.StringSplit")
   instanceFn(S, "split(Ljava.lang.String;I)[Ljava.lang.String;", "rt.StringSplitLimit")

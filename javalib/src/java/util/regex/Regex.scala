@@ -13,11 +13,20 @@ trait MatchResult:
   def group(group: Int): String
   def groupCount(): Int
 
-class PatternSyntaxException(desc: String, regex: String, index: Int)
-    extends java.lang.IllegalArgumentException(desc + " near index " + index + "\n" + regex):
+/** Thrown for an invalid pattern; the runtime throws it with Go's description and index -1 (unknown). */
+class PatternSyntaxException(desc: String, regex: String, index: Int) extends java.lang.IllegalArgumentException(desc):
   def getDescription(): String = desc
   def getPattern(): String = regex
   def getIndex(): Int = index
+
+  /** The description, the index, the pattern and a caret under the index, as in the JDK. */
+  override def getMessage(): String =
+    val nl = System.lineSeparator()
+    val sb = new java.lang.StringBuilder(desc)
+    if index >= 0 then sb.append(" near index ").append(index)
+    sb.append(nl).append(regex)
+    if index >= 0 && regex != null && index < regex.length then sb.append(nl).append(" ".repeat(index)).append('^')
+    sb.toString
 
 /** java.util.regex.Pattern on Go's regexp (RE2): no lookaround, backreferences or possessive
  *  quantifiers.
