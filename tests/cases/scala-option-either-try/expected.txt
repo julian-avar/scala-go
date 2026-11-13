@@ -68,6 +68,8 @@ non-fatal Exception
 fatal InterruptedException
 fatal Control
 fatal LinkageError
+fatal StackOverflowError
+fatal OutOfMemoryError
 non-fatal Quiet
 0 quiet
 Some(12)

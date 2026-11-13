@@ -1,5 +1,5 @@
 import scala.language.implicitConversions
-import scala.reflect.ClassTag
+import scala.reflect.{ClassTag, TypeTest}
 import scala.util.NotGiven
 
 // Implicits (docs/_docs/spec/language.md, section 7, and the Scala 3 reference features): givens
@@ -104,6 +104,15 @@ def combineAll[T](xs: List[T])(using m: Monoid[T]): T = xs.foldLeft(m.empty)(m.c
 def makeArray[T: ClassTag](n: Int, x: T): Array[T] = Array.fill(n)(x)
 def className[T](using ct: ClassTag[T]): String = ct.runtimeClass.getName
 
+// Type tests: a user-defined TypeTest, a ClassTag pattern and PartialFunction.elementWise.
+case class Num(n: Int)
+given TypeTest[Any, Num] with
+  def unapply(x: Any): Option[x.type & Num] = x match
+    case n: (x.type & Num) @unchecked => Some(n)
+    case _                            => None
+def onlyOf[T](xs: List[Any])(using TypeTest[Any, T]): List[T] = xs.collect { case t: T => t }
+def tagged[T: ClassTag](xs: List[Any]): List[T] = xs.collect { case t: T => t }
+
 object Main:
   def main(args: Array[String]): Unit =
     println(s"givens: ${maximum(List(3, 9, 2))} ${maximum(List("pear", "apple"))} ${maximum(List(List(1, 2), List(1, 3), List(1)))}")
@@ -147,3 +156,7 @@ object Main:
     val ints = makeArray(2, 7)
     println(s"ClassTag: ${arr.mkString(",")} ${ints.sum} ${className[String]} ${className[Int]} ${className[List[Int]]} ${className[Array[Int]]}")
     println(s"ClassTag newArray: ${summon[ClassTag[Int]].newArray(3).length} ${summon[ClassTag[Int]].runtimeClass == classOf[Int]}")
+
+    println(s"TypeTest: ${onlyOf[Num](List(Num(1), "x", Num(2)))} ${tagged[String](List(1, "a", 2.5, "b"))} ${tagged[Int](List(1, "a", 2))}")
+    val positive: PartialFunction[Int, Int] = { case x if x > 0 => x }
+    println(s"elementWise: ${positive.elementWise.unapplySeq(List(1, 2))} ${positive.elementWise.unapplySeq(List(1, -2))}")

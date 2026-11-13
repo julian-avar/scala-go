@@ -1,6 +1,5 @@
 ().## == 0: false
 ().hashCode == 0: false
-initCause twice: java.lang.RuntimeException
 Array(Array(1, 2), Array(3, 4)).transpose: throws java.lang.NullPointerException
 1 asInstanceOf NeverInstantiated: true
 1 asInstanceOf NeverImplemented: true

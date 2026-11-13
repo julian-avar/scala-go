@@ -48,6 +48,20 @@ object Main:
     run(new Thread(() => fail(new AssertionError("an Error")), "error"))
     Thread.ofVirtual().start(() => fail(new Quiet("from a virtual thread"))).join()
 
+    // A group's uncaughtException comes between the thread's handler and the default one; the
+    // group is what getUncaughtExceptionHandler returns when the thread has no handler.
+    val handling = new ThreadGroup("handling"):
+      override def uncaughtException(t: Thread, e: Throwable): Unit = println(s"group handler: ${t.getName} ${e.getMessage}")
+    run(new Thread(handling, () => fail(new Quiet("in group")), "grouped"))
+    val inGroup = new Thread(handling, () => (), "in group")
+    println(s"handler of a thread without one is its group: ${inGroup.getUncaughtExceptionHandler eq handling}")
+
+    // An exception thrown by a handler is reported and ignored.
+    val throwing = thrower("throwing handler")
+    throwing.setUncaughtExceptionHandler((_, _) => fail(new Quiet("from the handler")))
+    run(throwing)
+    println("after the throwing handler")
+
     Thread.setDefaultUncaughtExceptionHandler(null)
 
     // A thread that ended with an exception is terminated.

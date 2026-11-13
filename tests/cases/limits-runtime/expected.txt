@@ -1,5 +1,5 @@
 resource found: false
-Class.forName of a missing class: no.such.Class
+Class.forName of a class the program never uses: throws java.lang.ClassNotFoundException: NeverUsed
 weak reference cleared: false
 WeakHashMap size: 1
 finalized: false

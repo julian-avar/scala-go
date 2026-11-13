@@ -1,0 +1,3 @@
+SIGINT: status 130, output [a line printed before the signal | the hook ran]
+SIGTERM: status 143, output [a line printed before the signal | the hook ran]
+SIGHUP: status 129, output [a line printed before the signal | the hook ran]

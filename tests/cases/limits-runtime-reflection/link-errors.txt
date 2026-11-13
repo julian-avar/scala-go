@@ -1,30 +1,21 @@
-Main.scala:18:13: method java.lang.Class.getMethods()[Ljava.lang.reflect.Method; is not available (no native implementation)
-Main.scala:19:13: method java.lang.Class.getDeclaredFields()[Ljava.lang.reflect.Field; is not available (no native implementation)
-Main.scala:20:13: method java.lang.Class.getConstructors()[Ljava.lang.reflect.Constructor; is not available (no native implementation)
-Main.scala:21:24: method java.lang.Class.getMethod(Ljava.lang.String;[Ljava.lang.Class;)Ljava.lang.reflect.Method; is not available (no native implementation)
-Main.scala:21:36: method java.lang.reflect.Method.invoke(Ljava.lang.Object;[Ljava.lang.Object;)Ljava.lang.Object; is not available (no IR and no native implementation)
-Main.scala:22:13: method java.lang.Class.getAnnotations()[Ljava.lang.annotation.Annotation; is not available (no native implementation)
-Main.scala:23:53: static method java.lang.reflect.Proxy.newProxyInstance(Ljava.lang.ClassLoader;[Ljava.lang.Class;Ljava.lang.reflect.InvocationHandler;)Ljava.lang.Object; is not available
-Main.scala:24:13: class java.io.ObjectOutputStream is not available (no IR)
-Main.scala:25:13: static method java.lang.ClassLoader.getSystemClassLoader()Ljava.lang.ClassLoader; is not available
-Main.scala:25:55: method java.lang.ClassLoader.loadClass(Ljava.lang.String;)Ljava.lang.Class; is not available (no IR and no native implementation)
-Main.scala:26:50: static method java.lang.invoke.MethodHandles.lookup()Ljava.lang.invoke.MethodHandles$Lookup; is not available
-Main.scala:28:13: class java.io.ObjectInputStream is not available (no IR)
-Main.scala:29:13: static method java.lang.management.ManagementFactory.getRuntimeMXBean()Ljava.lang.management.RuntimeMXBean; is not available
-Main.scala:30:13: static method java.lang.management.ManagementFactory.getPlatformMBeanServer()Ljavax.management.MBeanServer; is not available
-Main.scala:31:13: static method java.lang.System.getSecurityManager()Ljava.lang.SecurityManager; is not available
-Main.scala:32:23: static method java.lang.System.loadLibrary(Ljava.lang.String;)V is not available
-Main.scala:34:25: method java.lang.Class.isInstance(Ljava.lang.Object;)Z is not available (no native implementation)
-Main.scala:35:19: method java.lang.Class.cast(Ljava.lang.Object;)Ljava.lang.Object; is not available (no native implementation)
-Main.scala:36:13: method java.lang.Class.getSuperclass()Ljava.lang.Class; is not available (no native implementation)
-Main.scala:37:13: method java.lang.Class.getInterfaces()[Ljava.lang.Class; is not available (no native implementation)
-Main.scala:38:13: method java.lang.Class.isInterface()Z is not available (no native implementation)
-Main.scala:39:13: method java.lang.Class.isEnum()Z is not available (no native implementation)
-Main.scala:40:13: method java.lang.Class.getEnumConstants()[Ljava.lang.Object; is not available (no native implementation)
-Main.scala:41:13: method java.lang.Class.getCanonicalName()Ljava.lang.String; is not available (no native implementation)
-Main.scala:49:77: static method java.util.concurrent.atomic.AtomicIntegerFieldUpdater.newUpdater(Ljava.lang.Class;Ljava.lang.String;)Ljava.util.concurrent.atomic.AtomicIntegerFieldUpdater; is not available
-Main.scala:50:79: static method java.util.concurrent.atomic.AtomicReferenceFieldUpdater.newUpdater(Ljava.lang.Class;Ljava.lang.Class;Ljava.lang.String;)Ljava.util.concurrent.atomic.AtomicReferenceFieldUpdater; is not available
-library/src/scala/reflect/ClassTag.scala:71:32: method java.lang.Class.isInstance(Ljava.lang.Object;)Z is not available
+Main.scala:13:13: method java.lang.Class.getMethods()[Ljava.lang.reflect.Method; is not available (no native implementation)
+Main.scala:14:13: method java.lang.Class.getDeclaredFields()[Ljava.lang.reflect.Field; is not available (no native implementation)
+Main.scala:15:13: method java.lang.Class.getConstructors()[Ljava.lang.reflect.Constructor; is not available (no native implementation)
+Main.scala:16:24: method java.lang.Class.getMethod(Ljava.lang.String;[Ljava.lang.Class;)Ljava.lang.reflect.Method; is not available (no native implementation)
+Main.scala:16:36: method java.lang.reflect.Method.invoke(Ljava.lang.Object;[Ljava.lang.Object;)Ljava.lang.Object; is not available (no IR and no native implementation)
+Main.scala:17:13: method java.lang.Class.getAnnotations()[Ljava.lang.annotation.Annotation; is not available (no native implementation)
+Main.scala:18:53: static method java.lang.reflect.Proxy.newProxyInstance(Ljava.lang.ClassLoader;[Ljava.lang.Class;Ljava.lang.reflect.InvocationHandler;)Ljava.lang.Object; is not available
+Main.scala:19:13: class java.io.ObjectOutputStream is not available (no IR)
+Main.scala:20:13: static method java.lang.ClassLoader.getSystemClassLoader()Ljava.lang.ClassLoader; is not available
+Main.scala:20:55: method java.lang.ClassLoader.loadClass(Ljava.lang.String;)Ljava.lang.Class; is not available (no IR and no native implementation)
+Main.scala:21:50: static method java.lang.invoke.MethodHandles.lookup()Ljava.lang.invoke.MethodHandles$Lookup; is not available
+Main.scala:23:13: class java.io.ObjectInputStream is not available (no IR)
+Main.scala:24:13: static method java.lang.management.ManagementFactory.getRuntimeMXBean()Ljava.lang.management.RuntimeMXBean; is not available
+Main.scala:25:13: static method java.lang.management.ManagementFactory.getPlatformMBeanServer()Ljavax.management.MBeanServer; is not available
+Main.scala:26:13: static method java.lang.System.getSecurityManager()Ljava.lang.SecurityManager; is not available
+Main.scala:27:23: static method java.lang.System.loadLibrary(Ljava.lang.String;)V is not available
+Main.scala:33:77: static method java.util.concurrent.atomic.AtomicIntegerFieldUpdater.newUpdater(Ljava.lang.Class;Ljava.lang.String;)Ljava.util.concurrent.atomic.AtomicIntegerFieldUpdater; is not available
+Main.scala:34:79: static method java.util.concurrent.atomic.AtomicReferenceFieldUpdater.newUpdater(Ljava.lang.Class;Ljava.lang.Class;Ljava.lang.String;)Ljava.util.concurrent.atomic.AtomicReferenceFieldUpdater; is not available
 method java.lang.Class.getField(Ljava.lang.String;)Ljava.lang.reflect.Field; is not available
 library/src/scala/reflect/Selectable.scala:42:15: method java.lang.reflect.Method.invoke(Ljava.lang.Object;[Ljava.lang.Object;)Ljava.lang.Object; is not available
 library/src/scala/collection/concurrent/TrieMap.scala:457:15: class scala.collection.concurrent.Gen is not available (no IR)

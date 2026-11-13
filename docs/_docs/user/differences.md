@@ -13,10 +13,11 @@ wraps, `==` and `hashCode` match the JVM, and uncaught exceptions print JVM-styl
 ## Runtime
 
 - **Standard output** is buffered: flushed at exit, before writing to standard error, before
-  reading standard input and around Go calls; not after each line.
-- **Signals** (SIGINT, SIGTERM, SIGHUP) and **fatal Go errors** end the program without running
-  shutdown hooks or flushing standard output. Fatal errors print Go's message
-  (`fatal error: stack overflow`) and exit with status 2.
+  reading standard input and around Go calls, at line ends on a terminal, and 100 ms after output
+  was last buffered; otherwise not after each line.
+- **Fatal Go errors** end the program without running shutdown hooks or flushing standard output
+  written in the last 100 ms. They print Go's message (`fatal error: stack overflow`) and exit
+  with status 2.
 - **Stack overflow and out of memory** end the program; `StackOverflowError` and
   `OutOfMemoryError` are never thrown. A goroutine's stack grows to 1 GB first, so deep recursion
   works.
@@ -36,7 +37,8 @@ wraps, `==` and `hashCode` match the JVM, and uncaught exceptions print JVM-styl
 - **Arrays of references** do not know their element type: `Arrays.copyOf` and
   `toArray(new Array[String](0))` return arrays whose class is `Object[]`.
 - **Boxed primitives** have no identity ([Data representation](../spec/data.md)).
-- **`Class.forName`** returns a `Class` for any name; it never throws `ClassNotFoundException`.
+- **`Class.forName`** finds only the classes the program uses (names with `classOf`, instantiates or
+  extends); others throw `ClassNotFoundException`. It does not initialize the class.
 
 ## Text
 

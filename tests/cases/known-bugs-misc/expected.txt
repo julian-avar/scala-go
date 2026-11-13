@@ -10,8 +10,3 @@ map eq map: throws java.lang.RuntimeException: runtime error: comparing uncompar
 "a".asInstanceOf[Integer]: java.lang.String
 i + inc(): 2
 ints(-1): throws java.lang.RuntimeException: runtime error: index out of range [-1]
-NonFatal(StackOverflowError()): true
-initializing Failing
-Failing.value: throws java.lang.IllegalStateException: init failed
-second access: java.lang.NoClassDefFoundError, cause null
-getSimpleName of a local class: 

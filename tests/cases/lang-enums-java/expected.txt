@@ -59,3 +59,7 @@ List(Red, Green)
 1
 Green ff00 -1
 List(A, B) 1 A
+-- java.lang.Enum
+Color Green true List(Red, Green)
+java.lang.Thread$State BLOCKED
+valueOf of a missing constant: java.lang.IllegalArgumentException: No enum constant Color.Blue

@@ -4,8 +4,7 @@ import scala.util.control.{Breaks, ControlThrowable, NonFatal}
 // Exceptions (docs/_docs/spec/language.md, "Exceptions"): try/catch/finally ordering, nesting,
 // rethrow, finally after return and break, exceptions replacing outcomes, guards, throws in
 // operands, NonFatal, custom exceptions, getMessage/getCause/addSuppressed, the run-time errors Go
-// detects. Not here: negative array indices and NonFatal of StackOverflowError (known-bugs-misc),
-// NullPointerException messages (limits-runtime).
+// detects. Not here: NullPointerException messages (limits-runtime).
 class AppException(val code: Int, msg: String, cause: Throwable = null) extends Exception(msg, cause)
 class ValidationException(field: String) extends AppException(400, s"invalid $field")
 case class Problem(what: String) extends RuntimeException(what)
@@ -253,3 +252,8 @@ object Main:
     show("exception in lambda")(Try(List(1, 0).map(10 / _)).failed.get.getMessage)
     show("exception in a constructor argument")(Try(new Resource("x", log, failClose = Integer.parseInt("?") > 0)).failed.get.getMessage)
     show("stack unwinds through frames")({ def deep(n: Int): Int = if n == 0 then throw Problem("bottom") else deep(n - 1) + 1; Try(deep(100)).failed.get.getMessage })
+    val twice = Exception("e")
+    twice.initCause(IllegalStateException("first"))
+    show("initCause twice")(twice.initCause(RuntimeException()))
+    show("initCause after a constructor cause")(RuntimeException("m", IllegalStateException()).initCause(null))
+    show("initCause once")(Exception("e").initCause(IllegalStateException("c")).getCause.getMessage)

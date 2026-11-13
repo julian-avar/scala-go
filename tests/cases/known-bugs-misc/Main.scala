@@ -1,4 +1,3 @@
-import scala.util.control.NonFatal
 import scalago.go.*
 
 // Known bugs (docs/roadmap.md, M0 "Known bugs"): each line prints what scala-go does today; the
@@ -14,11 +13,6 @@ object Main:
       try String.valueOf(body)
       catch case e: Throwable => s"throws ${e.getClass.getName}${Option(e.getMessage).fold("")(": " + _)}"
     println(s"$what: $result")
-
-  object Failing:
-    println("initializing Failing")
-    if true then throw IllegalStateException("init failed")
-    val value = 1
 
   def main(args: Array[String]): Unit =
     // JVM: true, true (compared as Float)
@@ -58,14 +52,3 @@ object Main:
     val minusOne = -1
     attempt("ints(-1)")(ints(minusOne))
 
-    // JVM: false (StackOverflowError is a VirtualMachineError)
-    attempt("NonFatal(StackOverflowError())")(NonFatal(StackOverflowError()))
-
-    // JVM: ExceptionInInitializerError, then NoClassDefFoundError caused by it
-    attempt("Failing.value")(Failing.value)
-    try Failing.value
-    catch case e: Throwable => println(s"second access: ${e.getClass.getName}, cause ${e.getCause}")
-
-    // JVM: Local
-    class Local
-    attempt("getSimpleName of a local class")(classOf[Local].getSimpleName)

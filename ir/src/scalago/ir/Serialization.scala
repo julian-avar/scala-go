@@ -10,7 +10,7 @@ import scala.collection.mutable
  */
 object Serialization:
   val Magic: Int = 0x53474f49 // "SGOI"
-  val FormatVersion: Int = 9
+  val FormatVersion: Int = 10
   val FileExtension: String = ".goir"
 
   final class IRFormatException(msg: String) extends IOException(msg)
@@ -179,6 +179,7 @@ object Serialization:
       pos(c.pos)
       option(c.goFacade) { f => str(f.pkg); str(f.name); list(f.typeAliases) { (g, s) => str(g); str(s) }; list(f.typeParams)(str) }
       option(c.goExport)(str)
+      option(c.innerClass) { i => option(i.outer)(str); str(i.name) }
 
     def scalaType(t: ScalaType): Unit = t match
       case ScalaType.Prim(p)         => { out.writeByte(0); tpe(p) }
@@ -286,7 +287,7 @@ object Serialization:
           option(GoExport(str(), list(scalaType()), scalaType(), bool())))
       }
       ClassDef(name, kind, isAbstract, superClass, interfaces, fields, methods, pos(), option(GoFacade(str(), str(), list((str(), str())), list(str()))),
-        option(str()))
+        option(str()), option(InnerClass(option(str()), str())))
 
     def scalaType(): ScalaType = in.readUnsignedByte() match
       case 0     => ScalaType.Prim(tpe())

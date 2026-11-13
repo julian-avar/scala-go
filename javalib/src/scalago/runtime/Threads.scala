@@ -23,6 +23,9 @@ object Threads:
   /** The number of running threads started as Threads. */
   def activeCount(): Int = native
 
+  /** What the thread waits for: 0 nothing, 1 a monitor, 2 an untimed wait, 3 a timed one. */
+  def blockedIn(state: Object): Int = native
+
   /** Parks the current thread (whose state is given) for `nanos`, or until unparked if negative. */
   def park(state: Object, nanos: Long): Unit = native
   def unpark(state: Object): Unit = native

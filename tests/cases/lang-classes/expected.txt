@@ -24,3 +24,4 @@ object: 1 2 true
 concurrent construction: 1 construction(s), sum 168
 static: 2 2 static label
 companion: MAIN 2
+simple names: Local $plus$plus a$minusb $colon$colon $colon$colon

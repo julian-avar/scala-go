@@ -18,12 +18,6 @@ object Main:
     attempt("().## == 0")(unit.## == 0)
     attempt("().hashCode == 0")(unit.hashCode == 0)
 
-    // initCause overwrites a cause set before. JVM: throws java.lang.IllegalStateException:
-    // Can't overwrite cause with java.lang.RuntimeException
-    val withCause = Exception("e")
-    withCause.initCause(IllegalStateException("first"))
-    attempt("initCause twice")(withCause.initCause(RuntimeException()).getCause)
-
     // transpose of an array of arrays needs the element class of the rows, which arrays of
     // references do not record. JVM: List(List(1, 3), List(2, 4))
     attempt("Array(Array(1, 2), Array(3, 4)).transpose")(Array(Array(1, 2), Array(3, 4)).transpose.map(_.toList).toList)
