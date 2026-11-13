@@ -172,6 +172,18 @@ final class Program(irClasses: Seq[ClassDef]):
       Tree.Apply(Tree.LoadModule(module)(sel.pos), module, getter, Nil, tpe)(sel.pos)
     }
 
+  /** A call of `values()` of `cls` if it is an enum class (extends `java.lang.Enum`): a static
+   *  method of the class (javalib's enums), or a method of its companion object (Scala 3's).
+   */
+  def enumValuesCall(cls: ClassName): Option[Tree.ApplyStatic] =
+    val values = MethodName("values", Nil, Type.Array(Type.Class(cls)))
+    get(cls).filter(_.superClass.contains(EnumClass)).flatMap { c =>
+      val call = Tree.ApplyStatic(cls, values, Nil, values.result)(c.pos)
+      Option.when(findMethod(cls, values).exists(_.isStatic) || staticMethodViaCompanion(call).isDefined)(call)
+    }
+
+  private val EnumClass = "java.lang.Enum"
+
   /** The static initializer of `cls`, if it has one. */
   def clinit(cls: ClassName): Option[MethodDef] =
     get(cls).flatMap(_.methods.find(m => m.isStatic && m.name.simple == "<clinit>"))

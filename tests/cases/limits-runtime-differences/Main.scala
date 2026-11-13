@@ -50,8 +50,7 @@ object Main:
       val process = child(mode, ready.getPath).redirectErrorStream(true).redirectOutput(output).start()
       val deadline = System.nanoTime() + 30_000_000_000L
       while !ready.exists && System.nanoTime() < deadline do Thread.sleep(5)
-      if signal == "TERM" then process.destroy()
-      else new ProcessBuilder("kill", s"-$signal", process.pid.toString).start().waitFor()
+      new ProcessBuilder("kill", s"-$signal", process.pid.toString).start().waitFor()
       val status = process.waitFor()
       val text = new String(java.nio.file.Files.readAllBytes(output.toPath), UTF_8)
       s"status $status, output [${text.linesIterator.take(1).mkString}]"
@@ -89,8 +88,6 @@ object Main:
       val out = new String(p.getInputStream.readAllBytes(), UTF_8)
       s"status ${p.waitFor()}, output [${out.linesIterator.mkString(" | ")}]"
     }
-    // JVM: status 143, output [a line printed before the signal] (and the hook runs).
-    attempt("SIGTERM")(signalled("wait-for-signal", "TERM"))
     // JVM: prints a thread dump, continues, and ends after its sleep with status 0.
     attempt("SIGQUIT")(signalled("wait-for-signal", "QUIT"))
     // JVM: status 0: System.out's error flag is set, and the program goes on.
@@ -175,8 +172,7 @@ object Main:
     t.start()
     t.join()
     attempt("frames below a thread's body")(frames(0))
-    // JVM: java.lang.ExceptionInInitializerError, FailingInit$.<clinit> (see known-bugs-misc for
-    // the missing ExceptionInInitializerError).
+    // JVM: java.lang.ExceptionInInitializerError, FailingInit$.<clinit>.
     try FailingInit.value
     catch case e: Throwable =>
       val root = if e.getCause != null then e.getCause else e

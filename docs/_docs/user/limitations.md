@@ -14,12 +14,9 @@ scala-go does not implement is a link error naming it, never a silent difference
 ## Language and runtime
 
 - **Runtime reflection** (`getMethods`, `Method.invoke`, run-time annotations, dynamic proxies,
-  class loading) does not exist; `getClass`, class names and `isAssignableFrom` work. Use macros,
+  class loading) does not exist; `getClass`, class names, the class hierarchy (`getSuperclass`,
+  `isAssignableFrom`, `isInstance`, ...) and `getEnumConstants` work. Use macros,
   givens and `Mirror`s. [Runtime: reflection](../spec/runtime.md#reflection-and-class-loading).
-- **Type tests with a `ClassTag`** (`case x: T`), user-defined `TypeTest` givens in patterns,
-  `Future.mapTo` and `PartialFunction.elementWise` do not link: `Class.isInstance`/`cast` are
-  missing, with other `Class` members
-  ([roadmap](../contributing/roadmap.md#silent-wrong-output)). Match on concrete types.
 - **Structural types** (`reflectiveSelectable`) do not link. Use a trait.
 - **Classpath resources** are not embedded: `getResourceAsStream` returns `null`, and
   `Source.fromResource` does not link. Read files, or embed data in code.
@@ -42,9 +39,10 @@ scala-go does not implement is a link error naming it, never a silent difference
   `%t`, `%a`, and `BigDecimal` with `%f`, with an `IllegalArgumentException` that names the
   JDK's exception. Output differences: [Differences](differences.md#text).
 - **Regular expressions** are Go's RE2: no lookaround, backreferences, possessive quantifiers or
-  atomic groups. Such a pattern throws `UnsupportedOperationException` when compiled.
+  atomic groups. Such a pattern throws `UnsupportedOperationException` when compiled; an
+  invalid one throws `PatternSyntaxException` with Go's description and no index.
 - **Charsets:** UTF-8, ISO-8859-1 and US-ASCII only; `Charset.isSupported` is `false` for others,
-  and using one throws `UnsupportedOperationException`.
+  and using one throws `UnsupportedEncodingException` or `UnsupportedCharsetException`.
 - **Libraries with Java code**, Scala 2 libraries and libraries built on runtime reflection do not
   link: today cats-effect, ZIO, fs2-io, circe, zio-json, scribe, scopt, requests-scala, munit,
   utest. Use Go libraries in place of Java ones. [Scala libraries](../libraries/scala.md).
@@ -60,8 +58,6 @@ scala-go does not implement is a link error naming it, never a silent difference
 - **cats-effect and ZIO** do not link. Use gears or `scala.concurrent` ([Concurrency](concurrency.md)).
 - **Parallel streams** run sequentially; `IntStream.parallel()` and the other primitive streams'
   do not link.
-- **`StringBuffer` is not synchronized** ([known bug](../contributing/roadmap.md#known-bugs)):
-  guard a shared one with a lock, or give each thread its own `StringBuilder`.
 
 ## Go interop
 
@@ -70,8 +66,7 @@ scala-go does not implement is a link error naming it, never a silent difference
 - **No Go structs from Scala:** Go sees Scala classes only through interfaces, so `encoding/json`,
   gin's `ShouldBindJSON` and database scanners cannot fill one. Bind into `any` and convert with
   [`GoData.toScala`](../interop/go-data.md#scala-data-for-go-code), or parse in Scala.
-- **Generics:** Scala does not check Go constraints (a [known bug](../contributing/roadmap.md#known-bugs));
-  some type arguments must be explicit; no type tests against generic facades.
+- **Generics:** Scala does not check Go constraints (the linker does); some type arguments must be explicit; no type tests against generic facades.
   [Generics](../interop/facades.md#generics).
 - **Values of types Scala cannot name** (unexported, `internal`) are typed `Any` or as an
   interface; calls taking them use reflection, so a wrong argument is a `ClassCastException` at

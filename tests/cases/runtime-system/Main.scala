@@ -76,3 +76,8 @@ object Main:
     println(s"${java.time.ZonedDateTime.ofInstant(Instant.ofEpochSecond(1700000000L), ZoneId.systemDefault)}")
     println(s"${Locale.getDefault} ${Locale.getDefault.getLanguage} ${Locale.getDefault.getCountry} ${Locale.getDefault.toLanguageTag}")
     println(s"${Charset.defaultCharset} ${"%.2f".format(1234.5)} ${"TITLE".toLowerCase} ${"i".toUpperCase}")
+
+    println("-- gc")
+    System.gc()
+    Runtime.getRuntime.gc()
+    println("gc returned")

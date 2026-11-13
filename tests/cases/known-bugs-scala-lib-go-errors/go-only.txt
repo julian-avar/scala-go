@@ -1,1 +1,0 @@
-Linking succeeds; go vet fails. The JVM prints f, g, h, i, j.

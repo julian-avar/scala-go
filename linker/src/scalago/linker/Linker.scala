@@ -3,6 +3,7 @@ package scalago.linker
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.{Files, Path}
 
+import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
 
@@ -89,9 +90,30 @@ object Linker:
     "IndexOutOfBounds"       -> "java.lang.IndexOutOfBoundsException",
     "IO"                     -> "java.io.IOException",
     "NoSuchMethod"           -> "java.lang.NoSuchMethodError",
-    "NoSuchField"            -> "java.lang.NoSuchFieldError"
+    "NoSuchField"            -> "java.lang.NoSuchFieldError",
+    "UnsupportedEncoding"    -> "java.io.UnsupportedEncodingException",
+    "ClassNotFound"          -> "java.lang.ClassNotFoundException"
   )
   private val MessageConstructor = MethodName(MethodName.ConstructorSimpleName, List(Type.String), Type.Void)
+  /** The runtime also throws `PatternSyntaxException(description, regex, index)` (`rt.MakePatternSyntaxException`). */
+  private val PatternSyntaxException: ClassName = "java.util.regex.PatternSyntaxException"
+  private val PatternSyntaxConstructor =
+    MethodName(MethodName.ConstructorSimpleName, List(Type.String, Type.String, Type.Int), Type.Void)
+
+  /** A static method of javalib that the runtime calls: the program sets the `rt` function
+   *  variable `variable` to call it (with `any` arguments and result).
+   */
+  private final case class RuntimeHook(variable: String, cls: ClassName, method: MethodName, programOnly: Boolean = false)
+
+  private val runtimeHooks =
+    val throwable = Type.Class("java.lang.Throwable")
+    val initializers = "scalago.runtime.Initializers"
+    List(
+      RuntimeHook("EndMainThread", "java.lang.Thread", MethodName("exitMain", List(throwable), Type.Void), programOnly = true),
+      RuntimeHook("InitializerThrown", initializers, MethodName("thrown", List(throwable), throwable)),
+      RuntimeHook("InitializerRecorded", initializers, MethodName("recorded", List(throwable), throwable)),
+      RuntimeHook("InitializerNoClassDefFound", initializers, MethodName("noClassDefFound", List(Type.String, throwable), throwable))
+    )
 
   /** Links the program and writes its Go module; returns the warnings. */
   def link(classpath: Seq[Path], outputDir: Path, config: Config = Config()): List[String] =
@@ -107,6 +129,7 @@ object Linker:
         program.vtable(mainModule).get(MainMethod).exists(o => program.findMethod(o, MainMethod).exists(!_.isAbstract))
     val entry =
       if config.library then
+        Exports.check(program, errors)
         Exports.addRoots(program, analyzer)
         if Exports.functions(program).isEmpty && Exports.classes(program).isEmpty then
           throw LinkingException(List("nothing to link into a library: no definition is marked @GoExport"))
@@ -128,6 +151,13 @@ object Linker:
     for (_, cls) <- exceptionClasses do
       analyzer.instantiate(cls)
       analyzer.reach(cls, MessageConstructor)
+    if program.findMethod(PatternSyntaxException, PatternSyntaxConstructor).isDefined then
+      analyzer.instantiate(PatternSyntaxException)
+      analyzer.reach(PatternSyntaxException, PatternSyntaxConstructor)
+    val hooks = runtimeHooks.filter(h => (!config.library || !h.programOnly) && program.findMethod(h.cls, h.method).exists(_.isStatic))
+    for h <- hooks do
+      analyzer.reach(h.cls, h.method)
+      analyzer.initializeStatics(h.cls)
     analyzer.run()
     if errors.all.nonEmpty then throw LinkingException(errors.all)
 
@@ -140,15 +170,16 @@ object Linker:
       catch case e: GoApi.GoApiException => throw LinkingException(List(s"loading Go packages failed: ${e.getMessage}"))
 
     val ctx = LinkContext(program, analyzer, errors, goApi, libraryMode = config.library, lineDirectives = config.lineDirectives)
+    val fileNames = classFileNames(program.classes.toList.map(_.name))
     val classFiles = program.classes.toList
       .sortBy(_.name)
-      .map(c => Mangling.fileName(c.name) -> ClassEmitter(ctx, c).emit())
+      .map(c => fileNames(c.name) -> ClassEmitter(ctx, c).emit())
       .filter(_._2.nonEmpty)
     val forwarder = Option.when(isModuleMain)(mainForwarder(ctx, config.mainObject, mainModule))
-    val entryFile = entryCode(ctx, entry, forwarder, exceptionClasses)
+    val entryFile = entryCode(ctx, entry, forwarder, exceptionClasses, hooks)
     val exportsFile = Option.when(config.library)(ctx.exports.internalFile)
     val rootFile = Option.when(config.library)(ctx.exports.rootFile(config.rootPackageName, s"${config.goModulePath}/$ScalaPackageDir"))
-    val support = supportFile(ctx)
+    val support = supportFile(ctx, if config.library then None else Some(config.mainObject))
     if errors.all.nonEmpty then throw LinkingException(errors.all)
 
     val scalaDir = Files.createDirectories(outputDir.resolve(ScalaPackageDir))
@@ -174,6 +205,22 @@ object Linker:
       catch case e: GoApi.GoApiException => throw LinkingException(List(e.getMessage))
     errors.warnings
 
+  /** Files of the generated package that are not a class's. */
+  private val ReservedFiles = Set("entry.go", "support.go", "exports.go", "tzdata.go")
+
+  /** The Go file of each class. Go rejects a package with two files whose names differ only in
+   *  case, and a class must not take the name of one of the linker's files: classes `Entry` and
+   *  `entry`, or `Entry` and the linker's `entry.go`, get distinct names.
+   */
+  private def classFileNames(classes: List[ClassName]): Map[ClassName, String] =
+    val taken = mutable.HashSet.from(ReservedFiles)
+    classes.sorted.map { cls =>
+      val base = Mangling.fileName(cls).stripSuffix(".go")
+      // An escaped class name never contains `__`, so a numbered name is not another class's.
+      val name = Iterator.from(0).map(n => if n == 0 then s"$base.go" else s"${base}__$n.go").find(f => taken.add(f.toLowerCase)).get
+      cls -> name
+    }.toMap
+
   private def goMod(config: Config): String =
     val sb = StringBuilder(s"module ${config.goModulePath}\n\ngo 1.27\n")
     if config.goRequires.nonEmpty then
@@ -182,8 +229,10 @@ object Linker:
     sb.toString
 
   private def goFile(ctx: LinkContext, config: Config, body: String): String =
-    def uses(pkg: String) = s"(?<![A-Za-z0-9_.])$pkg\\.".r.findFirstIn(body).isDefined
-    val goPackages = "(?<![A-Za-z0-9_.])(gp_[A-Za-z0-9_]+)\\.".r.findAllMatchIn(body).map(_.group(1)).toSet.toList.sorted
+    // Imports follow from the code: not from what string literals and line directives spell.
+    val code = "\"(?:[^\"\\\\\n]|\\\\.)*\"|/\\*line [^\n]*?\\*/".r.replaceAllIn(body, "")
+    def uses(pkg: String) = s"(?<![A-Za-z0-9_.])$pkg\\.".r.findFirstIn(code).isDefined
+    val goPackages = "(?<![A-Za-z0-9_.])(gp_[A-Za-z0-9_]+)\\.".r.findAllMatchIn(code).map(_.group(1)).toSet.toList.sorted
       .map(alias => s"$alias \"${ctx.interop.imports(alias)}\"")
     val imports = List(
       Option.when(uses("rt"))(s"\"${config.goModulePath}/$RuntimeDir\""),
@@ -218,7 +267,8 @@ object Linker:
     (directives.function(header, pos, List(call)) ++ List("}") ++ directives.end()).mkString("", "\n", "\n\n")
 
   /** `Main()`, which runs the Scala entry point, and the hooks the runtime needs. */
-  private def entryCode(ctx: LinkContext, entry: String, forwarder: Option[String], exceptions: List[(String, ClassName)]): String =
+  private def entryCode(ctx: LinkContext, entry: String, forwarder: Option[String], exceptions: List[(String, ClassName)],
+      hooks: List[RuntimeHook]): String =
     val sb = StringBuilder()
     forwarder.foreach(sb ++= _)
     if ctx.analyzer.instantiated.contains(GoInterop.GoException) then
@@ -239,6 +289,20 @@ object Linker:
         sb ++= s"\t\tcase rt.$kind:\n"
         sb ++= s"\t\t\treturn ${Mangling.newInstance(cls, MessageConstructor)}(message)\n"
       sb ++= "\t\t}\n\t\treturn nil\n\t}\n}\n\n"
+    if ctx.analyzer.instantiated.contains(PatternSyntaxException) then
+      sb ++= "func init() {\n"
+      sb ++= "\trt.MakePatternSyntaxException = func(description, regex *rt.String, index int32) any {\n"
+      sb ++= s"\t\treturn ${Mangling.newInstance(PatternSyntaxException, PatternSyntaxConstructor)}(description, regex, index)\n"
+      sb ++= "\t}\n}\n\n"
+    if hooks.nonEmpty then
+      sb ++= "func init() {\n"
+      for h <- hooks do
+        val args = h.method.params.zipWithIndex.map((t, i) => ctx.cast(s"a$i", Type.Class(ClassName.Object), t))
+        val call = s"${Mangling.impl(h.cls, h.method)}(${args.mkString(", ")})"
+        val init = if ctx.analyzer.staticInit.contains(h.cls) then s"${Mangling.clinit(h.cls)}(); " else ""
+        val (result, ret) = if h.method.result == Type.Void then ("", "") else (" any", "return ")
+        sb ++= s"\trt.${h.variable} = func(${h.method.params.indices.map(i => s"a$i").mkString(", ")} any)$result { $init$ret$call }\n"
+      sb ++= "}\n\n"
     if entry.isEmpty then return sb.toString // a library: no entry point
     sb ++= "// Main runs the Scala program's entry point with the command-line arguments.\n"
     sb ++= "// Like the JVM, it then waits for the non-daemon threads the program started.\n"
@@ -250,7 +314,8 @@ object Linker:
     sb.toString
 
   /** String literals, dispatchers and type tests requested while emitting method bodies. */
-  private def supportFile(ctx: LinkContext): String =
+  private def supportFile(ctx: LinkContext, mainClass: Option[ClassName]): String =
+    val classes = classInfos(ctx, mainClass) // first: it adds class literals
     val sb = StringBuilder()
     def line(s: String = ""): Unit = sb ++= s ++= "\n"
 
@@ -263,12 +328,21 @@ object Linker:
         line(s"\t$v = $init")
       line(")")
       line()
+      // intern() returns the literals for equal strings.
+      if ctx.analyzer.usedNatives.contains(Natives.StringIntern) then
+        line("func init() {")
+        line("\trt.RegisterStringLiterals(")
+        for vs <- ctx.stringLiterals.values.grouped(16) do line(s"\t\t${vs.mkString(", ")},")
+        line("\t)")
+        line("}")
+        line()
 
     if ctx.classLiterals.nonEmpty then
       line("var (")
       for (name, v) <- ctx.classLiterals do line(s"\t$v = rt.ClassOf(${FunctionEmitter.goStringLiteral(name)})")
       line(")")
       line()
+    sb ++= classes
 
     for cls <- ctx.ifaceCasts.toList.sorted do
       val iface = Mangling.iface(cls)
@@ -306,19 +380,6 @@ object Linker:
       line("\treturn x")
       line("}")
     if ctx.checkedCasts.nonEmpty then line()
-
-    // Class.isAssignableFrom needs the class hierarchy: the classes with Go types, and those
-    // `classOf` names, with their ancestors.
-    if ctx.analyzer.usedNatives.contains(Natives.ClassIsAssignableFrom) then
-      val classes = (ctx.declared ++ ctx.classLiterals.keys.filter(ctx.program.contains)).toList.sorted
-      line("func init() {")
-      line("\trt.RegisterClassAncestors(map[string][]string{")
-      for c <- classes do
-        val ancestors = (ctx.program.ancestors(c) - ClassName.Object).toList.sorted
-        line(s"\t\t${FunctionEmitter.goStringLiteral(c)}: {${ancestors.map(FunctionEmitter.goStringLiteral).mkString(", ")}},")
-      line("\t})")
-      line("}")
-      line()
 
     for m <- ctx.dispatchers.toList.sortBy(_.descriptor) do
       val params = m.params.zipWithIndex.map((t, i) => (s"a$i", ctx.goType(t)))
@@ -365,6 +426,37 @@ object Linker:
       line("\treturn false")
       line("}")
       line()
+    sb.toString
+
+  /** `rt.DefineClasses` for the classes that can have `Class` objects (those with Go types, those
+   *  `classOf` names, the main class and the JDK's value classes) and the classes they extend or are members of: what the
+   *  reflective methods of `Class` need.
+   */
+  private def classInfos(ctx: LinkContext, mainClass: Option[ClassName]): String =
+    val program = ctx.program
+    val classes = mutable.LinkedHashSet.empty[ClassName]
+    def add(name: ClassName): Unit =
+      for c <- program.get(name) if !Hijacked.isHijacked(name) && classes.add(name) do
+        (c.superClass.toList ++ c.interfaces ++ c.innerClass.flatMap(_.outer)).foreach(add)
+    (ctx.declared.toList.sorted ++ ctx.classLiterals.keys ++ mainClass ++ Hijacked.ancestors.values.flatten.toList.distinct.sorted).foreach(add)
+    if classes.isEmpty then return ""
+    val sb = StringBuilder("func init() {\n\trt.DefineClasses([]rt.ClassInfo{\n")
+    for name <- classes.toList.sorted; c <- program.get(name) do
+      val fields = List.newBuilder[String]
+      fields += s"Class: ${ctx.classLiteral(name)}"
+      c.superClass.foreach(s => fields += s"Super: ${ctx.classLiteral(s)}")
+      if c.interfaces.nonEmpty then fields += s"Interfaces: []*rt.Class{${c.interfaces.map(ctx.classLiteral).mkString(", ")}}"
+      if c.kind == ClassKind.Interface then fields += "Interface: true"
+      for inner <- c.innerClass do
+        fields += s"Nested: true, SimpleName: ${FunctionEmitter.goStringLiteral(inner.name)}"
+        inner.outer.foreach(o => fields += s"Outer: ${ctx.classLiteral(o)}")
+      for call <- program.enumValuesCall(name) if ctx.analyzer.enumValues(name) do
+        val values = MethodDef(call.method, Nil, Some(call), isStatic = true, isPrivate = true, c.pos)
+        // Not in `c`, whose static initializer the call must trigger.
+        val body = FunctionEmitter(ctx, c.copy(name = "scalago.EnumValues"), values).emitBody(call).map(l => s"\t\t\t${l.text}\n").mkString
+        fields += s"Values: func() *rt.Array[any] {\n$body\t\t}"
+      sb ++= s"\t\t{${fields.result().mkString(", ")}},\n"
+    sb ++= "\t})\n}\n\n"
     sb.toString
 
   /** Removes what a previous link produced: top-level `.go` files and the generated packages

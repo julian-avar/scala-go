@@ -1,5 +1,4 @@
 exit in a shutdown hook: status 5, output [main returns | the hook calls exit]
-SIGTERM: status 143, output []
 SIGQUIT: status 2, output [SIGQUIT: quit]
 writing to a closed standard output: status 141
 main threadId: 1

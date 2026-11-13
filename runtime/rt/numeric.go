@@ -38,8 +38,9 @@ func FRem(a, b float64) float64 {
 func And(a, b bool) bool { return a && b }
 func Or(a, b bool) bool  { return a || b }
 
-// Special floating-point values, used for literals that Go constants cannot express.
-func NaN() float64         { return math.NaN() }
+// Special floating-point values, used for literals that Go constants cannot express. NaN is
+// Java's canonical NaN (Go's math.NaN() has payload 1).
+func NaN() float64         { return math.Float64frombits(0x7ff8000000000000) }
 func Inf(sign int) float64 { return math.Inf(sign) }
 func NegZero() float64     { return math.Copysign(0, -1) }
 

@@ -5,6 +5,7 @@ kind: Stringer info
 kind: error an error
 kind: null
 isInstanceOf: true true false
+String as Go types: false false true
 null cast: null
 cast copy: 30 3
 bad cast: ClassCastException

@@ -160,6 +160,8 @@ object Natives:
   instanceFn(S, "toCharArray()[C", "rt.StringToCharArray")
   instance(S, "toString()Ljava.lang.String;")((r, _) => r)
   instanceFn(S, "intern()Ljava.lang.String;", "rt.StringIntern")
+  /** When reachable, the linker gives the runtime the program's string literals (Linker.supportFile). */
+  val StringIntern: (ClassName, MethodName) = (S, parseMethod("intern()Ljava.lang.String;"))
   instanceFn(S, "repeat(I)Ljava.lang.String;", "rt.StringRepeat")
   instanceFn(S, "split(Ljava.lang.String;)[Ljava.lang.String;", "rt.StringSplit")
   instanceFn(S, "split(Ljava.lang.String;I)[Ljava.lang.String;", "rt.StringSplitLimit")
@@ -191,18 +193,27 @@ object Natives:
   // ---- java.lang.Class ------------------------------------------------------------------------
 
   private val C = Hijacked.ClassClass
+  // The runtime knows the program's classes from the linker (rt.DefineClasses, Linker.supportFile).
   instanceFn(C, "getName()Ljava.lang.String;", "rt.ClassGetName")
-  instanceFn(C, "getTypeName()Ljava.lang.String;", "rt.ClassGetName")
+  instanceFn(C, "getTypeName()Ljava.lang.String;", "rt.ClassGetTypeName")
   instanceFn(C, "getSimpleName()Ljava.lang.String;", "rt.ClassGetSimpleName")
+  instanceFn(C, "getCanonicalName()Ljava.lang.String;", "rt.ClassGetCanonicalName")
   // A Go binary carries no class path resources.
   methods((C, parseMethod("getResourceAsStream(Ljava.lang.String;)Ljava.io.InputStream;"))) = NullResult
   instanceFn(C, "isArray()Z", "rt.ClassIsArray")
   instanceFn(C, "isPrimitive()Z", "rt.ClassIsPrimitive")
+  instanceFn(C, "isInterface()Z", "rt.ClassIsInterface")
+  instanceFn(C, "isEnum()Z", "rt.ClassIsEnum")
   instanceFn(C, "getComponentType()Ljava.lang.Class;", "rt.ClassGetComponentType")
+  instanceFn(C, "getSuperclass()Ljava.lang.Class;", "rt.ClassGetSuperclass")
+  instanceFn(C, "getInterfaces()[Ljava.lang.Class;", "rt.ClassGetInterfaces")
+  instanceFn(C, "getEnumConstants()[Ljava.lang.Object;", "rt.ClassGetEnumConstants")
+  /** When reachable, the `values()` of enum classes are (see Analyzer.reachEnumValues). */
+  val ClassGetEnumConstants: (ClassName, MethodName) = (C, parseMethod("getEnumConstants()[Ljava.lang.Object;"))
   instanceFn(C, "toString()Ljava.lang.String;", "rt.ClassToString")
   instanceFn(C, "isAssignableFrom(Ljava.lang.Class;)Z", "rt.ClassIsAssignableFrom")
-  /** When reachable, the linker gives the runtime the program's class hierarchy (Linker.supportFile). */
-  val ClassIsAssignableFrom: (ClassName, MethodName) = (C, parseMethod("isAssignableFrom(Ljava.lang.Class;)Z"))
+  instanceFn(C, "isInstance(Ljava.lang.Object;)Z", "rt.ClassIsInstance")
+  instanceFn(C, "cast(Ljava.lang.Object;)Ljava.lang.Object;", "rt.ClassCastValue")
   instance(C, "desiredAssertionStatus()Z")((_, _) => "false")
   instance(C, "getClassLoader()Ljava.lang.ClassLoader;")((_, _) => "nil")
   staticFn(C, "forName(Ljava.lang.String;)Ljava.lang.Class;", "rt.ClassForName")
@@ -321,7 +332,7 @@ object Natives:
   private val Float = "java.lang.Float"
   staticFn(Double, "parseDouble(Ljava.lang.String;)D", "rt.ParseDouble")
   static(Double, "valueOf(Ljava.lang.String;)Ljava.lang.Double;")(as => s"any(rt.ParseDouble(${as.head}))")
-  static(Float, "parseFloat(Ljava.lang.String;)F")(as => s"float32(rt.ParseDouble(${as.head}))")
+  staticFn(Float, "parseFloat(Ljava.lang.String;)F", "rt.ParseFloat")
   for (box, code, goT) <- List((Double, "D", "float64"), (Float, "F", "float32")) do
     static(box, s"isNaN($code)Z")(as => s"(${as.head} != ${as.head})")
     static(box, s"isInfinite($code)Z")(as => s"math.IsInf(float64(${as.head}), 0)")
@@ -346,7 +357,7 @@ object Natives:
   for (name, fn) <- List(
       "isDigit" -> "rt.CharIsDigit", "isLetter" -> "rt.CharIsLetter", "isLetterOrDigit" -> "rt.CharIsLetterOrDigit",
       "isWhitespace" -> "rt.CharIsWhitespace", "isSpaceChar" -> "rt.CharIsSpaceChar",
-      "isUpperCase" -> "rt.CharIsUpperCase", "isLowerCase" -> "rt.CharIsLowerCase", "isAlphabetic" -> "rt.CharIsLetter"
+      "isUpperCase" -> "rt.CharIsUpperCase", "isLowerCase" -> "rt.CharIsLowerCase", "isAlphabetic" -> "rt.CharIsAlphabetic"
     )
   do
     static(Character, s"$name(C)Z")(as => s"$fn(int32(${as.head}))")
@@ -381,19 +392,26 @@ object Natives:
   for mathClass <- List("java.lang.Math", "java.lang.StrictMath") do
     def m(desc: String)(gen: List[String] => String) = static(mathClass, desc)(gen)
     def unaryD(name: String, goFn: String) = m(s"$name(D)D")(as => s"$goFn(${as.head})")
-    for (name, goFn) <- List("sqrt" -> "math.Sqrt", "cbrt" -> "math.Cbrt", "exp" -> "math.Exp", "log" -> "math.Log",
-        "log10" -> "math.Log10", "log1p" -> "math.Log1p", "expm1" -> "math.Expm1", "sin" -> "math.Sin",
-        "cos" -> "math.Cos", "tan" -> "math.Tan", "asin" -> "math.Asin", "acos" -> "math.Acos", "atan" -> "math.Atan",
-        "sinh" -> "math.Sinh", "cosh" -> "math.Cosh", "tanh" -> "math.Tanh", "floor" -> "math.Floor",
-        "ceil" -> "math.Ceil", "rint" -> "rt.MathRint", "signum" -> "rt.MathSignum")
-    do unaryD(name, goFn)
+    // Math may differ from fdlibm in the last bits, StrictMath must not (rt/fdlibm.go): Go's
+    // functions serve Math, except pow, whose results Go's Pow gets wrong by several ulps.
+    val strict = mathClass == "java.lang.StrictMath"
+    for (name, goFn, strictFn) <- List(
+        ("sqrt", "math.Sqrt", "math.Sqrt"), ("cbrt", "math.Cbrt", "rt.StrictCbrt"), ("exp", "math.Exp", "rt.StrictExp"),
+        ("log", "math.Log", "rt.StrictLog"), ("log10", "math.Log10", "rt.StrictLog10"),
+        ("log1p", "math.Log1p", "rt.StrictLog1p"), ("expm1", "math.Expm1", "rt.StrictExpm1"),
+        ("sin", "math.Sin", "rt.StrictSin"), ("cos", "math.Cos", "rt.StrictCos"), ("tan", "math.Tan", "rt.StrictTan"),
+        ("asin", "math.Asin", "rt.StrictAsin"), ("acos", "math.Acos", "rt.StrictAcos"),
+        ("atan", "math.Atan", "rt.StrictAtan"), ("sinh", "math.Sinh", "rt.StrictSinh"),
+        ("cosh", "math.Cosh", "rt.StrictCosh"), ("tanh", "math.Tanh", "rt.StrictTanh"), ("floor", "math.Floor", "math.Floor"),
+        ("ceil", "math.Ceil", "math.Ceil"), ("rint", "rt.MathRint", "rt.MathRint"), ("signum", "rt.MathSignum", "rt.MathSignum"))
+    do unaryD(name, if strict then strictFn else goFn)
     m("nextUp(D)D")(as => s"math.Nextafter(${as.head}, math.Inf(1))")
     m("nextDown(D)D")(as => s"math.Nextafter(${as.head}, math.Inf(-1))")
     m("toRadians(D)D")(as => s"(${as.head} / 180 * math.Pi)")
     m("toDegrees(D)D")(as => s"(${as.head} * 180 / math.Pi)")
-    m("pow(DD)D")(as => s"math.Pow(${as(0)}, ${as(1)})")
-    m("atan2(DD)D")(as => s"math.Atan2(${as(0)}, ${as(1)})")
-    m("hypot(DD)D")(as => s"math.Hypot(${as(0)}, ${as(1)})")
+    m("pow(DD)D")(as => s"rt.StrictPow(${as(0)}, ${as(1)})")
+    m("atan2(DD)D")(as => s"${if strict then "rt.StrictAtan2" else "math.Atan2"}(${as(0)}, ${as(1)})")
+    m("hypot(DD)D")(as => s"${if strict then "rt.StrictHypot" else "math.Hypot"}(${as(0)}, ${as(1)})")
     m("random()D")(_ => "rt.MathRandom()")
     m("round(D)J")(as => s"rt.MathRound(${as.head})")
     m("round(F)I")(as => s"rt.MathRoundFloat(${as.head})")
@@ -436,6 +454,7 @@ object Natives:
   staticFn(System, "identityHashCode(Ljava.lang.Object;)I", "rt.IdentityHashCode")
   staticFn(System, "exit(I)V", "rt.Exit")
   staticFn(System, "getenv(Ljava.lang.String;)Ljava.lang.String;", "rt.Getenv")
+  staticFn(System, "gc()V", "rt.GC")
 
   private val ReflectArray = "java.lang.reflect.Array"
   staticFn(ReflectArray, "newInstance(Ljava.lang.Class;I)Ljava.lang.Object;", "rt.NewArrayOf")
@@ -733,6 +752,7 @@ object Natives:
       "yieldNow()V" -> "rt.Yield",
       "holdsLock(Ljava.lang.Object;)Z" -> "rt.MonitorHeldByCurrent",
       "activeCount()I" -> "rt.ActiveThreadCount",
+      "blockedIn(Ljava.lang.Object;)I" -> "rt.ThreadBlockedIn",
       "park(Ljava.lang.Object;J)V" -> "rt.Park",
       "unpark(Ljava.lang.Object;)V" -> "rt.Unpark"
     )
@@ -947,6 +967,7 @@ object Natives:
       s"mapType($O$O)$O" -> "rt.GoTypeMap",
       s"chanType($O)$O" -> "rt.GoTypeChan",
       s"ptrType($O)$O" -> "rt.GoTypePtr",
+      s"typeName($O)Ljava.lang.String;" -> "rt.GoTypeName",
       s"isNil($O)Z" -> "rt.GoIsNil",
       s"makeSlice(${O}II)$O" -> "rt.GoMakeSlice",
       s"sliceLength($O)I" -> "rt.GoSliceLength",

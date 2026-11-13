@@ -1,0 +1,2 @@
+Main.scala:13:43: Go facade member slices.Max: type argument any of E does not satisfy its Go constraint
+type argument []int of E does not satisfy its Go constraint (comparable)

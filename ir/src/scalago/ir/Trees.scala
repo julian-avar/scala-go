@@ -26,8 +26,19 @@ final case class ClassDef(
     /** Set for Go facades: classes standing for a Go package or a Go type (see [[GoFacade]]). */
     goFacade: Option[GoFacade] = None,
     /** Set for classes exported to Go (`@GoExport`): the Go type name. */
-    goExport: Option[String] = None
+    goExport: Option[String] = None,
+    /** Set for nested classes (see [[InnerClass]]). */
+    innerClass: Option[InnerClass] = None
 )
+
+/** A nested class's entry of the JVM's `InnerClasses` attribute, as the JVM backend writes it:
+ *  `Class.getSimpleName` and `getCanonicalName` derive from it.
+ *
+ *  @param outer the class it is a member of (for a member of a top-level object, the object's
+ *               mirror class); `None` for local and anonymous classes
+ *  @param name  its simple name (`Inner`, `Inner$` for an object); `""` for anonymous classes
+ */
+final case class InnerClass(outer: Option[ClassName], name: String)
 
 /** A Scala declaration of Go code (`@GoImport`). Facades have no IR bodies: the linker turns uses
  *  of their members into Go code, converting values at the boundary.

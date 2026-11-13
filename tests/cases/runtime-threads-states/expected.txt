@@ -1,0 +1,23 @@
+-- states
+sleep: TIMED_WAITING
+wait: WAITING
+timed wait: TIMED_WAITING
+join: WAITING
+timed join: TIMED_WAITING
+held monitor: BLOCKED
+park: WAITING
+new: NEW
+terminated: TERMINATED
+-- priorities
+created by a thread of priority 8: 8
+in a group of maximum priority 4: 4
+set to 9 in that group: 4
+main: 5
+-- messages
+Thread.sleep(-1): throws java.lang.IllegalArgumentException: timeout value is negative
+Thread.sleep(0, 1000000): throws java.lang.IllegalArgumentException: nanosecond timeout value out of range
+wait(-1): throws java.lang.IllegalArgumentException: timeout value is negative
+Thread.ofPlatform().priority(42): throws java.lang.IllegalArgumentException
+-- main thread
+main returns
+main thread after main returned: alive=false TERMINATED

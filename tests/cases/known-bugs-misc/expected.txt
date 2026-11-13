@@ -1,9 +1,0 @@
-Math.round(0.49999999999999994): 1
-Math.round(4503599627370497.0): 4503599627370498
-"\uD83D\uDE00".lastIndexOf(0x1F600): -1
-"\uFFFD".indexOf(0x110000): 0
-NonFatal(StackOverflowError()): true
-initializing Failing
-Failing.value: throws java.lang.IllegalStateException: init failed
-second access: java.lang.NoClassDefFoundError, cause null
-getSimpleName of a local class: 

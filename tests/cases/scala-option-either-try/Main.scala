@@ -129,6 +129,8 @@ object Main:
     println(classify(InterruptedException()))
     println(classify(Control()))
     println(classify(LinkageError()))
+    println(classify(StackOverflowError()))
+    println(classify(OutOfMemoryError()))
     println(classify(Quiet()))
     println(s"${Quiet().getStackTrace.length} ${Quiet().getMessage}")
     println(catching(classOf[NumberFormatException]).opt("12".toInt))

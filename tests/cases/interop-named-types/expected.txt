@@ -9,6 +9,7 @@ slice literal: a|b|c []
 slice conversion: x|y
 map literal: a=1 b=3
 map conversion: k=7
+data for defined types: 2 1
 func type: cba ABC GO
 empty interface: string int32 named.Level <nil>
 zero struct: [] debug []

@@ -13,3 +13,8 @@ object Api:
 @GoExport class Point(x: Int, y: Int):
   @GoExport def this() = this(0, 0)
   @GoExport def sum(): Int = x + y
+
+object Values:
+  @GoExport val answer: Int = 42
+
+@GoExport class Pair(@GoExport val first: Int)

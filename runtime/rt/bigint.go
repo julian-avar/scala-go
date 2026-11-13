@@ -1,9 +1,6 @@
 package rt
 
-import (
-	"math/big"
-	"strings"
-)
+import "math/big"
 
 // BigInteger is java.math.BigInteger, backed by math/big. Values are immutable.
 type BigInteger struct {
@@ -27,14 +24,61 @@ func (b *BigInteger) String() string { return b.v.String() }
 
 func BigIntegerValueOf(x int64) *BigInteger { return bigOf(big.NewInt(x)) }
 
+// bigDigitsPerInt[radix] is the length of the groups of digits the JDK's BigInteger(String, int)
+// parses with Integer.parseInt (the last ones; the first is shorter): its exceptions name the
+// group with the bad digit.
+var bigDigitsPerInt = [maxRadix + 1]int{0, 0, 30, 19, 15, 13, 11, 11, 10, 9, 9, 8, 8, 8, 8, 7, 7, 7, 7, 7, 7,
+	7, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 5}
+
+// NewBigIntegerFromString is new BigInteger(s, radix): an optional sign, then digits as
+// Character.digit reads them (any Unicode decimal digit), with the JDK's exceptions.
 func NewBigIntegerFromString(s *String, radix int32) *BigInteger {
-	str := s.GoString()
-	if strings.HasPrefix(str, "+") && !strings.HasPrefix(str, "+-") {
-		str = str[1:]
+	if radix < minRadix || radix > maxRadix {
+		ThrowKind(NumberFormat, "Radix out of range")
 	}
-	v, ok := new(big.Int).SetString(str, int(radix))
-	if !ok || strings.Contains(str, "_") {
-		ThrowKind(NumberFormat, "For input string: \""+s.GoString()+"\"")
+	chars := s.chars
+	minus, plus := -1, -1 // the last ones
+	for i, c := range chars {
+		switch c {
+		case '-':
+			minus = i
+		case '+':
+			plus = i
+		}
+	}
+	start := 0
+	if minus > 0 || plus > 0 {
+		ThrowKind(NumberFormat, "Illegal embedded sign character")
+	} else if minus == 0 || plus == 0 {
+		start = 1
+	}
+	if start == len(chars) {
+		ThrowKind(NumberFormat, "Zero length BigInteger")
+	}
+	for start < len(chars) && CharDigit(int32(chars[start]), radix) == 0 {
+		start++
+	}
+	digits := make([]byte, 0, len(chars)-start+1)
+	if minus == 0 {
+		digits = append(digits, '-')
+	}
+	for i := start; i < len(chars); i++ {
+		d := CharDigit(int32(chars[i]), radix)
+		if d < 0 {
+			group := bigDigitsPerInt[radix]
+			first := start + (len(chars)-start-1)%group + 1 // end of the first group
+			from, to := start, first
+			if i >= first {
+				from = first + (i-first)/group*group
+				to = from + group
+			}
+			numberFormat(decodeUTF16(chars[from:to]), radix)
+		}
+		digits = append(digits, byte(CharForDigit(d, radix)))
+	}
+	v, ok := new(big.Int).SetString(string(digits), int(radix))
+	if !ok { // no digits after leading zeros
+		return BigZero
 	}
 	return bigOf(v)
 }
@@ -61,14 +105,20 @@ func NewBigIntegerFromMagnitude(signum int32, a *Array[int8]) *BigInteger {
 		bytes[i] = byte(x)
 	}
 	v := new(big.Int).SetBytes(bytes)
-	if signum < 0 {
+	switch {
+	case signum < -1 || signum > 1:
+		ThrowKind(NumberFormat, "Invalid signum value")
+	case signum == 0 && v.Sign() != 0:
+		ThrowKind(NumberFormat, "signum-magnitude mismatch")
+	case signum < 0:
 		v.Neg(v)
 	}
 	return bigOf(v)
 }
 
+// BigIntegerToByteArray is the shortest two's complement, sign bit included.
 func BigIntegerToByteArray(b *BigInteger) *Array[int8] {
-	n := b.v.BitLen()/8 + 1
+	n := BigIntegerBitLength(b)/8 + 1
 	mod := new(big.Int).Lsh(big.NewInt(1), uint(8*n))
 	u := new(big.Int).Mod(&b.v, mod) // two's complement in n bytes
 	bytes := u.FillBytes(make([]byte, n))

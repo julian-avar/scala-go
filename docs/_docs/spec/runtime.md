@@ -15,25 +15,24 @@ A linked program is a Go module: generated code in `internal/scala`, the runtime
 | Start | Go package initialization (Go: [Package initialization][go-pkginit]) of `rt`, the packages facades import, then the generated package. It creates string literals and `classOf` constants and runs no Scala code; no class is initialized eagerly |
 | Entry point | `main(Array[String])` of the configured object (`--main`, default `Main`), or the class generated for a `@main` method. `args` excludes the program name |
 | `main` returns | Waits for every non-daemon `Thread` (Go alone would not; Go: [Program execution][go-exec]), runs the shutdown hooks, flushes standard output, exits with status 0. Daemon threads end with the process |
-| Uncaught exception in `main` | Prints `Exception in thread "main" ` and the stack trace on standard error; then as above, with status 1 |
-| Uncaught exception in another thread | Goes to the thread's handler, else the group's, else the default handler, else is printed as `Exception in thread "<name>" ...`. The program continues |
+| `main` throws | The main thread ends: the exception goes to the handlers as for other threads, and, without one, `Exception in thread "main" ` and the stack trace are printed on standard error; then as above, with status 1 |
+| Uncaught exception in another thread | Goes to the thread's handler, else the group's `uncaughtException` (which passes it to the parent group, then the default handler, else prints it as `Exception in thread "<name>" ...`). An exception the handler throws is reported and ignored. The program continues |
 | `System.exit(n)`, `Runtime.exit(n)` | Runs the shutdown hooks (each in a new thread, concurrently, waiting for all), flushes standard output, exits with status `n`. Other threads stop |
 | `Runtime.halt(n)` | Flushes standard output, exits with status `n`; no hooks |
 | `exit` from a shutdown hook | Exits at once. **Deviation:** the JVM blocks forever |
 | Go panic nothing recovers (Go: [Handling panics][go-panics]) | Go's panic report, exit status 2, no hooks. `Thread`s recover every panic; a Scala exception thrown into Go code can end here ([Errors and panics](interop.md#errors-and-panics)) |
+| `SIGINT`, `SIGTERM`, `SIGHUP` | As `System.exit(128 + signal number)`: the shutdown hooks run and standard output is flushed ([Signals](#signals)) |
 | Go fatal error (stack or heap exhaustion, ...) | Go prints `fatal error: ...` and every goroutine's stack; exit status 2; no hooks |
 
 - Exits with a status (`System.exit`, `halt`, uncaught exception in `main`) skip the pending
   `finally` blocks of all threads, as on the JVM (`os.Exit` runs no deferred functions).
 - The main thread is a non-daemon `Thread` named `main` with priority 5; its `threadId` is
   usually 1 (JDK 25: 3).
-- **Deviation:** buffered standard output is lost when the process ends by a signal
-  ([Signals](#signals)) or a Go fatal error.
-- **Deviation (bug):** an uncaught exception in `main` is always printed by the runtime; the main
-  thread's handler and the default handler are not called for it. The main `Thread` stays alive
-  after `main` returns or throws (`join()` on it never returns). An overridden
-  `ThreadGroup.uncaughtException` is never called, and a default handler that throws ends the
-  program with a Go panic. [Known bugs](../contributing/roadmap.md#known-bugs).
+- **Deviation:** buffered standard output written in the last 100 ms ([Standard I/O](#standard-io))
+  is lost when a Go fatal error ends the process. Go cannot recover from fatal errors, so nothing
+  of the runtime runs then.
+- The main `Thread` terminates when `main` returns or throws: `isAlive` is `false` and `join()`
+  returns.
 
 ## Threads
 
@@ -44,9 +43,9 @@ scheduler over `GOMAXPROCS` OS threads. Goroutines that Go code starts:
 | API | Behavior |
 |-----|----------|
 | `start`, `run`, `join` (with timeouts), `isAlive`, names (`Thread-0`, ...), ids, daemon status, uncaught-exception handlers | As on the JVM |
-| `getState` | **Deviation (bug):** `RUNNABLE` in `sleep`, `wait`, `join` and while blocked on a monitor; only `LockSupport` parking reports `WAITING`/`TIMED_WAITING` |
+| `getState` | `TIMED_WAITING` in `sleep` and timed `wait`, `join` and parking; `WAITING` in untimed ones; `BLOCKED` entering a monitor another thread holds |
 | `currentThread` | The goroutine's `Thread`. A goroutine not started as a `Thread` (the main goroutine, or one Go code started) gets one on first request, kept while it runs |
-| priorities | Stored and reported; no effect on scheduling. **Deviation (bug):** a new thread starts at 5, not at its creator's priority capped by its group's maximum |
+| priorities | Stored and reported, as on the JVM: a new thread starts at its creator's priority, capped by its group's maximum; no effect on scheduling |
 | `sleep`, `yield`, `onSpinWait` | `sleep` is interruptible; `yield` and `onSpinWait` are `runtime.Gosched` |
 | `interrupt`, `isInterrupted`, `interrupted` | As on the JVM. Wakes `sleep`, `join`, `Object.wait`, `LockSupport.park` (and all built on it: locks, conditions, queues, futures), `Process.waitFor` and blocked `GoChan` operations. **Deviation:** does not interrupt blocking socket or file I/O |
 | `Thread.ofPlatform()`, `ofVirtual()`, `startVirtualThread` | Both build goroutine-backed threads; virtual threads are daemons, unnamed by default, `isVirtual` |
@@ -103,7 +102,7 @@ A `GoMap` used concurrently with a write is a fatal error ([Go data](interop.md#
 | Heap exhaustion | **Deviation:** a Go fatal error (`fatal error: runtime: out of memory`), not a catchable `OutOfMemoryError` |
 | `Runtime.totalMemory`, `freeMemory` | The heap Go obtained from the system, and its unused part |
 | `Runtime.maxMemory` | **Deviation:** `Long.MaxValue` unless `GOMEMLIMIT` is set (JVM: its `-Xmx`) |
-| `Runtime.gc()` | `runtime.GC()`. **Deviation (bug):** `System.gc()` is a link error ([Known bugs](../contributing/roadmap.md#known-bugs)) |
+| `Runtime.gc()`, `System.gc()` | `runtime.GC()` |
 
 ## Stack
 
@@ -112,7 +111,7 @@ deeper than the JVM's default thread stacks (512 KB–1 MB) succeeds. The `stack
 `Thread` constructors and builders is ignored.
 
 **Deviation:** exhausting the stack is a Go fatal error (`fatal error: stack overflow`, exit
-status 2), not a `StackOverflowError`: no `catch` or `finally` runs, and buffered standard output
+status 2), not a `StackOverflowError`: no `catch` or `finally` runs, and standard output buffered in the last 100 ms
 is lost (`tests/cases/limits-runtime-stack-overflow`).
 
 ## Class and object initialization
@@ -131,22 +130,23 @@ that reaches an unimplemented reflective API fails to link, naming the chain of 
 | API | Behavior |
 |-----|----------|
 | `getClass`, `classOf[T]` | One interned `Class` per JVM class name (`==` and `eq` work) |
-| `Class.getName`, `getTypeName`, `toString`, `isArray`, `isPrimitive`, `getComponentType` | As on the JVM, from the class name |
-| `Class.getSimpleName` | As on the JVM, except for local classes ([Language](language.md#5-classes-and-objects)) |
-| `Class.isAssignableFrom` | Works for program classes, primitives, arrays and the JDK value classes |
-| `Class.forName(name)` | **Deviation:** returns a `Class` with that name for any name; never throws `ClassNotFoundException`; does not initialize the class |
+| `Class.getName`, `getTypeName`, `toString`, `isArray`, `isPrimitive`, `getComponentType`, `getSimpleName`, `getCanonicalName` | As on the JVM, from the class name and the class's `InnerClasses` entry |
+| `Class.getSuperclass`, `getInterfaces`, `isInterface`, `isEnum`, `isAssignableFrom`, `isInstance`, `cast` | Work for program classes, primitives, arrays and the JDK value classes, on the hierarchy the linker records for the classes the program uses |
+| `Class.getEnumConstants` | `values()` of an enum class (a `java.lang.Enum` subclass, including Java-style Scala 3 enums); `null` for others |
+| `Class.forName(name)` | Finds the classes the program uses (names with `classOf`, instantiates or extends) and arrays of them; others throw `ClassNotFoundException`. **Deviation:** a class the program never uses is not found; does not initialize the class |
 | `getClassLoader` | **Deviation:** `null`, also for program classes |
 | `getResource`, `getResourceAsStream` | `null`: a binary has no class-path resources |
 | `desiredAssertionStatus` | `false` |
 | `java.lang.reflect.Array` | `newInstance`, `getLength`, `get`, `set`. **Deviation:** `newInstance` of a reference component type gives an `Object[]` ([Arrays](data.md#arrays)) |
 | `ClassTag` | Works; `newArray` of a reference type gives an `Object[]` |
-| `Class.isInstance`, `cast`; fields, methods, constructors, annotations, proxies, `MethodHandle`, `VarHandle`, `ServiceLoader`, atomic field updaters | Not implemented |
+| fields, methods, constructors, annotations, proxies, `MethodHandle`, `VarHandle`, `ServiceLoader`, atomic field updaters | Not implemented |
 
 ## Standard I/O
 
 - `System.out` (and `Console.out`, `println`) writes UTF-8 into a 32 KB buffer, flushed at exit,
   when full, before anything is written to standard error, before standard input is read, around
-  calls into Go code, and before a subprocess inherits standard output. **Deviation:** the JDK
+  calls into Go code, before a subprocess inherits standard output, at line ends when standard
+  output is a terminal, and 100 ms after the buffer last became non-empty. **Deviation:** the JDK
   flushes every line; output interleaves differently with other writers to the same descriptor.
 - `System.err` is unbuffered. `System.in` is a buffered stream over standard input.
 - Each `print`/`println` call is written atomically: lines from different threads never
@@ -206,9 +206,8 @@ that reaches an unimplemented reflective API fails to link, naming the chain of 
   (`-1`, JDK `ffffffff`); `BigInteger` arguments print a Go struct
   ([Silent wrong output](../contributing/roadmap.md#silent-wrong-output)).
 - Charsets: UTF-8 (default), ISO-8859-1 and US-ASCII, with the JDK's malformed-input handling;
-  `Charset.isSupported` is `false` for others. **Deviation (bug):** using another throws
-  `UnsupportedOperationException` (JVM: `UnsupportedEncodingException` or
-  `UnsupportedCharsetException`).
+  `Charset.isSupported` is `false` for others, and using one throws
+  `UnsupportedEncodingException` (by name) or `UnsupportedCharsetException`, as in the JDK.
 - `Character` classification and case mapping use Go's Unicode tables (Unicode 16.0 with Go 1.27,
   as in JDK 25). **Deviation:** they follow the Go release, not the targeted JDK.
 - Regular expressions run on Go's RE2: no lookaround, backreferences or possessive quantifiers.
@@ -227,11 +226,12 @@ that reaches an unimplemented reflective API fails to link, naming the chain of 
 
 ## Signals
 
-scala-go installs no signal handlers; Go's defaults apply. There is no `sun.misc.Signal`.
+scala-go handles `SIGINT`, `SIGTERM` and `SIGHUP` as the JVM does; Go's defaults apply to the
+others. There is no `sun.misc.Signal`.
 
 | Signal | Behavior |
 |--------|----------|
-| `SIGINT`, `SIGTERM`, `SIGHUP` | The process ends by the signal (status 128 + signal in a shell). **Deviation:** shutdown hooks do not run. Verified with `SIGTERM`: both exit with 143; only the JVM runs the hook |
+| `SIGINT`, `SIGTERM`, `SIGHUP` | Run the shutdown hooks, flush standard output and exit with status 128 + the signal's number, as `System.exit` does |
 | `SIGQUIT` | Go prints every goroutine's stack and exits with status 2. **Deviation:** the JVM prints a thread dump and continues |
 | `SIGPIPE` on standard output or error | The process ends ([Standard I/O](#standard-io)) |
 | `SIGSEGV`, `SIGBUS`, `SIGFPE` from Go code | Go run-time panics, translated into Java exceptions where possible |

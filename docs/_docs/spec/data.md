@@ -49,11 +49,6 @@ interface of references to `C` (names are mangled).
 - Converting to Go text (I/O, interop, `s.toGoString`) copies and transcodes UTF-16 to UTF-8;
   unpaired surrogates become U+FFFD (on the console, `?`, as on the JDK). Converting from Go
   text (`g.toJavaString`) replaces invalid UTF-8 with U+FFFD.
-- **Deviation (bug):** `s.indexOf(cp)` with an integer that is not a valid code point
-  (`0x110000`) searches for U+FFFD, as Go converts it (Go: [Conversions to and from a string
-  type][go-string-conv]): `"a�b".indexOf(0x110000)` is `1` (JVM: `-1`).
-- **Deviation (bug):** `s.lastIndexOf(cp)` and `lastIndexOf(cp, from)` never find a
-  supplementary code point: `"a😀b".lastIndexOf(0x1F600)` is `-1` (JVM: `1`). `indexOf` finds it.
 
 ## Arrays
 
@@ -153,8 +148,7 @@ Scala.js); their methods are Go functions:
 
 - Calls on references typed by a supertype of these (`Any`, `Comparable`, `CharSequence`,
   `Number`) go through Go type switches.
-- **Deviation:** `BigInteger` and `BigDecimal` cannot be subclassed. **Deviation (bug):** a
-  subclass is not a link error; the generated code does not compile.
+- **Deviation:** `BigInteger` and `BigDecimal` cannot be subclassed: a subclass is a link error.
 - `scala.math.BigInt` and `scala.math.BigDecimal` are the Scala library's wrappers around them.
 - Static members of `Math`, `StrictMath`, `System`, `Character`, `Integer` and the other boxes,
   `java.util.Arrays` (primitive arrays), `Objects`, `java.lang.reflect.Array`,
@@ -202,6 +196,5 @@ passing and `==` on Go values in [Go data](interop.md#go-data).
 [go-methodsets]: https://go.dev/ref/spec#Method_sets
 [go-numeric]: https://go.dev/ref/spec#Numeric_types
 [go-size]: https://go.dev/ref/spec#Size_and_alignment_guarantees
-[go-string-conv]: https://go.dev/ref/spec#Conversions_to_and_from_a_string_type
 [go-strings]: https://go.dev/ref/spec#String_types
 [go-struct]: https://go.dev/ref/spec#Struct_types

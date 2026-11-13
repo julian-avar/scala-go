@@ -1,22 +1,33 @@
 == basics
 12 false true o World Hello []
 ell Hello, World! [] 12
-charAt(-1): java.lang.StringIndexOutOfBoundsException
-charAt(12): java.lang.StringIndexOutOfBoundsException
-substring(13): java.lang.StringIndexOutOfBoundsException
-substring(5, 2): java.lang.StringIndexOutOfBoundsException
-substring(-1, 2): java.lang.StringIndexOutOfBoundsException
+charAt(-1): java.lang.StringIndexOutOfBoundsException: Index -1 out of bounds for length 12
+charAt(12): java.lang.StringIndexOutOfBoundsException: Index 12 out of bounds for length 12
+substring(13): java.lang.StringIndexOutOfBoundsException: Range [13, 12) out of bounds for length 12
+substring(5, 2): java.lang.StringIndexOutOfBoundsException: Range [5, 2) out of bounds for length 12
+substring(-1, 2): java.lang.StringIndexOutOfBoundsException: Range [-1, 2) out of bounds for length 12
+subSequence(0, 13): java.lang.StringIndexOutOfBoundsException: Range [0, 13) out of bounds for length 12
 repeat ababab [] []
 repeat(-1): java.lang.IllegalArgumentException: count is negative: -1
 hashCode 0 97 -505841268 -2147483648 65535
-intern true true equals true false false
+intern true true true true false true
+equals true false false
 new String |xyz|bc|copy
-new String(chars, 3, 2): java.lang.StringIndexOutOfBoundsException
+new String(chars, 3, 2): java.lang.StringIndexOutOfBoundsException: Range [3, 3 + 2) out of bounds for length 2
+new String(chars, 0, -1): java.lang.StringIndexOutOfBoundsException: Range [0, 0 + -1) out of bounds for length 2
+valueOf(chars, 1, 2): java.lang.StringIndexOutOfBoundsException: Range [1, 1 + 2) out of bounds for length 2
 getChars ..bcd.
+getChars(1, 7): java.lang.StringIndexOutOfBoundsException: Range [1, 7) out of bounds for length 6
+getChars(0, 3, dst, 4): java.lang.StringIndexOutOfBoundsException: Range [4, 4 + 3) out of bounds for length 6
 isBlank true true false
+isBlank false false true
+strip [ x ] [x]
 == searching
 indexOf 0 3 -1 1 8 0 0 -1
 lastIndexOf 10 7 8 1 11 -1 7
+from past the end 11 -1 11 -1 0
+code points 1 4 4 1 1 -1 1 5
+not code points -1 -1 -1 -1
 contains true true false
 startsWith true true true false false endsWith true true
 regionMatches true true false false false true
@@ -50,10 +61,37 @@ STRASSE αβγ Ǆ 2
 5:[x][][y][][]
 4:[one][two][three][four]
 2:[😀][😀]
+0:
+3:[][][]
+4:[a][b][c][]
+4:[b][][c][]
+4:[a][][b][]
+split("("): java.util.regex.PatternSyntaxException
 == replace
 bonono bANANa ba -a-b-c- abc
 a#b#c# a#b2c3 Smith, John $
 E a$1b
+XX -b--c- <aaa><> -a-b-c- |a| |b|
+ab2c a[b]c a[]c a$\c aabc
+no match abc abc
+replaceAll("b", "$2"): java.lang.IndexOutOfBoundsException: No group 2
+replaceAll("(b)", "$2"): java.lang.IndexOutOfBoundsException: No group 2
+replaceAll("b", "$"): java.lang.IllegalArgumentException: Illegal group reference: group index is missing
+replaceAll("b", "\"): java.lang.IllegalArgumentException: character to be escaped is missing
+replaceAll("b", "$a"): java.lang.IllegalArgumentException: Illegal group reference
+replaceAll("(b)", "${x}"): java.lang.IllegalArgumentException: No group with name {x}
+replaceAll("b", "${}"): java.lang.IllegalArgumentException: named capturing group has 0 length name
+replaceAll("b", "${x"): java.lang.IllegalArgumentException: named capturing group is missing trailing '}'
+replaceAll("b", "${1x}"): java.lang.IllegalArgumentException: capturing group name {1x} starts with digit character
+replaceFirst("b", "$2"): java.lang.IndexOutOfBoundsException: No group 2
+replaceAll("("): java.util.regex.PatternSyntaxException
+replaceAll(")"): java.util.regex.PatternSyntaxException
+replaceAll("["): java.util.regex.PatternSyntaxException
+replaceAll("*a"): java.util.regex.PatternSyntaxException
+replaceAll("[z-a]"): java.util.regex.PatternSyntaxException
+replaceAll("\"): java.util.regex.PatternSyntaxException
+replaceAll("a)|(b"): java.util.regex.PatternSyntaxException
+matches("a)|(b"): java.util.regex.PatternSyntaxException
 == conversions
 true c 42 -7 1.5 2.0 null
 abc bc xy
@@ -76,8 +114,13 @@ decode UTF-8 hé 41,fffd,28,fffd
 range hé cde bc
 round trip true
 lone surrogate 61 3f 62 61 3f
+encoded surrogates fffd fffd,41 fffd,41 fffd d7ff
+new String(bytes, "no-such-charset"): java.io.UnsupportedEncodingException: no-such-charset
+new String(bytes, 0, 1, "bad name"): java.io.UnsupportedEncodingException: bad name
+getBytes("no-such-charset"): java.io.UnsupportedEncodingException: no-such-charset
+getBytes(null: String): java.lang.NullPointerException: null
 == surrogates
 6 128512 56832 119070 d83d 1 4 3
 😀 A😀B𝄞 4 𝄞b😀a
 𐐀 𐐨 10400
-codePointAt(9): java.lang.StringIndexOutOfBoundsException
+codePointAt(9): java.lang.StringIndexOutOfBoundsException: Index 9 out of bounds for length 6

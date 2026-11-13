@@ -14,15 +14,14 @@ class Outer:
 object Outer:
   class Nested
 
-object Main:
-  val interfaces = Set[Class[?]](classOf[Shape], classOf[Runnable], classOf[java.util.Map.Entry[?, ?]])
+class Cat extends Shape
+enum Color:
+  case Red, Green
 
-  /** getTypeName of arrays and toString of interfaces are known bugs (known-bugs-runtime). */
+object Main:
   def describe(c: Class[?]): Unit =
     val component = Option(c.getComponentType).fold("-")(_.getName)
-    val typeName = if c.isArray then "" else s" | ${c.getTypeName}"
-    val string = if interfaces.contains(c) then "" else s" | $c"
-    println(s"${c.getName}$typeName | ${c.getSimpleName}$string | array=${c.isArray} primitive=${c.isPrimitive} component=$component")
+    println(s"${c.getName} | ${c.getTypeName} | ${c.getSimpleName} | $c | array=${c.isArray} primitive=${c.isPrimitive} component=$component")
 
   def main(args: Array[String]): Unit =
     println("-- names")
@@ -71,6 +70,33 @@ object Main:
     assignable(classOf[Array[Long]], classOf[Array[Int]])
     assignable(classOf[Exception], classOf[IllegalStateException])
     assignable(classOf[RuntimeException], classOf[Exception])
+
+    println("-- hierarchy")
+    class Local
+    def hierarchy(c: Class[?]): Unit =
+      val interfaces = c.getInterfaces.map(_.getName).sorted.mkString(",")
+      println(s"${c.getName}: super=${c.getSuperclass} interfaces=[$interfaces] interface=${c.isInterface} enum=${c.isEnum} canonical=${c.getCanonicalName}")
+    for c <- Seq[Class[?]](classOf[Square], classOf[Shape], classOf[Point], classOf[Object], classOf[Int], classOf[String],
+        classOf[Array[Int]], classOf[Array[String]], classOf[Registry.Entry], classOf[Outer.Nested],
+        classOf[IllegalStateException], classOf[Thread.State], classOf[Runnable], classOf[java.util.Map.Entry[?, ?]],
+        classOf[Local], classOf[Array[Local]], classOf[Cat], classOf[Color])
+    do hierarchy(c)
+    println(s"${classOf[Thread.State].getEnumConstants.toList} ${classOf[Color].getEnumConstants == null} ${classOf[Square].getEnumConstants == null}")
+
+    println("-- isInstance, cast, forName")
+    println(s"${classOf[Shape].isInstance(new Square)} ${classOf[Square].isInstance(new Shape {})} ${classOf[Number].isInstance(1)} ${classOf[String].isInstance(null)}")
+    println(s"${classOf[Array[Int]].isInstance(Array(1))} ${classOf[Array[Int]].isInstance(Array(1L))} ${classOf[java.lang.Integer].isInstance(1)} ${classOf[Object].isInstance(())}")
+    println(classOf[Shape].cast(new Square).getClass.getName)
+    println(classOf[Shape].cast(null))
+    try classOf[Square].cast("s")
+    catch case e: ClassCastException => println("cast: ClassCastException")
+    println(Class.forName("rtclasses.Square").getName)
+    println(Class.forName("[I").getName)
+    println(Class.forName("[Ljava.lang.String;").getName)
+    println(Class.forName("java.lang.String") eq classOf[String])
+    for name <- List("no.such.Class", "rtclasses.Square2", "int", "[Lno.Such;") do
+      try println(Class.forName(name))
+      catch case e: ClassNotFoundException => println(s"ClassNotFoundException: ${e.getMessage}")
 
     println("-- loaders, assertions")
     println(s"${classOf[String].getClassLoader} ${classOf[Int].getClassLoader} ${classOf[java.util.ArrayList[?]].getClassLoader}")

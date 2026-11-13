@@ -1,4 +1,0 @@
-before
-Exception in thread "main" java.lang.IllegalStateException: boom
-	at Main$.main(Main.scala:8)
-	at Main.main(Main.scala)

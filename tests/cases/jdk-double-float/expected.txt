@@ -106,10 +106,33 @@ parseDouble("1,5"): java.lang.NumberFormatException: For input string: "1,5"
 parseDouble("--1"): java.lang.NumberFormatException: For input string: "--1"
 parseDouble("0.1e+2"): 10.0
 parseDouble("123456789012345678901234567890"): 1.2345678901234568E29
-parseDouble(""): java.lang.NumberFormatException
-parseDouble(" "): java.lang.NumberFormatException
-parseDouble("1.2.3"): java.lang.NumberFormatException
-parseDouble(null): java.lang.NullPointerException
+parseDouble("2.5F"): 2.5
+parseDouble("-NaN"): NaN
+parseDouble("+NaN"): NaN
+parseDouble("1_000"): java.lang.NumberFormatException: For input string: "1_000"
+parseDouble("infinity"): java.lang.NumberFormatException: For input string: "infinity"
+parseDouble("nan"): java.lang.NumberFormatException: For input string: "nan"
+parseDouble(" 1"): java.lang.NumberFormatException: For input string: " 1"
+parseDouble(" 1"): 1.0
+parseDouble("NaNd"): java.lang.NumberFormatException: For input string: "NaNd"
+parseDouble("Infinityf"): java.lang.NumberFormatException: For input string: "Infinityf"
+parseDouble("1.e3"): 1000.0
+parseDouble("0x1.p1"): 2.0
+parseDouble("0x1p1f"): 2.0
+parseDouble("0x1p"): java.lang.NumberFormatException: For input string: "0x1p"
+parseDouble("1e+"): java.lang.NumberFormatException: For input string: "1e+"
+parseDouble(".e5"): java.lang.NumberFormatException: For input string: ".e5"
+parseDouble("1"): java.lang.NumberFormatException: For input string: "1"
+parseDouble("1e99999999999"): Infinity
+parseDouble("0e99999999999"): 0.0
+parseDouble("1.7976931348623158e308"): 1.7976931348623157E308
+parseDouble("1.7976931348623159e308"): Infinity
+parseDouble(""): java.lang.NumberFormatException: empty String
+parseDouble(" "): java.lang.NumberFormatException: empty String
+parseDouble("1.2.3"): java.lang.NumberFormatException: multiple points
+parseDouble("1.."): java.lang.NumberFormatException: multiple points
+parseDouble(" 1.2.3 "): java.lang.NumberFormatException: multiple points
+parseDouble(null): NullPointerException
 == parseFloat
 parseFloat("1.1"): 1.1
 parseFloat("3.4028235e38"): 3.4028235E38
@@ -122,6 +145,15 @@ parseFloat("-0"): -0.0
 parseFloat("NaN"): NaN
 parseFloat("0x1.fffffep127"): 3.4028235E38
 parseFloat("x"): java.lang.NumberFormatException: For input string: "x"
+parseFloat(""): java.lang.NumberFormatException: empty String
+parseFloat("1.00000017881393432617187499"): 1.0000001
+parseFloat("1.00000017881393432617187501"): 1.0000002
+parseFloat("1.5f"): 1.5
+parseFloat("3.4028235677973366e38"): 3.4028235E38
+parseFloat("7e-46"): 0.0
+parseFloat("7.1e-46"): 1.4E-45
+parseFloat("0x1.0000011p0"): 1.0000001
+parseFloat("2.5F"): 2.5
 Double.valueOf("2.5"): 2.5
 "1.5".toDouble: 1.5
 "1.5x".toDouble: java.lang.NumberFormatException: For input string: "1.5x"
@@ -132,7 +164,7 @@ Double.valueOf("2.5"): 2.5
 1.0: 3ff0000000000000 raw=3ff0000000000000 back=1.0
 -2.0: c000000000000000 raw=c000000000000000 back=-2.0
 0.1: 3fb999999999999a raw=3fb999999999999a back=0.1
-NaN: 7ff8000000000000 raw=(NaN: known-bugs-jdk) back=NaN
+NaN: 7ff8000000000000 raw=7ff8000000000000 back=NaN
 Infinity: 7ff0000000000000 raw=7ff0000000000000 back=Infinity
 4.9E-324: 1 raw=1 back=4.9E-324
 1.7976931348623157E308: 7fefffffffffffff raw=7fefffffffffffff back=1.7976931348623157E308
@@ -167,3 +199,5 @@ true false true false
 1 -1 0 1
 1231 1237 1231 true
 false
+== constant bit patterns
+-Infinity -0.0

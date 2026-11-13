@@ -32,6 +32,12 @@ digit radix 10: 0 5 9 -1 -1 -1 -1 -1 -1 -1 -1 -1
 digit radix 16: 0 5 9 10 15 -1 -1 10 15 -1 -1 -1
 digit radix 36: 0 5 9 10 15 16 35 10 15 35 -1 -1
 digit(int) 7 35 -1
+non-ASCII digits 3 3 10 35 1 1 -1 -1
+digit in radix 10 3 -1 -1
+radix out of range -1 -1 -1 -1 -1
+Other_Uppercase true true true
+Other_Lowercase true true true true true true
+isAlphabetic true false true true true true false false false
 forDigit 0123456789abcdef z 0 0 0 0
 == identifiers
 samples                  61 5a 5f 24 30 2d 20 0 7f ad 200b 2160 301 a2 203f 4e2d

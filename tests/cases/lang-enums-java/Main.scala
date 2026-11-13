@@ -146,5 +146,10 @@ object Main {
     println(Color.valueOf("Green").ordinal)
     println(s"${Color.Green.name()} ${Color.Green.hex} ${Color.Red.compareTo(Color.Green)}")
     println(s"${Simple.values.toList} ${Simple.B.ordinal} ${Simple.fromOrdinal(0)}")
+
+    println("-- java.lang.Enum")
+    println(s"${Color.Red.getDeclaringClass.getName} ${java.lang.Enum.valueOf(classOf[Color], "Green")} ${classOf[Color].isEnum} ${classOf[Color].getEnumConstants.toList}")
+    println(s"${Thread.State.valueOf("NEW").getDeclaringClass.getName} ${java.lang.Enum.valueOf(classOf[Thread.State], "BLOCKED")}")
+    attempt("valueOf of a missing constant")(java.lang.Enum.valueOf(classOf[Color], "Blue"))
   }
 }

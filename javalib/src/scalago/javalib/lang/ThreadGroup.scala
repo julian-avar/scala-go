@@ -23,12 +23,17 @@ class ThreadGroup private (parent: ThreadGroup, name: String, private var maxPri
     current != null
   @deprecated def checkAccess(): Unit = ()
 
+  /** Passes the exception to the parent group; the system group to the default handler, else
+   *  prints it.
+   */
   def uncaughtException(t: Thread, e: java.lang.Throwable): Unit =
     if parent != null then parent.uncaughtException(t, e)
     else
       val h = Thread.getDefaultUncaughtExceptionHandler()
       if h != null then h.uncaughtException(t, e)
-      else java.lang.System.err.println("Exception in thread \"" + t.getName() + "\" " + e)
+      else
+        java.lang.System.err.print("Exception in thread \"" + t.getName() + "\" ")
+        e.printStackTrace(java.lang.System.err)
 
   override def toString(): String = getClass().getName() + "[name=" + name + ",maxpri=" + maxPriority + "]"
 

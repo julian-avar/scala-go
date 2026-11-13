@@ -49,31 +49,30 @@ Main.scala:51:25: static method java.lang.Math.ceilDiv(II)I is not available
 Main.scala:52:37: static method java.lang.Integer.parseUnsignedInt(Ljava.lang.String;)I is not available
 Main.scala:53:45: static method java.lang.Long.parseUnsignedLong(Ljava.lang.String;)J is not available
 Main.scala:54:27: static method java.lang.System.console()Ljava.io.Console; is not available
-Main.scala:55:22: static method java.lang.System.gc()V is not available
-Main.scala:56:35: static method java.lang.System.runFinalization()V is not available
-Main.scala:57:13: method getStackTrace()[Ljava.lang.StackTraceElement; not found in java.lang.Thread
-Main.scala:58:13: method getContextClassLoader()Ljava.lang.ClassLoader; not found in java.lang.Thread
-Main.scala:59:13: static method java.lang.Thread.getAllStackTraces()Ljava.util.Map; is not available
-Main.scala:60:62: method activeCount()I not found in java.lang.ThreadGroup
-Main.scala:61:60: method enumerate([Ljava.lang.Thread;)I not found in java.lang.ThreadGroup
-Main.scala:63:13: class java.lang.ref.PhantomReference is not available (no IR)
-Main.scala:64:41: static method java.lang.ref.Cleaner.create()Ljava.lang.ref.Cleaner; is not available
-Main.scala:65:60: method poll()Ljava.lang.ref.Reference; not found in java.lang.ref.ReferenceQueue
-Main.scala:67:60: method parallel()Ljava.util.stream.IntStream; not found in java.util.stream.IntStream
-Main.scala:69:13: class java.util.concurrent.SubmissionPublisher is not available (no IR)
-Main.scala:71:13: class java.util.jar.JarFile is not available (no IR)
-Main.scala:72:13: class java.util.jar.JarInputStream is not available (no IR)
-Main.scala:74:13: class java.net.DatagramSocket is not available (no IR)
-Main.scala:75:49: static method java.nio.channels.SocketChannel.open()Ljava.nio.channels.SocketChannel; is not available
-Main.scala:76:49: static method javax.net.ssl.SSLContext.getInstance(Ljava.lang.String;)Ljavax.net.ssl.SSLContext; is not available
-Main.scala:77:44: static method javax.crypto.Cipher.getInstance(Ljava.lang.String;)Ljavax.crypto.Cipher; is not available
-Main.scala:78:48: static method java.security.Signature.getInstance(Ljava.lang.String;)Ljava.security.Signature; is not available
-Main.scala:79:55: static method java.security.KeyPairGenerator.getInstance(Ljava.lang.String;)Ljava.security.KeyPairGenerator; is not available
-Main.scala:80:47: static method java.security.KeyStore.getInstance(Ljava.lang.String;)Ljava.security.KeyStore; is not available
-Main.scala:81:13: class java.net.HttpCookie is not available (no IR)
-Main.scala:82:13: static method java.net.ProxySelector.getDefault()Ljava.net.ProxySelector; is not available
-Main.scala:83:13: class java.net.CookieManager is not available (no IR)
-Main.scala:84:56: method proxy(Ljava.net.ProxySelector;)Ljava.net.http.HttpClient$Builder; not found in java.net.http.HttpClient$Builder
-Main.scala:85:64: method cookieHandler(Ljava.net.CookieHandler;)Ljava.net.http.HttpClient$Builder; not found in java.net.http.HttpClient$Builder
-Main.scala:86:64: method authenticator(Ljava.net.Authenticator;)Ljava.net.http.HttpClient$Builder; not found in java.net.http.HttpClient$Builder
+Main.scala:55:35: static method java.lang.System.runFinalization()V is not available
+Main.scala:56:13: method getStackTrace()[Ljava.lang.StackTraceElement; not found in java.lang.Thread
+Main.scala:57:13: method getContextClassLoader()Ljava.lang.ClassLoader; not found in java.lang.Thread
+Main.scala:58:13: static method java.lang.Thread.getAllStackTraces()Ljava.util.Map; is not available
+Main.scala:59:62: method activeCount()I not found in java.lang.ThreadGroup
+Main.scala:60:60: method enumerate([Ljava.lang.Thread;)I not found in java.lang.ThreadGroup
+Main.scala:62:13: class java.lang.ref.PhantomReference is not available (no IR)
+Main.scala:63:41: static method java.lang.ref.Cleaner.create()Ljava.lang.ref.Cleaner; is not available
+Main.scala:64:60: method poll()Ljava.lang.ref.Reference; not found in java.lang.ref.ReferenceQueue
+Main.scala:66:60: method parallel()Ljava.util.stream.IntStream; not found in java.util.stream.IntStream
+Main.scala:68:13: class java.util.concurrent.SubmissionPublisher is not available (no IR)
+Main.scala:70:13: class java.util.jar.JarFile is not available (no IR)
+Main.scala:71:13: class java.util.jar.JarInputStream is not available (no IR)
+Main.scala:73:13: class java.net.DatagramSocket is not available (no IR)
+Main.scala:74:49: static method java.nio.channels.SocketChannel.open()Ljava.nio.channels.SocketChannel; is not available
+Main.scala:75:49: static method javax.net.ssl.SSLContext.getInstance(Ljava.lang.String;)Ljavax.net.ssl.SSLContext; is not available
+Main.scala:76:44: static method javax.crypto.Cipher.getInstance(Ljava.lang.String;)Ljavax.crypto.Cipher; is not available
+Main.scala:77:48: static method java.security.Signature.getInstance(Ljava.lang.String;)Ljava.security.Signature; is not available
+Main.scala:78:55: static method java.security.KeyPairGenerator.getInstance(Ljava.lang.String;)Ljava.security.KeyPairGenerator; is not available
+Main.scala:79:47: static method java.security.KeyStore.getInstance(Ljava.lang.String;)Ljava.security.KeyStore; is not available
+Main.scala:80:13: class java.net.HttpCookie is not available (no IR)
+Main.scala:81:13: static method java.net.ProxySelector.getDefault()Ljava.net.ProxySelector; is not available
+Main.scala:82:13: class java.net.CookieManager is not available (no IR)
+Main.scala:83:56: method proxy(Ljava.net.ProxySelector;)Ljava.net.http.HttpClient$Builder; not found in java.net.http.HttpClient$Builder
+Main.scala:84:64: method cookieHandler(Ljava.net.CookieHandler;)Ljava.net.http.HttpClient$Builder; not found in java.net.http.HttpClient$Builder
+Main.scala:85:64: method authenticator(Ljava.net.Authenticator;)Ljava.net.http.HttpClient$Builder; not found in java.net.http.HttpClient$Builder
 library/src/scala/io/Source.scala:226:109: method getContextClassLoader()Ljava.lang.ClassLoader; not found in java.lang.Thread

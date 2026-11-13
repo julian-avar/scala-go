@@ -4,8 +4,8 @@ B init end
 A init end
 A.x=2 B.y=1
 Failing init
-Failing, first access: boom
-Failing, second access: Could not initialize class Failing$
+Failing, first access: java.lang.ExceptionInInitializerError null boom true
+Failing, second access: Could not initialize class Failing$, cause java.lang.ExceptionInInitializerError: Exception java.lang.IllegalStateException: boom [in thread "main"]
 lazy threw: attempt 1
 lazy: 2
 lazy: 2

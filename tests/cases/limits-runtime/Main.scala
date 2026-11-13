@@ -7,6 +7,8 @@ import java.lang.ref.WeakReference
 class Finalizable:
   override def finalize(): Unit = Main.finalized = true
 
+class NeverUsed
+
 object Main:
   @volatile var finalized = false
 
@@ -21,8 +23,9 @@ object Main:
   def main(args: Array[String]): Unit =
     // Classpath resources are not embedded. JVM: true
     attempt("resource found")(classOf[Main.type].getResourceAsStream("/Main.class") != null)
-    // JVM: throws ClassNotFoundException
-    attempt("Class.forName of a missing class")(Class.forName("no.such.Class").getName)
+
+    // Class.forName finds only the classes the program uses. JVM: NeverUsed
+    attempt("Class.forName of a class the program never uses")(Class.forName("NeverUsed").getName)
 
     // Weak references hold their referents strongly; finalizers never run. JVM: true, 0, true
     // (after a collection, nothing else refers to the referents)
@@ -63,11 +66,9 @@ object Main:
     // JVM: throws UnsatisfiedLinkError
     attempt("@native method")(nativeMethod())
 
-    // Exception messages. JVM: the helpful NullPointerException message, and
-    // "Index 5 out of bounds for length 3" (JDK 21)
+    // Exception messages. JVM: the helpful NullPointerException message
     val nullString: String = null
     attempt("NPE message")(nullString.length)
-    attempt("charAt(5)")("abc".charAt(5))
 
     // JVM system properties are unset. JVM: false, false
     attempt("java.version is null")(System.getProperty("java.version") == null)

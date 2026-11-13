@@ -234,9 +234,12 @@ class EndToEndTests extends munit.FunSuite:
    *  the tests start, this cache is pruned of entries unused for a day, and then, if it is still
    *  larger than `SCALAGO_TEST_GOCACHE_GB` (10 by default), of the least recently used ones until
    *  it is half that (Go refreshes an entry's modification time when it uses it).
+   *  `SCALAGO_TEST_GOCACHE` names another directory, so that concurrent test runs (in several
+   *  worktrees) do not prune each other's entries.
    */
   private val goCache: Path =
-    val dir = Path.of(sys.props("user.home"), ".cache", "scalago-tests", "go-build")
+    val dir = sys.env.get("SCALAGO_TEST_GOCACHE").map(Path.of(_))
+      .getOrElse(Path.of(sys.props("user.home"), ".cache", "scalago-tests", "go-build"))
     Files.createDirectories(dir)
     val maxBytes = sys.env.get("SCALAGO_TEST_GOCACHE_GB").map(_.toLong).getOrElse(10L) << 30
     val cutoff = java.time.Instant.now().minus(java.time.Duration.ofDays(1))

@@ -46,7 +46,7 @@ object Main:
     println(s"isUpperCase  ${flags(bmp)(c => Character.isUpperCase(c.toChar))}")
     println(s"isLowerCase  ${flags(bmp)(c => Character.isLowerCase(c.toChar))}")
     println(s"isISOControl ${flags(bmp)(c => Character.isISOControl(c.toChar))}")
-    println(s"negative code point ${Character.isISOControl(Integer.parseInt("-1"))} ${Character.isLetter(-1)} ${Character.isDigit(0x110000)}")
+    println(s"negative code point ${Character.isISOControl(-1)} ${Character.isLetter(-1)} ${Character.isDigit(0x110000)}")
     // Scala's RichChar forwards to Character.
     println(s"RichChar ${'x'.isLetter} ${'7'.isDigit} ${' '.isWhitespace} ${'Q'.isUpper} ${'q'.isLower} ${'q'.toUpper} ${'Q'.toLower} ${'7'.asDigit}")
 
@@ -65,6 +65,14 @@ object Main:
     for radix <- Seq(2, 8, 10, 16, 36) do
       println(s"digit radix $radix: ${ds.map(c => Character.digit(c, radix)).mkString(" ")}")
     println(s"digit(int) ${Character.digit('7'.toInt, 10)} ${Character.digit('z'.toInt, 36)} ${Character.digit(0x1f600, 10)}")
+    // Any Unicode decimal digit (Arabic-Indic, fullwidth, mathematical), and the fullwidth letters; no radix out of range.
+    println(s"non-ASCII digits ${Seq(0x663, 0xff13, 0xff21, 0xff5a, 0x1d7d9, 0x1d7e3, 0x2160, 0xb2).map(Character.digit(_, 36)).mkString(" ")}")
+    println(s"digit in radix 10 ${Seq(0x663, 0xff21, 0xff3a).map(Character.digit(_, 10)).mkString(" ")}")
+    println(s"radix out of range ${Character.digit('0', 1)} ${Character.digit('5', 37)} ${Character.digit('0', 0)} ${Character.digit('0', -1)} ${Character.digit(0x663, 37)}")
+    // Other_Uppercase and Other_Lowercase (Roman numerals, circled letters, ª, modifier letters); Other_Alphabetic.
+    println(s"Other_Uppercase ${Seq(0x2160, 0x24b6, 0x1f130).map(Character.isUpperCase(_)).mkString(" ")}")
+    println(s"Other_Lowercase ${Seq(0x2170, 0x24d0, 0xaa, 0xba, 0x2b0, 0x345).map(Character.isLowerCase(_)).mkString(" ")}")
+    println(s"isAlphabetic ${Seq('a'.toInt, '1'.toInt, 0x2160, 0x345, 0x24b6, 0x5d0, 0x20, 0x1f600, 0x1d7d9).map(Character.isAlphabetic(_)).mkString(" ")}")
     println(s"forDigit ${(0 to 15).map(d => Character.forDigit(d, 16)).mkString} ${Character.forDigit(35, 36)} ${Character.forDigit(10, 10).toInt} ${Character.forDigit(-1, 10).toInt} ${Character.forDigit(1, 1).toInt} ${Character.forDigit(1, 37).toInt}")
 
   def identifiers(): Unit =

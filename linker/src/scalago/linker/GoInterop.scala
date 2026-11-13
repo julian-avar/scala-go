@@ -293,6 +293,9 @@ final class GoInterop(ctx: LinkContext):
     case (Ref(Arity("scala.Function", _), args), NamedFunc(sig)) => funcToGo(e, args, sig)
     case (Prim(p), GoType.Named(pkg, n)) if p.isNumeric && namedDecl(pkg, n).kind == GoTypeKind.Other =>
       s"${qualified(pkg, n)}($e)"
+    // Go data for a defined type with the same underlying type (`type Names []string`): converted.
+    case (Ref(t, _), Defined(_, _, decl)) if GoValueTypes(t) && t != GoStringType && decl.kind == GoTypeKind.Other && decl.underlying.isDefined =>
+      s"${typeString(g)}(${toGoNormalized(e, s, decl.underlying.get)})"
     case (Ref(cls, _), Defined(pkg, n, decl)) =>
       val goT = typeString(g)
       decl.kind match
@@ -706,7 +709,46 @@ final class GoInterop(ctx: LinkContext):
     coresBack()
     cores()
     for (n, _) <- sig.typeParams if !bound.contains(n) do fail(s"cannot infer type argument $n of the generic Go function: $sig")
+    checkConstraints(sig, bound.toMap)
     bound.toMap
+
+  /** Fails when a type argument does not satisfy its Go constraint, which Go's compiler would
+   *  reject in the generated call (type sets, `comparable`, and interfaces' methods).
+   *  Type sets ignore `~`: a defined type passes a term of its underlying type.
+   */
+  private def checkConstraints(sig: GoSignature, bound: Map[String, GoType]): Unit =
+    def underlying(g: GoType): GoType = g match
+      case GoType.Named(p, n) if p != ScalaExportPkg => api.typeDecl(p, n).flatMap(_.underlying).getOrElse(g)
+      case _                                         => g
+    def isInterface(g: GoType): Boolean = g match
+      case GoType.Named(p, n) if p != ScalaExportPkg => api.typeDecl(p, n).exists(_.kind == GoTypeKind.Interface)
+      case _                                         => false
+    def comparable(g: GoType): Boolean = underlying(g) match
+      case GoType.Slice(_) | GoType.MapOf(_, _) | GoType.Func(_) => false
+      case GoType.ArrayOf(_, e)                                   => comparable(e)
+      case _                                                      => true
+    def inTypeSet(g: GoType, terms: List[GoType]): Boolean =
+      g != GoType.EmptyInterface && terms.exists {
+        case GoType.TypeParam(_) | GoType.Other(_) => true
+        case t if isInterface(t)                   => true // a union of constraints: not expanded
+        case t                                     => underlying(t) == underlying(g)
+      }
+    /** The methods of the values of `g`; none if not known. */
+    def methods(g: GoType): Option[Set[String]] = g match
+      case GoType.Named(p, n) if p != ScalaExportPkg => api.typeDecl(p, n).map(_.methods.keySet)
+      case GoType.Ptr(GoType.Named(p, n)) if p != ScalaExportPkg =>
+        api.typeDecl(p, n).map(d => d.methods.keySet ++ d.pointerMethods.keySet)
+      case GoType.Basic(_) | GoType.EmptyInterface | GoType.Slice(_) | GoType.MapOf(_, _) => Some(Set.empty)
+      case _                                                                         => None
+    def satisfies(g: GoType, c: GoType): Boolean = c match
+      case GoType.Constraint(_, terms, mustBeComparable) =>
+        (terms.isEmpty || inTypeSet(g, terms)) && (!mustBeComparable || comparable(g))
+      case GoType.Named(p, n) if isInterface(c) =>
+        methods(g).forall(have => api.typeDecl(p, n).get.methods.keySet.subsetOf(have))
+      case _ => true
+    for (n, constraint) <- sig.typeParams do
+      val c = constraint.substitute(bound)
+      if !satisfies(bound(n), c) then fail(s"type argument ${bound(n)} of $n does not satisfy its Go constraint ($c) in the generic Go function: $sig")
 
   /** The Go type for a Scala type: for instantiating generic Go functions, and in exports. */
   def goTypeOf(s: ScalaType): GoType = s match
@@ -797,7 +839,7 @@ final class GoInterop(ctx: LinkContext):
     reporting(pos, s"type test against ${scalaName(cls)}") {
       if isGenericFacade(cls) then fail("type tests against generic Go types are not supported (their type arguments are erased)")
       val t = facadeType(cls)
-      if t.isStruct then s"rt.IsStruct[${t.name}]($e)" else s"rt.Is[${t.stored}]($e)"
+      if t.isStruct then s"rt.IsStruct[${t.name}]($e)" else s"rt.IsForeign[${t.stored}]($e)"
     }
 
   /** A cast to a facade; a struct value is copied to a new pointer (see `typeTest`). */

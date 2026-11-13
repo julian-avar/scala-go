@@ -37,7 +37,7 @@ the Go signature. For Go data, it names the expected Scala view: a Go `[]string`
 | Uncaught exception                                        | JVM-style stack trace with Scala file names and lines; exit status 1 |
 | Stack trace hides Go frames                               | `SCALAGO_TRACE=1` keeps every frame, with Go names and positions  |
 | A Go panic in Go code called from Scala                   | becomes a Java exception: Go runtime errors map to their Java counterparts (`NullPointerException`, `ArithmeticException`, `ClassCastException`, ...), other panics to `RuntimeException` with the panic's message |
-| Output missing after a crash                              | standard output is buffered; a signal (Ctrl-C, `docker stop`) or a fatal Go error (stack overflow, out of memory, deadlock) ends the program without flushing it or running shutdown hooks |
+| Output missing after a crash                              | standard output is buffered; a fatal Go error (stack overflow, out of memory, deadlock) ends the program without flushing output written in the last 100 ms or running shutdown hooks |
 | `NoSuchMethodError` from a pattern match on a type parameter | type tests with a `ClassTag` are unsupported ([Limitations](limitations.md#language-and-runtime)) |
 | `f"..."` or `String.format` throws or prints something else | some conversions are unsupported or differ ([Limitations](limitations.md#jdk-and-scala-libraries), [Differences](differences.md#text)) |
 

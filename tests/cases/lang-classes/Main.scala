@@ -5,6 +5,9 @@ import scala.annotation.static
 // Classes and objects (docs/_docs/spec/language.md, section 5; data.md "Classes and objects"):
 // constructors, inner classes, case classes and their generated members, value classes, objects
 // constructed on first access (once, also when threads race), companions and @static members.
+class ++
+class `a-b`
+
 class Temperature(val celsius: Double):
   private var readings = 0
   def this(fahrenheit: Int, unit: String) =
@@ -87,8 +90,14 @@ object Registry:
   def apply(name: String): Registry = new Registry(name.toUpperCase)
   def created: Int = count
 
+// Named like files the linker generates (entry.go, support.go), up to case.
+class Entry(val n: Int)
+class Support(val n: Int)
+
 object Main:
   def main(args: Array[String]): Unit =
+    println(s"classes named like linker files: ${Entry(1).n} ${Support(2).n}")
+
     // Constructors.
     val t1 = Temperature(212, "F")
     val t2 = Temperature()
@@ -163,3 +172,7 @@ object Main:
     val reg = Registry("main")
     Registry("other")
     println(s"companion: ${reg.name} ${Registry.created}")
+
+    // Simple names: of local classes, operator-named ones ($plus$plus) and the library's :: .
+    class Local
+    println(s"simple names: ${classOf[Local].getSimpleName} ${classOf[++].getSimpleName} ${classOf[`a-b`].getSimpleName} ${List(1).getClass.getSimpleName} ${classOf[::[?]].getSimpleName}")

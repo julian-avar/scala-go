@@ -6,9 +6,37 @@ import (
 )
 
 // Class is java.lang.Class, identified by its JVM name ("java.lang.String", "int", "[I").
-// Instances are interned, so reference equality works as on the JVM.
+// Instances are interned, so reference equality works as on the JVM. The program's classes and
+// the JDK value classes also have a ClassInfo, which the reflective methods use.
 type Class struct {
 	name string
+	info *ClassInfo
+
+	supertypesOnce sync.Once
+	supertypes     map[*Class]bool // all but Object, for isAssignableFrom
+}
+
+// ClassInfo describes a class the program defines (or a JDK value class).
+type ClassInfo struct {
+	Class      *Class
+	Super      *Class // nil for interfaces and Object
+	Interfaces []*Class
+	Interface  bool
+	// A nested class has the JVM's InnerClasses entry: its simple name ("" if anonymous) and,
+	// for a member class, the class it is a member of (nil for local and anonymous classes).
+	Nested     bool
+	SimpleName string
+	Outer      *Class
+	// For an enum class, its values(), if the program uses getEnumConstants.
+	Values func() *Array[any]
+}
+
+// DefineClasses gives the program's classes their ClassInfo. The generated code calls it while
+// the program initializes, before any Scala code runs.
+func DefineClasses(infos []ClassInfo) {
+	for i := range infos {
+		infos[i].Class.info = &infos[i]
+	}
 }
 
 // classes interns Class objects by name. Lookups are frequent (getClass, classOf in library
@@ -54,6 +82,32 @@ var (
 	class_Ljava_lang_Object_     = ClassOf("[Ljava.lang.Object;")
 	classjava_lang_Object        = ClassOf("java.lang.Object")
 )
+
+// The JDK value classes, whose instances are Go values (Hijacked.ancestors in the linker), and
+// the interfaces of arrays (Hijacked.arrayAncestors).
+var arrayInterfaces = []*Class{ClassOf("java.lang.Cloneable"), ClassOf("java.io.Serializable")}
+
+func init() {
+	serializable, comparable := ClassOf("java.io.Serializable"), ClassOf("java.lang.Comparable")
+	constable, constantDesc := ClassOf("java.lang.constant.Constable"), ClassOf("java.lang.constant.ConstantDesc")
+	number := ClassOf("java.lang.Number")
+	define := func(c *Class, super *Class, interfaces ...*Class) {
+		c.info = &ClassInfo{Class: c, Super: super, Interfaces: interfaces}
+	}
+	define(classjava_lang_String, classjava_lang_Object, serializable, comparable, ClassOf("java.lang.CharSequence"),
+		constable, constantDesc)
+	define(classjava_lang_Boolean, classjava_lang_Object, serializable, comparable, constable)
+	define(classjava_lang_Character, classjava_lang_Object, serializable, comparable, constable)
+	for _, box := range []*Class{classjava_lang_Byte, classjava_lang_Short, classjava_lang_Integer,
+		classjava_lang_Long, classjava_lang_Float, classjava_lang_Double} {
+		define(box, number, comparable, constable, constantDesc)
+	}
+	define(classscala_runtime_BoxedUnit, classjava_lang_Object, serializable)
+	define(classjava_lang_Class, classjava_lang_Object, serializable,
+		ClassOf("java.lang.reflect.GenericDeclaration"), ClassOf("java.lang.reflect.Type"))
+	define(classjava_math_BigInteger, number, comparable)
+	define(classjava_math_BigDecimal, number, comparable)
+}
 
 func GetClass(x any) *Class {
 	switch v := x.(type) {
@@ -115,18 +169,57 @@ func GetClass(x any) *Class {
 
 func ClassGetName(c *Class) *String { return Str(c.name) }
 
+// ClassGetTypeName implements getTypeName: getName, but arrays are named after their component
+// type ("int[]", "java.lang.String[][]").
+func ClassGetTypeName(c *Class) *String {
+	dims := ""
+	for ClassIsArray(c) {
+		c = ClassGetComponentType(c)
+		dims += "[]"
+	}
+	return Str(c.name + dims)
+}
+
 func ClassGetSimpleName(c *Class) *String {
-	name := c.name
-	if strings.HasPrefix(name, "[") {
+	if ClassIsArray(c) {
 		return StringConcat(ClassGetSimpleName(ClassGetComponentType(c)), Str("[]"))
 	}
-	name = name[strings.LastIndex(name, ".")+1:]
-	if i := strings.LastIndex(strings.TrimSuffix(name, "$"), "$"); i >= 0 {
-		// As on the JVM, an anonymous class (Outer$1) has an empty simple name, and a local
-		// class (Outer$1Local) loses its digits.
-		name = strings.TrimLeft(name[i+1:], "0123456789")
+	name := c.name[strings.LastIndex(c.name, ".")+1:]
+	switch {
+	case c.info != nil && c.info.Nested:
+		return Str(c.info.SimpleName)
+	case c.info == nil:
+		// A class the program does not define (a JDK class it names with classOf): from the
+		// name, as JDK 8 did. An anonymous class (Outer$1) has an empty simple name, and a
+		// local class (Outer$1Local) loses its digits.
+		if i := strings.LastIndex(strings.TrimSuffix(name, "$"), "$"); i >= 0 {
+			name = strings.TrimLeft(name[i+1:], "0123456789")
+		}
 	}
 	return Str(name)
+}
+
+// ClassGetCanonicalName implements getCanonicalName: null for local and anonymous classes (and
+// arrays of them); for a member class, the canonical name of its class and its simple name.
+func ClassGetCanonicalName(c *Class) *String {
+	if ClassIsArray(c) {
+		component := ClassGetCanonicalName(ClassGetComponentType(c))
+		if component == nil {
+			return nil
+		}
+		return StringConcat(component, Str("[]"))
+	}
+	if c.info == nil || !c.info.Nested {
+		return Str(c.name)
+	}
+	if c.info.Outer == nil {
+		return nil
+	}
+	outer := ClassGetCanonicalName(c.info.Outer)
+	if outer == nil {
+		return nil
+	}
+	return StringConcat(outer, Str("."+c.info.SimpleName))
 }
 
 func ClassIsArray(c *Class) bool { return strings.HasPrefix(c.name, "[") }
@@ -134,6 +227,22 @@ func ClassIsArray(c *Class) bool { return strings.HasPrefix(c.name, "[") }
 func ClassIsPrimitive(c *Class) bool {
 	_, ok := primitiveDescriptors[c.name]
 	return ok || c.name == "void"
+}
+
+func ClassIsInterface(c *Class) bool { return c.info != nil && c.info.Interface }
+
+// ClassIsEnum implements isEnum: true for the classes that extend java.lang.Enum directly (not
+// for the classes of enum constants with a body).
+func ClassIsEnum(c *Class) bool {
+	return c.info != nil && c.info.Super != nil && c.info.Super.name == "java.lang.Enum"
+}
+
+// ClassGetEnumConstants implements getEnumConstants: values() of an enum class, else null.
+func ClassGetEnumConstants(c *Class) *Array[any] {
+	if !ClassIsEnum(c) || c.info.Values == nil {
+		return nil
+	}
+	return c.info.Values()
 }
 
 func ClassGetComponentType(c *Class) *Class {
@@ -153,38 +262,67 @@ func ClassGetComponentType(c *Class) *Class {
 }
 
 func ClassToString(c *Class) *String {
-	if ClassIsPrimitive(c) {
+	switch {
+	case ClassIsPrimitive(c):
 		return Str(c.name)
+	case ClassIsInterface(c):
+		return Str("interface " + c.name)
 	}
 	return Str("class " + c.name)
 }
 
-// hijackedAncestors are the supertypes (but Object) of the classes whose instances are Go values
-// (Hijacked.ancestors in the linker).
-var hijackedAncestors = func() map[string][]string {
-	comparable := []string{"java.lang.Comparable", "java.io.Serializable", "java.lang.constant.Constable"}
-	numeric := []string{"java.lang.Number", "java.lang.Comparable", "java.io.Serializable",
-		"java.lang.constant.Constable", "java.lang.constant.ConstantDesc"}
-	m := map[string][]string{
-		"java.lang.Boolean":   comparable,
-		"java.lang.Character": comparable,
-		"java.lang.String": {"java.lang.CharSequence", "java.lang.Comparable", "java.io.Serializable",
-			"java.lang.constant.Constable", "java.lang.constant.ConstantDesc"},
-		"java.lang.Class":         {"java.io.Serializable", "java.lang.reflect.Type", "java.lang.reflect.GenericDeclaration"},
-		"scala.runtime.BoxedUnit": {"java.io.Serializable"},
-		"java.math.BigInteger":    {"java.lang.Number", "java.lang.Comparable", "java.io.Serializable"},
-		"java.math.BigDecimal":    {"java.lang.Number", "java.lang.Comparable", "java.io.Serializable"},
+// ClassGetSuperclass implements getSuperclass: null for Object, interfaces and primitives;
+// Object for arrays and for the classes of Go values.
+func ClassGetSuperclass(c *Class) *Class {
+	switch {
+	case c == classjava_lang_Object || ClassIsPrimitive(c) || ClassIsInterface(c):
+		return nil
+	case c.info != nil:
+		return c.info.Super
 	}
-	for _, box := range []string{"Byte", "Short", "Integer", "Long", "Float", "Double"} {
-		m["java.lang."+box] = numeric
-	}
-	return m
-}()
+	return classjava_lang_Object
+}
 
-// ClassIsAssignableFrom implements c.isAssignableFrom(other) where the runtime can tell: the same
-// class, Object, primitives, arrays (whose elements are of class Object unless primitive, see
-// Array), and the classes whose instances are Go values. The runtime does not know the program's
-// class hierarchy (there is no reflection), so other cases throw UnsupportedOperationException.
+// ClassGetInterfaces implements getInterfaces: the interfaces the class declares.
+func ClassGetInterfaces(c *Class) *Array[any] {
+	interfaces := arrayInterfaces
+	if !ClassIsArray(c) {
+		interfaces = nil
+		if c.info != nil {
+			interfaces = c.info.Interfaces
+		}
+	}
+	result := make([]any, len(interfaces))
+	for i, ic := range interfaces {
+		result[i] = ic
+	}
+	return &Array[any]{Data: result}
+}
+
+// allSupertypes returns the classes c extends or implements, directly or not, but Object.
+func (c *Class) allSupertypes() map[*Class]bool {
+	c.supertypesOnce.Do(func() {
+		c.supertypes = map[*Class]bool{}
+		var add func(*ClassInfo)
+		add = func(info *ClassInfo) {
+			for _, s := range append([]*Class{info.Super}, info.Interfaces...) {
+				if s != nil && s != classjava_lang_Object && !c.supertypes[s] {
+					c.supertypes[s] = true
+					if s.info != nil {
+						add(s.info)
+					}
+				}
+			}
+		}
+		if c.info != nil {
+			add(c.info)
+		}
+	})
+	return c.supertypes
+}
+
+// ClassIsAssignableFrom implements c.isAssignableFrom(other). Arrays of references are of class
+// Object[] whatever their elements (see Array).
 func ClassIsAssignableFrom(c, other *Class) bool {
 	if other == nil {
 		ThrowKind(NullPointer, "")
@@ -200,38 +338,30 @@ func ClassIsAssignableFrom(c, other *Class) bool {
 		if ClassIsArray(c) {
 			return ClassIsAssignableFrom(ClassGetComponentType(c), ClassGetComponentType(other))
 		}
-		return c.name == "java.lang.Cloneable" || c.name == "java.io.Serializable"
-	case ClassIsArray(c) || other == classjava_lang_Object:
-		return false
+		return c == arrayInterfaces[0] || c == arrayInterfaces[1]
 	}
-	if _, ok := hijackedAncestors[c.name]; ok {
-		return false // they have no subclasses (BigInteger and BigDecimal cannot be extended)
-	}
-	if ancestors, ok := hijackedAncestors[other.name]; ok {
-		for _, a := range ancestors {
-			if a == c.name {
-				return true
-			}
-		}
-		return false
-	}
-	if ancestors, ok := classAncestors[other.name]; ok {
-		for _, a := range ancestors {
-			if a == c.name {
-				return true
-			}
-		}
-		return false
-	}
-	ThrowKind(UnsupportedOperation, "Class.isAssignableFrom("+other.name+") on "+c.name+": the class is not part of the program")
-	return false
+	return other.allSupertypes()[c]
 }
 
-// classAncestors maps the program's classes to their ancestors (except java.lang.Object), for
-// isAssignableFrom. The linker registers it only if the program uses isAssignableFrom.
-var classAncestors map[string][]string
+// ClassIsInstance implements c.isInstance(x). As with isInstanceOf, an array of references is an
+// instance of every class of arrays of references.
+func ClassIsInstance(c *Class, x any) bool {
+	if x == nil {
+		return false
+	}
+	if _, ok := x.(*Array[any]); ok && ClassIsArray(c) {
+		return !ClassIsPrimitive(ClassGetComponentType(c))
+	}
+	return ClassIsAssignableFrom(c, GetClass(x))
+}
 
-func RegisterClassAncestors(m map[string][]string) { classAncestors = m }
+// ClassCastValue implements c.cast(x).
+func ClassCastValue(c *Class, x any) any {
+	if x != nil && !ClassIsInstance(c, x) {
+		ThrowKind(ClassCast, "Cannot cast "+GetClass(x).name+" to "+c.name)
+	}
+	return x
+}
 
 // ArrayClassOf is the class of arrays whose elements have class c.
 func ArrayClassOf(c *Class) *Class {
@@ -247,5 +377,28 @@ func ArrayClassOf(c *Class) *Class {
 // String implements fmt.Stringer.
 func (c *Class) String() string { return c.name }
 
-// ClassForName implements Class.forName. There is no class loading, so any name succeeds.
-func ClassForName(name *String) *Class { return ClassOf(name.GoString()) }
+// ClassForName implements Class.forName: it finds the classes with a ClassInfo, which are those
+// the linked program can use, and arrays of them or of primitives. It does not initialize the
+// class.
+func ClassForName(name *String) *Class {
+	if name == nil {
+		ThrowKind(NullPointer, "")
+	}
+	n := name.GoString()
+	elem, missing := strings.TrimLeft(n, "["), n
+	switch {
+	case len(elem) == len(n):
+	case len(elem) == 1 && strings.Contains("ZCBSIJFD", elem):
+		return ClassOf(n)
+	case len(elem) > 2 && elem[0] == 'L' && elem[len(elem)-1] == ';':
+		elem = elem[1 : len(elem)-1]
+		missing = elem // as on the JVM, the message names the element class
+	default:
+		elem = ""
+	}
+	if c, ok := classes.Load(elem); ok && c.(*Class).info != nil {
+		return ClassOf(n)
+	}
+	ThrowKind(ClassNotFound, missing)
+	return nil
+}

@@ -10,7 +10,7 @@ object Main:
       catch case e: Exception => s"${e.getClass.getName}: ${e.getMessage}"
     println(s"$label: $r")
 
-  /** Only the exception's class: the messages of index errors differ (see known-bugs-jdk). */
+  /** Only the exception's class: the descriptions of invalid regular expressions are Go's. */
   def attemptType(label: String)(body: => Any): Unit =
     val r =
       try String.valueOf(body)
@@ -37,28 +37,44 @@ object Main:
     val s = "Hello, World"
     println(s"${s.length} ${s.isEmpty} ${"".isEmpty} ${s.charAt(4)} ${s.substring(7)} ${s.substring(0, 5)} [${s.substring(5, 5)}]")
     println(s"${s.subSequence(1, 4)} ${s.concat("!")} [${"".concat("")}] ${s.toCharArray.length}")
-    attemptType("charAt(-1)")(s.charAt(-1))
-    attemptType("charAt(12)")(s.charAt(12))
-    attemptType("substring(13)")(s.substring(13))
-    attemptType("substring(5, 2)")(s.substring(5, 2))
-    attemptType("substring(-1, 2)")(s.substring(-1, 2))
+    attempt("charAt(-1)")(s.charAt(-1))
+    attempt("charAt(12)")(s.charAt(12))
+    attempt("substring(13)")(s.substring(13))
+    attempt("substring(5, 2)")(s.substring(5, 2))
+    attempt("substring(-1, 2)")(s.substring(-1, 2))
+    attempt("subSequence(0, 13)")(s.subSequence(0, 13))
     println(s"repeat ${"ab".repeat(3)} [${"ab".repeat(0)}] [${"".repeat(5)}]")
     attempt("repeat(-1)")("ab".repeat(-1))
     println(s"hashCode ${"".hashCode} ${"a".hashCode} ${s.hashCode} ${"polygenelubricants".hashCode} ${"\u0000￿".hashCode}")
+    // intern returns the literal for an equal string, and the first interned one otherwise.
     val interned = new String("abc".toCharArray).intern()
-    println(s"intern ${interned == "abc"} ${new String("abc") == "abc"} equals ${s.equals("Hello, World")} ${s.equals(null)} ${s.equals(42)}")
+    val computed = new String(Array('q', 'z', 'x')) // no literal is equal
+    println(s"intern ${interned == "abc"} ${interned eq "abc"} ${computed.intern() eq computed} ${new String(computed).intern() eq computed} ${new String("abc") eq "abc"} ${new StringBuilder("lit").append("eral").toString.intern() eq "literal"}")
+    println(s"equals ${s.equals("Hello, World")} ${s.equals(null)} ${s.equals(42)}")
     println(s"new String ${new String()}|${new String(Array('x', 'y', 'z'))}|${new String(Array('a', 'b', 'c', 'd'), 1, 2)}|${new String("copy")}")
-    attemptType("new String(chars, 3, 2)")(new String(Array('a', 'b'), 3, 2))
+    attempt("new String(chars, 3, 2)")(new String(Array('a', 'b'), 3, 2))
+    attempt("new String(chars, 0, -1)")(new String(Array('a', 'b'), 0, -1))
+    attempt("valueOf(chars, 1, 2)")(String.valueOf(Array('a', 'b'), 1, 2))
     val dst = Array.fill(6)('.')
     "abcdef".getChars(1, 4, dst, 2)
     println(s"getChars ${dst.mkString}")
+    attempt("getChars(1, 7)")("abcdef".getChars(1, 7, dst, 0))
+    attempt("getChars(0, 3, dst, 4)")("abcdef".getChars(0, 3, dst, 4))
     println(s"isBlank ${"".isBlank} ${" \t\n ".isBlank} ${" x ".isBlank}")
+    // Character.isWhitespace: the no-break spaces and U+0085 are not white space, U+001C to U+001F are.
+    println(s"isBlank ${" ".isBlank} ${"  \u0085".isBlank} ${"\u001c\u001f　".isBlank}")
+    println(s"strip [${" x ".strip}] [${"\u001cx ".strip}]")
 
   def searching(): Unit =
     println("== searching")
     val s = "abracadabra"
     println(s"indexOf ${s.indexOf('a')} ${s.indexOf('a', 1)} ${s.indexOf('z')} ${s.indexOf("bra")} ${s.indexOf("bra", 2)} ${s.indexOf("")} ${s.indexOf('a', -5)} ${s.indexOf('a', 99)}")
     println(s"lastIndexOf ${s.lastIndexOf('a')} ${s.lastIndexOf('a', 9)} ${s.lastIndexOf("bra")} ${s.lastIndexOf("bra", 7)} ${s.lastIndexOf("")} ${s.lastIndexOf('a', -1)} ${s.lastIndexOf("abra", 100)}")
+    println(s"from past the end ${s.indexOf("", 20)} ${s.indexOf("a", 20)} ${s.lastIndexOf("", 20)} ${s.lastIndexOf("", -1)} ${s.indexOf("", -5)}")
+    // Code points: supplementary ones are surrogate pairs; values that are not code points are never found.
+    val pairs = "x😀y😀"
+    println(s"code points ${pairs.indexOf(0x1F600)} ${pairs.indexOf(0x1F600, 2)} ${pairs.lastIndexOf(0x1F600)} ${pairs.lastIndexOf(0x1F600, 3)} ${pairs.lastIndexOf(0x1F600, 2)} ${pairs.lastIndexOf(0x1F600, 0)} ${pairs.indexOf(0xD83D)} ${pairs.lastIndexOf(0xDE00)}")
+    println(s"not code points ${"�".indexOf(0x110000)} ${"�".lastIndexOf(0x110000)} ${"￿".indexOf(-1)} ${"￿".lastIndexOf(-1)}")
     println(s"contains ${s.contains("cad")} ${s.contains("")} ${s.contains("dab ")}")
     println(s"startsWith ${s.startsWith("abr")} ${s.startsWith("bra", 1)} ${s.startsWith("", 11)} ${s.startsWith("a", -1)} ${s.startsWith("a", 12)} endsWith ${s.endsWith("bra")} ${s.endsWith("")}")
     println(s"regionMatches ${s.regionMatches(0, "xabrx", 1, 3)} ${s.regionMatches(true, 7, "ABRA", 0, 4)} ${s.regionMatches(false, 7, "ABRA", 0, 4)} ${s.regionMatches(-1, "a", 0, 1)} ${s.regionMatches(0, "a", 0, 5)} ${s.regionMatches(0, "q", 0, 0)}")
@@ -101,12 +117,30 @@ object Main:
     println(show("x--y--".split("-", -1)))
     println(show("one two\tthree\nfour".split("\\s")))
     println(show("😀a😀".split("a")))
+    // Empty matches right after a match count, as in Java (Go's regexp skips them).
+    println(show("aaa".split("a*")))
+    println(show("aaa".split("a*", -1)))
+    println(show("abc".split("", -1)))
+    println(show("baaac".split("a*", -1)))
+    println(show("a1b".split("\\d*", -1)))
+    attemptType("split(\"(\")")("abc".split("("))
 
   def replacing(): Unit =
     println("== replace")
     println(s"${"banana".replace('a', 'o')} ${"banana".replace("an", "AN")} ${"aaa".replace("aa", "b")} ${"abc".replace("", "-")} ${"abc".replace('x', 'y')}")
     println(s"${"a1b2c3".replaceAll("\\d", "#")} ${"a1b2c3".replaceFirst("\\d", "#")} ${"John Smith".replaceAll("(\\w+) (\\w+)", "$2, $1")} ${"x".replaceAll("x", "\\$")}")
     println(s"${"".replaceAll("", "E")} ${"a.b".replace(".", "$1")}")
+    // Empty matches right after a match are replaced too, as in Java.
+    println(s"${"aaa".replaceAll("a*", "X")} ${"baaac".replaceAll("a*", "-")} ${"aaa".replaceAll("(a*)", "<$1>")} ${"abc".replaceAll("x*", "-")} ${"a b".replaceAll("\\b", "|")}")
+    // Group references: digits while the number is a group, named groups, escapes.
+    println(s"${"abc".replaceAll("(b)", "$12")} ${"abc".replaceAll("(?<x>b)", "[${x}]")} ${"abc".replaceAll("(b)|(z)", "[$2]")} ${"abc".replaceAll("b", "\\$\\\\")} ${"abc".replaceFirst("(.)", "$1$1")}")
+    println(s"no match ${"abc".replaceAll("x", "$9")} ${"abc".replaceFirst("x", "\\")}")
+    for (pattern, replacement) <- Seq("b" -> "$2", "(b)" -> "$2", "b" -> "$", "b" -> "\\", "b" -> "$a", "(b)" -> "${x}", "b" -> "${}", "b" -> "${x", "b" -> "${1x}")
+    do attempt(s"replaceAll(\"$pattern\", \"$replacement\")")("abc".replaceAll(pattern, replacement))
+    attempt("replaceFirst(\"b\", \"$2\")")("abc".replaceFirst("b", "$2"))
+    // Invalid patterns.
+    for pattern <- Seq("(", ")", "[", "*a", "[z-a]", "\\", "a)|(b") do attemptType(s"replaceAll(\"$pattern\")")("abc".replaceAll(pattern, "x"))
+    attemptType("matches(\"a)|(b\")")("abc".matches("a)|(b"))
 
   def conversions(): Unit =
     println("== conversions")
@@ -138,6 +172,14 @@ object Main:
     println(s"range ${new String("xhéllo".getBytes(UTF_8), 1, 3, UTF_8)} ${new String("abcdef".getBytes, 2, 3)} ${new String("abcdef".getBytes, 1, 2, "US-ASCII")}")
     println(s"round trip ${new String(text.getBytes(UTF_8), UTF_8) == text}")
     println(s"lone surrogate ${hex("a\ud800b".getBytes(UTF_8))} ${hex("a\udc00".getBytes(ISO_8859_1))}")
+    // An encoded surrogate (ED A0..BF xx) is one malformed sequence, whole or truncated.
+    def decode(bytes: Int*) = codes(new String(bytes.map(_.toByte).toArray, UTF_8))
+    println(s"encoded surrogates ${decode(0xed, 0xa0, 0x80)} ${decode(0xed, 0xbf, 0xbf, 0x41)} ${decode(0xed, 0xa0, 0x41)} ${decode(0xed, 0xa0)} ${decode(0xed, 0x9f, 0xbf)}")
+    // Only the three charsets are supported here; unknown names throw as in the JDK.
+    attempt("new String(bytes, \"no-such-charset\")")(new String(Array[Byte](65), "no-such-charset"))
+    attempt("new String(bytes, 0, 1, \"bad name\")")(new String(Array[Byte](65), 0, 1, "bad name"))
+    attempt("getBytes(\"no-such-charset\")")("A".getBytes("no-such-charset"))
+    attempt("getBytes(null: String)")("A".getBytes(null: String))
 
   def surrogates(): Unit =
     println("== surrogates")
@@ -145,4 +187,4 @@ object Main:
     println(s"${s.length} ${s.codePointAt(1)} ${s.codePointAt(2)} ${s.codePointAt(4)} ${s.charAt(1).toInt.toHexString} ${s.indexOf(0x1F600)} ${s.indexOf(0x1D11E)} ${s.indexOf("b")}")
     println(s"${s.substring(1, 3)} ${s.toUpperCase} ${s.reverse.codePoints().count()} ${new java.lang.StringBuilder(s).reverse()}")
     println(s"${"𐐨".toUpperCase} ${"𐐀".toLowerCase} ${"𐐨".toUpperCase.codePointAt(0).toHexString}")
-    attemptType("codePointAt(9)")(s.codePointAt(9))
+    attempt("codePointAt(9)")(s.codePointAt(9))

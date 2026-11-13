@@ -1,0 +1,1 @@
+A StringBuffer is appended to from many threads: it must be free of data races.

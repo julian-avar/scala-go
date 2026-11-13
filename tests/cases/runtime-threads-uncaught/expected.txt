@@ -9,5 +9,10 @@ default handler: defaulted from defaulted
 thread's handler before the default: preferred
 default handler: error an Error
 default handler:  from a virtual thread
+group handler: grouped in group
+handler of a thread without one is its group: true
+
+Exception: Quiet thrown from the UncaughtExceptionHandler in thread "throwing handler"
+after the throwing handler
 after an uncaught exception: TERMINATED alive=false
 main returns

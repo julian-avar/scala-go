@@ -61,6 +61,9 @@ object Main:
     println(s"${small / 3} ${BigDecimal(22).apply(MathContext(4)) / 7} ${BigDecimal(1) / 7}")
     println(s"${BigDecimal("1.50").underlying.stripTrailingZeros} ${BigDecimal("1E+3").toBigInt} ${BigDecimal("1E+3").bigDecimal.toPlainString}")
     println(s"${BigDecimal(0.1)} ${BigDecimal.decimal(0.1)} ${BigDecimal.exact(0.1)} ${BigDecimal(1.5f)} ${BigDecimal(42L)}")
+    // From a Double that is not a constant: scala.math.BigDecimal(Double) and BigDecimal == Double use a MathContext too.
+    val d: Double = "1.5".toDouble
+    println(s"${BigDecimal(d)} ${BigDecimal("1.5") == d} ${BigDecimal(d) == BigDecimal("1.5")} ${BigDecimal(d, MathContext(1))} ${BigDecimal("1.50") == d}")
     println(s"${BigDecimal("1e-3")} ${BigDecimal("12345678901234567890.1234567890")} ${BigDecimal(BigInt(12345), 2)}")
     println(s"${x.toInt} ${x.toLong} ${x.toDouble} ${x.toFloat} ${x.toBigIntExact} ${BigDecimal(7).toBigIntExact} ${BigDecimal(7).toIntExact}")
     println(try x.toIntExact catch case e: ArithmeticException => s"toIntExact: ${e.getMessage}")

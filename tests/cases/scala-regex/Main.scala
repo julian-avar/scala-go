@@ -30,3 +30,13 @@ object Main:
     println(found.mkString(","))
     println(p.matcher("z9").matches())
     println("tel: 555-1234".replaceAll("(\\d+)-(\\d+)", "$2-$1"))
+
+    // Empty matches right after a match are found too, as in Java.
+    println("a*".r.findAllMatchIn("baaac").map(m => s"${m.start}-${m.end}").mkString(" "))
+    println("(a*)".r.replaceAllIn("baaac", m => s"<${m.group(1)}>"))
+    val words = java.util.regex.Pattern.compile("(?<word>\\w+)").matcher("one two")
+    val sb = new java.lang.StringBuilder()
+    while words.find() do words.appendReplacement(sb, "${word}!")
+    println(words.appendTail(sb))
+    try java.util.regex.Pattern.compile("(")
+    catch case e: java.util.regex.PatternSyntaxException => println(s"${e.getClass.getName} ${e.getPattern}")
