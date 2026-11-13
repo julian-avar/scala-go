@@ -10,7 +10,7 @@ Where the JDK talks to the operating system, javalib calls Go's standard library
 | Package                         | Coverage                                                         |
 |---------------------------------|------------------------------------------------------------------|
 | `java.lang`                     | core classes, `Thread`, `StringBuilder`, `Math`, `System`, `ProcessBuilder` |
-| `java.util`                     | collections, streams, `Optional`, `Random`, `UUID`, `regex` (RE2), `Properties`, `Base64` |
+| `java.util`                     | collections, streams, `Optional`, `Random`, `UUID`, `regex` (RE2), `Formatter`, `Properties`, `Base64` |
 | `java.util.concurrent`          | executors, `ForkJoinPool`, `CompletableFuture`, locks, atomics, concurrent collections |
 | `java.util.function`            | complete                                                         |
 | `java.util.zip`                 | deflate, GZIP, zip files                                         |

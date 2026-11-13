@@ -150,7 +150,7 @@ object Main:
     println(s"${String.join("-", "a", "b", "c")} [${String.join(",")}] ${String.join("/", java.util.List.of("x", "y"))} ${String.join(", ", java.util.Set.of("only"))}")
     println(s"chars ${"héllo".chars().toArray.mkString(",")} sum ${"abc".chars().sum()} count ${"".chars().count()}")
     println(s"codePoints ${"a😀b".codePoints().toArray.mkString(",")} ${"a😀b".chars().count()} ${"a😀b".codePoints().count()}")
-    // String.format's supported subset (Limitations lists the conversions that throw).
+    // String.format (jdk-formatter has the rest).
     println(String.format("%d|%5d|%-5d|%05d|%+d|%x|%X|%o|%s|%10s|%-6s|%S|%c|%b|%b|%%|%.3f|%10.2f|%-8.1f|%e|%.2e|%s", Integer.valueOf(42),
       Integer.valueOf(-7), Integer.valueOf(3), Integer.valueOf(-42), Integer.valueOf(5), Integer.valueOf(255), Integer.valueOf(48879),
       Integer.valueOf(8), "str", "right", "left", "up", Character.valueOf('z'), java.lang.Boolean.TRUE, null, java.lang.Double.valueOf(Math.PI),

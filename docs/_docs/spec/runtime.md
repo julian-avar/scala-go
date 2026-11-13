@@ -198,13 +198,9 @@ that reaches an unimplemented reflective API fails to link, naming the chain of 
 - **Deviation:** there is no locale data. `Locale.getDefault()` is `en_US` regardless of the
   environment, and every locale formats numbers and dates and maps case as `Locale.ROOT`:
   `String.format(Locale.GERMANY, "%.1f", x)` uses `.`.
-- `String.format` supports `%s %d %x %o %f %e %g %c %b %n %%`, widths, precision and the flags
-  `-`, `0`, `+`, space. `%f` and `%e` round as the JDK does. **Deviation:** the `,` flag,
-  argument indices and other conversions throw `IllegalArgumentException` itself, not a subclass
-  such as `UnknownFormatConversionException`. **Deviation (bug):** `%g` drops trailing zeros
-  (`"%g".format(1.0)` is `1`, JDK `1.00000`); `%x` and `%o` of negative numbers print a sign
-  (`-1`, JDK `ffffffff`); `BigInteger` arguments print a Go struct
-  ([Silent wrong output](../contributing/roadmap.md#silent-wrong-output)).
+- `String.format`, `f"..."`, `formatted` and `printf` are `java.util.Formatter`, with the JDK's
+  conversions, flags, argument indices and exceptions. `%t` takes `java.time` values, and `Long`
+  and `Date` in the default time zone (there is no `Calendar`).
 - Charsets: UTF-8 (default), ISO-8859-1 and US-ASCII, with the JDK's malformed-input handling;
   `Charset.isSupported` is `false` for others, and using one throws
   `UnsupportedEncodingException` (by name) or `UnsupportedCharsetException`, as in the JDK.

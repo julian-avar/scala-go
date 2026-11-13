@@ -45,7 +45,15 @@ class FormatterClosedException extends IllegalStateException
 class IllegalFormatCodePointException(private val c: Int)
     extends IllegalFormatException {
   def getCodePoint(): Int = c
-  override def getMessage(): String = s"Code point = $c"
+  override def getMessage(): String = "Code point = 0x" + Integer.toHexString(c)
+}
+
+class IllegalFormatArgumentIndexException private[util] (private val i: Int)
+    extends IllegalFormatException {
+  def getArgIndex(): Int = i
+  override def getMessage(): String =
+    if (i == Int.MinValue) "Format argument index: (not representable as int)"
+    else "Illegal format argument index = " + i
 }
 
 class IllegalFormatConversionException private (private val c: Char)

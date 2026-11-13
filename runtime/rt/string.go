@@ -864,9 +864,3 @@ func StringToUpperCaseLocale(s *String, locale any) *String {
 	}
 	return StringToUpperCase(s)
 }
-
-// StringFormatLocale implements String.format(locale, format, args); a null locale means no
-// localization, which is what every locale gets.
-func StringFormatLocale(_ any, format *String, args *Array[any]) *String {
-	return StringFormat(format, args)
-}

@@ -1,17 +1,3 @@
-%1$s: throws java.lang.IllegalArgumentException: UnknownFormatConversionException: Conversion = '$'
-%s %<s: throws java.lang.IllegalArgumentException: MissingFormatArgumentException: Format specifier '%<'
-%,d: throws java.lang.IllegalArgumentException: UnknownFormatConversionException: Conversion = ','
-%h: throws java.lang.IllegalArgumentException: UnknownFormatConversionException: Conversion = 'h'
-%tY: throws java.lang.IllegalArgumentException: UnknownFormatConversionException: Conversion = 't'
-%a: throws java.lang.IllegalArgumentException: UnknownFormatConversionException: Conversion = 'a'
-%.2f of BigDecimal: throws java.lang.IllegalArgumentException: IllegalFormatConversionException: f != java.math.BigDecimal
-f"$n%,d": throws java.lang.IllegalArgumentException: UnknownFormatConversionException: Conversion = ','
-%x of -1: -1
-%o of -8: -10
-%g of 1.0: 1
-%d of BigInt: &{{{{{[] {} 0}}}} 0 5}
-%d of BigInteger: &{{%!d(bool=false) [5]}}
-%(d: %!((int32=-5)d
 lookahead: throws java.lang.UnsupportedOperationException: unsupported regular expression a(?=b)b: error parsing regexp: invalid or unsupported Perl syntax: `(?=`
 lookbehind: throws java.lang.UnsupportedOperationException: unsupported regular expression a(?<=a)b: error parsing regexp: invalid named capture: `(?<=a)b`
 backreference: throws java.lang.UnsupportedOperationException: unsupported regular expression (a)\1: error parsing regexp: invalid escape sequence: `\1`

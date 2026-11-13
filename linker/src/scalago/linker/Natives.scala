@@ -174,8 +174,6 @@ object Natives:
   staticFn(S, "valueOf([CII)Ljava.lang.String;", "rt.NewStringFromCharRange")
   staticFn(S, "copyValueOf([C)Ljava.lang.String;", "rt.NewStringFromChars")
   for t <- List("Z", "I", "J", "F", "D") do staticFn(S, s"valueOf($t)Ljava.lang.String;", "rt.StringValueOf")
-  staticFn(S, "format(Ljava.lang.String;[Ljava.lang.Object;)Ljava.lang.String;", "rt.StringFormat")
-  staticFn(S, "format(Ljava.util.Locale;Ljava.lang.String;[Ljava.lang.Object;)Ljava.lang.String;", "rt.StringFormatLocale")
   staticFn(S, "join(Ljava.lang.CharSequence;[Ljava.lang.CharSequence;)Ljava.lang.String;", "rt.StringJoin")
   instanceFn(S, "getChars(II[CI)V", "rt.StringGetChars")
   // Charsets are represented by their names (see rt.NewStringFromBytes).
