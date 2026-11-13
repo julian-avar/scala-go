@@ -8,3 +8,4 @@ out/
 .claude/worktrees/
 .direnv/
 result
+.scala-build/
